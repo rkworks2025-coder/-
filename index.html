@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>シートビューア</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="data:application/manifest+json,{}">
+<style>
+  :root { --border:#e7eaf3; --bg:#f6f7fb; --text:#111; --muted:#667; }
+  * { box-sizing: border-box; }
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{position:sticky;top:0;background:#fff;padding:12px 12px 8px;border-bottom:1px solid var(--border);z-index:10}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .tab{padding:6px 12px;border-radius:999px;border:1px solid #d5d9e2;background:#fff;cursor:pointer}
+  .tab.active{background:#111;color:#fff;border-color:#111}
+  .controls{display:flex;gap:8px}
+  .controls input,.controls select{flex:1;padding:10px 12px;border:1px solid #d5d9e2;border-radius:8px;background:#fff}
+  main{padding:12px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,0.03);}
+  .row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .title{font-weight:600}
+  .badge{font-size:12px;background:#eef1f7;border:1px solid #d5d9e2;padding:2px 8px;border-radius:999px}
+  .meta{font-size:13px;color:#555;display:flex;flex-wrap:wrap;gap:10px}
+  .moon{margin-left:6px}
+  footer{padding:16px 12px 36px;color:var(--muted); font-size:12px; text-align:center}
+  .none{opacity:.6}
+</style>
+</head>
+<body>
+<header>
+  <div class="tabs" id="tabs"></div>
+  <div class="controls">
+    <input id="q" placeholder="検索（ST名・車種・登録番号）" />
+    <select id="sort">
+      <option value="date_desc">日付↓</option>
+      <option value="date_asc">日付↑</option>
+      <option value="no_asc">No↑</option>
+      <option value="no_desc">No↓</option>
+    </select>
+  </div>
+</header>
+<main id="list"></main>
+<footer>更新: <span id="updated"></span> ・ ホーム画面に追加でアプリ風に使えます</footer>
+<script>
+const APP_DATA = {"sheets": ["Sheet1"], "records_by_sheet": {"Sheet1": []}, "updated_at": "2025-08-12T17:19:53.521379"};
+
+const tabs = document.getElementById('tabs');
+const list = document.getElementById('list');
+const q = document.getElementById('q');
+const sortSel = document.getElementById('sort');
+const updated = document.getElementById('updated');
+let currentSheet = APP_DATA.sheets[0] || '';
+
+updated.textContent = new Date(APP_DATA.updated_at).toLocaleString();
+
+function renderTabs(){
+  tabs.innerHTML = '';
+  APP_DATA.sheets.forEach(s=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = s;
+    b.className = 'tab' + (s===currentSheet ? ' active':'');
+    b.onclick = ()=>{ currentSheet=s; renderTabs(); renderList(); };
+    tabs.appendChild(b);
+  });
+}
+
+function normalize(v){ return (v??'').toString().trim(); }
+
+function parseDate(s){
+  s = normalize(s);
+  if(!s) return null;
+  const t = Date.parse(s.replace(/年|月/g,'/').replace('日','').replaceAll('.','/'));
+  return isNaN(t) ? null : new Date(t);
+}
+
+function moonIcon(v){
+  v = normalize(v);
+  if(['○','◯','〇','△'].includes(v)) return '🌙';
+  return '';
+}
+
+function compare(a,b, key, asc=true){
+  const va = a[key], vb = b[key];
+  if(va===vb) return 0;
+  if(va===null) return 1;
+  if(vb===null) return -1;
+  return (va>vb?1:-1) * (asc?1:-1);
+}
+
+function renderList(){
+  const kw = q.value.trim();
+  const rows = (APP_DATA.records_by_sheet[currentSheet]||[]).map(r=>{
+    return {
+      dateRaw: normalize(r['日付']),
+      date: parseDate(r['日付']),
+      no: Number(normalize(r['No'])) || null,
+      night: normalize(r['夜']),
+      st: normalize(r['ST名']),
+      car: normalize(r['車種']),
+      plate: normalize(r['登録番号'])
+    };
+  }).filter(r=>{
+    if(!kw) return true;
+    const hay = [r.st, r.car, r.plate, r.dateRaw, String(r.no||'')].join(' ').toLowerCase();
+    return hay.includes(kw.toLowerCase());
+  });
+
+  const mode = sortSel.value;
+  rows.sort((a,b)=>{
+    if(mode==='no_asc') return compare(a,b,'no',true);
+    if(mode==='no_desc') return compare(a,b,'no',false);
+    if(mode==='date_asc') return compare(a,b,'date',true);
+    return compare(a,b,'date',false);
+  });
+
+  list.innerHTML = rows.map(r=>`
+    <div class="card">
+      <div class="row1">
+        <div class="title">${r.st || '(ST未設定)'}</div>
+        <div class="badge">${r.dateRaw || '-'}</div>
+      </div>
+      <div class="meta">
+        <div>No: ${r.no ?? '-'}</div>
+        <div>車種: ${r.car || '-'}</div>
+        <div>登録番号: ${r.plate || '-'}</div>
+        <div class="moon">${moonIcon(r.night)}</div>
+      </div>
+    </div>
+  `).join('') || '<p class="none">データがありません</p>';
+}
+
+q.oninput = renderList;
+sortSel.onchange = renderList;
+
+renderTabs();
+renderList();
+</script>
+</body>
+</html>
