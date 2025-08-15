@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>海老名市 巡回リスト</title>
+
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; margin: 0; background:#f7f7f9; }
+  header { position: sticky; top: 0; background: #fff; padding: 12px 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); display:flex; align-items:center; gap:12px; }
+  header a { text-decoration:none; }
+  .title { font-size: 18px; font-weight: 700; }
+  .sub { color:#666; font-size: 13px; }
+  .container { padding: 16px; }
+  .card { background:#fff; border-radius:12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 14px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; }
+  th { position: sticky; top: 56px; background: #fafafa; z-index: 1; }
+  tr.checked { background: #eaf7ea; }
+  .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#f0f0f5; font-size:12px; }
+  .progress { font-weight:700; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+  .btn { display:inline-block; padding: 8px 12px; border-radius: 10px; background:#f0f2ff; text-decoration:none; }
+  .muted { color:#777; font-size:12px; }
+</style>
+
+
+<script>
+// MM-DD 形式で日付文字列を返す
+function formatDateMMDD(date = new Date()) {
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${m}-${d}`;
+}
+
+// 都市ページ：チェック状態を読み書きするキー
+function makeKey(city, reg) {
+  return `巡回チェック:${city}:${reg}`;
+}
+
+// 行を適用
+function applyRowState(tr, city, reg) {
+  const key = makeKey(city, reg);
+  const saved = localStorage.getItem(key);
+  const checkbox = tr.querySelector('input[type="checkbox"]');
+  const dateCell = tr.querySelector('.date-cell');
+  if (saved) {
+    checkbox.checked = true;
+    tr.classList.add('checked');
+    dateCell.textContent = saved;
+  } else {
+    checkbox.checked = false;
+    tr.classList.remove('checked');
+    dateCell.textContent = '';
+  }
+}
+
+// 都市ページ：進捗更新
+function updateProgress(city) {
+  const rows = Array.from(document.querySelectorAll('tbody tr'));
+  const total = rows.length;
+  const done = rows.filter(r => r.classList.contains('checked')).length;
+  const percent = total ? Math.round(done * 100 / total) : 0;
+  document.querySelector('#progress').textContent = `${done}/${total}（${percent}%）`;
+}
+
+// 都市ページ：初期化
+function initCityPage(city) {
+  // 既存状態を反映
+  document.querySelectorAll('tbody tr').forEach(tr => {
+    const reg = tr.dataset.reg;
+    applyRowState(tr, city, reg);
+  });
+  updateProgress(city);
+
+  // 変更イベント
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const tr = e.target.closest('tr');
+      const reg = tr.dataset.reg;
+      const key = makeKey(city, reg);
+      const dateCell = tr.querySelector('.date-cell');
+
+      const proceed = confirm('よろしいですか？');
+      if (!proceed) {
+        e.target.checked = !e.target.checked; // 元に戻す
+        return;
+      }
+      if (e.target.checked) {
+        const mmdd = formatDateMMDD();
+        localStorage.setItem(key, mmdd);
+        tr.classList.add('checked');
+        dateCell.textContent = mmdd;
+      } else {
+        localStorage.removeItem(key);
+        tr.classList.remove('checked');
+        dateCell.textContent = '';
+      }
+      updateProgress(city);
+      // 全体進捗を更新（index側で再読込時に反映される想定）
+    });
+  });
+}
+
+// Index：全都市の進捗算出
+function computeCityProgress(city, regs) {
+  let done = 0;
+  regs.forEach(reg => {
+    const key = makeKey(city, reg);
+    if (localStorage.getItem(key)) done++;
+  });
+  const total = regs.length;
+  const percent = total ? Math.round(done * 100 / total) : 0;
+  return { done, total, percent };
+}
+
+</script>
+
+<body onload="initCityPage('海老名市')">
+<header>
+  <a class="btn" href="index.html">← インデックス</a>
+  <div>
+    <div class="title">海老名市 巡回リスト</div>
+    <div class="sub">チェックで背景色変更／列2にMM-DD表示</div>
+  </div>
+  <div style="margin-left:auto" class="badge">進捗 <span id="progress" class="progress"></span></div>
+</header>
+<div class="container">
+  <div class="card" style="overflow:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>✔</th>
+          <th>日付</th>
+          <th>ステーション名</th>
+          <th>車種名</th>
+          <th>登録番号</th>
+          <th>所在地</th>
+          <th>備考</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr data-reg="相模501ワ8181">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8181"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅前第２</td>
+          <td>ﾌﾘｰﾄﾞ 1500</td>
+          <td>相模501ワ8181</td>
+          <td>海老名市めぐみ町5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6814">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6814"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅前第２</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ6814</td>
+          <td>海老名市めぐみ町5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5668">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5668"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅前第２</td>
+          <td>CX-30 2000ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模300ワ5668</td>
+          <td>海老名市めぐみ町5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8127">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8127"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅前第２</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ8127</td>
+          <td>海老名市めぐみ町5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7594">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7594"></td>
+          <td class="date-cell"></td>
+          <td>小田急厚木第１駐車場（小田急）</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ7594</td>
+          <td>海老名市河原口1-26</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7277">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7277"></td>
+          <td class="date-cell"></td>
+          <td>小田急厚木第１駐車場（小田急）</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ7277</td>
+          <td>海老名市河原口1-26</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8033">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8033"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名河原口</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8033</td>
+          <td>海老名市河原口1409</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5603">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5603"></td>
+          <td class="date-cell"></td>
+          <td>ロイヤルプラザ海老名駐車場</td>
+          <td>ﾉｱ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ5603</td>
+          <td>海老名市国分北1-4</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6239">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6239"></td>
+          <td class="date-cell"></td>
+          <td>ロイヤルプラザ海老名駐車場</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ6239</td>
+          <td>海老名市国分北1-4</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5604">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5604"></td>
+          <td class="date-cell"></td>
+          <td>ロイヤルプラザ海老名駐車場</td>
+          <td>ｵｰﾗ e-POWER</td>
+          <td>相模300ワ5604</td>
+          <td>海老名市国分北1-4</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7298">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7298"></td>
+          <td class="date-cell"></td>
+          <td>ロイヤルプラザ海老名駐車場</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ7298</td>
+          <td>海老名市国分北1-4</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5827">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5827"></td>
+          <td class="date-cell"></td>
+          <td>ロイヤルプラザ海老名駐車場</td>
+          <td>ﾌﾟﾘｳｽ 1800</td>
+          <td>相模300ワ5827</td>
+          <td>海老名市国分北1-4</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ6044">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ6044"></td>
+          <td class="date-cell"></td>
+          <td>ロイヤルプラザ海老名駐車場</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ6044</td>
+          <td>海老名市国分北1-4</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ4011">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ4011"></td>
+          <td class="date-cell"></td>
+          <td>海老名国分北２丁目</td>
+          <td>ﾊｽﾗｰ 660</td>
+          <td>相模580ワ4011</td>
+          <td>海老名市国分北2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8910">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8910"></td>
+          <td class="date-cell"></td>
+          <td>マハロ壱番館</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8910</td>
+          <td>海老名市上郷1-26</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4926">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4926"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第３</td>
+          <td>ﾉｱ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ4926</td>
+          <td>海老名市上郷862</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4508">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4508"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第３</td>
+          <td>CX-30 2000</td>
+          <td>相模300ワ4508</td>
+          <td>海老名市上郷862</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ3114">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ3114"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第３</td>
+          <td>ﾊｽﾗｰ 660</td>
+          <td>相模580ワ3114</td>
+          <td>海老名市上郷862</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4907">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4907"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第３</td>
+          <td>CX-5 2000</td>
+          <td>相模300ワ4907</td>
+          <td>海老名市上郷862</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7816">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7816"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第３</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ7816</td>
+          <td>海老名市上郷862</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8184">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8184"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第３</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ8184</td>
+          <td>海老名市上郷862</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ3376">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ3376"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第３</td>
+          <td>ﾊｽﾗｰ 660</td>
+          <td>相模580ワ3376</td>
+          <td>海老名市上郷862</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7095">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7095"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第２</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ7095</td>
+          <td>海老名市扇町12</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9444">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9444"></td>
+          <td class="date-cell"></td>
+          <td>扇町見世ビル</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9444</td>
+          <td>海老名市扇町5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7864">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7864"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名駅西口第４</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ7864</td>
+          <td>海老名市扇町8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5328">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5328"></td>
+          <td class="date-cell"></td>
+          <td>海老名駅西口（ＥＶ）</td>
+          <td>ﾘｰﾌ</td>
+          <td>相模300ワ5328</td>
+          <td>海老名市泉1-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7611">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7611"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名泉</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ7611</td>
+          <td>海老名市泉2-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4912">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4912"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名泉</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ4912</td>
+          <td>海老名市泉2-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9383">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9383"></td>
+          <td class="date-cell"></td>
+          <td>セントガーデン海老名＿限定</td>
+          <td>ｼｴﾝﾀ ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ9383</td>
+          <td>海老名市泉2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9403">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9403"></td>
+          <td class="date-cell"></td>
+          <td>セントガーデン海老名＿限定</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ9403</td>
+          <td>海老名市泉2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7924">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7924"></td>
+          <td class="date-cell"></td>
+          <td>タイムズビナフロント</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ7924</td>
+          <td>海老名市中央1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5975">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5975"></td>
+          <td class="date-cell"></td>
+          <td>タイムズビナフロント</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ5975</td>
+          <td>海老名市中央1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7911">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7911"></td>
+          <td class="date-cell"></td>
+          <td>タイムズビナフロント</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ7911</td>
+          <td>海老名市中央1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7040">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7040"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央公園地下</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ7040</td>
+          <td>海老名市中央1-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8985">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8985"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央公園地下</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ8985</td>
+          <td>海老名市中央1-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6811">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6811"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央公園地下</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ6811</td>
+          <td>海老名市中央1-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7065">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7065"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央公園地下</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ7065</td>
+          <td>海老名市中央1-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5669">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5669"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央公園地下（ＥＶ）</td>
+          <td>ﾘｰﾌ</td>
+          <td>相模300ワ5669</td>
+          <td>海老名市中央1-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8018">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8018"></td>
+          <td class="date-cell"></td>
+          <td>クラウンハイツ海老名</td>
+          <td>ｽｲﾌﾄ 1200以上</td>
+          <td>相模501ワ8018</td>
+          <td>海老名市中央2-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7250">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7250"></td>
+          <td class="date-cell"></td>
+          <td>クラウンハイツ海老名</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ7250</td>
+          <td>海老名市中央2-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8977">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8977"></td>
+          <td class="date-cell"></td>
+          <td>クラウンハイツ海老名</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ8977</td>
+          <td>海老名市中央2-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6185">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6185"></td>
+          <td class="date-cell"></td>
+          <td>スターバックスコーヒー海老名中央店</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ6185</td>
+          <td>海老名市中央2-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7312">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7312"></td>
+          <td class="date-cell"></td>
+          <td>スターバックスコーヒー海老名中央店</td>
+          <td>ｽｲﾌﾄ 1200以上</td>
+          <td>相模501ワ7312</td>
+          <td>海老名市中央2-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9089">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9089"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ9089</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8863">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8863"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ8863</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8028">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8028"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ﾌﾘｰﾄﾞ 1500</td>
+          <td>相模501ワ8028</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7819">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7819"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ7819</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6815">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6815"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ﾌｨｯﾄ 1300</td>
+          <td>相模501ワ6815</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8851">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8851"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ8851</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6369">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6369"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ6369</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5990">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5990"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ﾌﾘｰﾄﾞ 1500</td>
+          <td>相模501ワ5990</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6041">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6041"></td>
+          <td class="date-cell"></td>
+          <td>イオン海老名ショッピングセンターＧ</td>
+          <td>ﾌｨｯﾄ 1300</td>
+          <td>相模501ワ6041</td>
+          <td>海老名市中央2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ2448">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ2448"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央第６</td>
+          <td>N BOX</td>
+          <td>相模580ワ2448</td>
+          <td>海老名市中央2-6</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8185">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8185"></td>
+          <td class="date-cell"></td>
+          <td>海老名駅前第３</td>
+          <td>ﾌﾘｰﾄﾞ 1500</td>
+          <td>相模501ワ8185</td>
+          <td>海老名市中央3-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8250">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8250"></td>
+          <td class="date-cell"></td>
+          <td>海老名駅前第３</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ8250</td>
+          <td>海老名市中央3-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9122">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9122"></td>
+          <td class="date-cell"></td>
+          <td>海老名市中央３丁目</td>
+          <td>ﾌｨｯﾄ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ9122</td>
+          <td>海老名市中央3-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9608">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9608"></td>
+          <td class="date-cell"></td>
+          <td>海老名市中央３丁目</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9608</td>
+          <td>海老名市中央3-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7308">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7308"></td>
+          <td class="date-cell"></td>
+          <td>海老名市中央３丁目</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ7308</td>
+          <td>海老名市中央3-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ3039">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ3039"></td>
+          <td class="date-cell"></td>
+          <td>海老名市中央３丁目</td>
+          <td>ﾊｽﾗｰ 660</td>
+          <td>相模580ワ3039</td>
+          <td>海老名市中央3-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8357">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8357"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央第４</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ8357</td>
+          <td>海老名市中央3-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8370">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8370"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ海老名中央第４</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ8370</td>
+          <td>海老名市中央3-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5939">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5939"></td>
+          <td class="date-cell"></td>
+          <td>ＵＲえびな団地</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ5939</td>
+          <td>海老名市中新田2-8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ4015">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ4015"></td>
+          <td class="date-cell"></td>
+          <td>厚木第２駐車場（小田急）</td>
+          <td>ﾊｽﾗｰ 660</td>
+          <td>相模580ワ4015</td>
+          <td>海老名市中新田2-8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9095">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9095"></td>
+          <td class="date-cell"></td>
+          <td>厚木第２駐車場（小田急）</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ9095</td>
+          <td>海老名市中新田2-8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8186">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8186"></td>
+          <td class="date-cell"></td>
+          <td>厚木第２駐車場（小田急）</td>
+          <td>ｽｲﾌﾄ 1200以上</td>
+          <td>相模501ワ8186</td>
+          <td>海老名市中新田2-8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5731">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5731"></td>
+          <td class="date-cell"></td>
+          <td>厚木第２駐車場（小田急）</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ5731</td>
+          <td>海老名市中新田2-8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5908">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5908"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ東柏ケ谷</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ5908</td>
+          <td>海老名市東柏ケ谷1-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8015">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8015"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ東柏ケ谷</td>
+          <td>ﾌｨｯﾄ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8015</td>
+          <td>海老名市東柏ケ谷1-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ6071">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ6071"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ東柏ケ谷</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ6071</td>
+          <td>海老名市東柏ケ谷1-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ6041">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ6041"></td>
+          <td class="date-cell"></td>
+          <td>ＰーＲＥＸさがみ野駐車場</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ6041</td>
+          <td>海老名市東柏ケ谷2-28</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8520">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8520"></td>
+          <td class="date-cell"></td>
+          <td>ＰーＲＥＸさがみ野駐車場</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8520</td>
+          <td>海老名市東柏ケ谷2-28</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5854">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5854"></td>
+          <td class="date-cell"></td>
+          <td>ＰーＲＥＸさがみ野駐車場</td>
+          <td>MAZDA3 5HB 1500</td>
+          <td>相模300ワ5854</td>
+          <td>海老名市東柏ケ谷2-28</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8152">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8152"></td>
+          <td class="date-cell"></td>
+          <td>さがみ野駅南口（屋上）</td>
+          <td>ｽｲﾌﾄ 1200以上</td>
+          <td>相模501ワ8152</td>
+          <td>海老名市東柏ケ谷2-29</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9335">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9335"></td>
+          <td class="date-cell"></td>
+          <td>さがみ野駅南口（屋上）</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ9335</td>
+          <td>海老名市東柏ケ谷2-29</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8626">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8626"></td>
+          <td class="date-cell"></td>
+          <td>さがみ野駅南口（屋上）</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ8626</td>
+          <td>海老名市東柏ケ谷2-29</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8198">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8198"></td>
+          <td class="date-cell"></td>
+          <td>さがみ野駅南口（屋上）</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ8198</td>
+          <td>海老名市東柏ケ谷2-29</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7147">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7147"></td>
+          <td class="date-cell"></td>
+          <td>さがみ野駅南口（屋上）</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ7147</td>
+          <td>海老名市東柏ケ谷2-29</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9288">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9288"></td>
+          <td class="date-cell"></td>
+          <td>タイムズさがみ野相鉄ライフ第２</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9288</td>
+          <td>海老名市東柏ケ谷3-12</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5976">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5976"></td>
+          <td class="date-cell"></td>
+          <td>タイムズさがみ野相鉄ライフ第２</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ5976</td>
+          <td>海老名市東柏ケ谷3-12</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9283">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9283"></td>
+          <td class="date-cell"></td>
+          <td>タイムズさがみ野相鉄ライフ第２</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9283</td>
+          <td>海老名市東柏ケ谷3-12</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5174">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5174"></td>
+          <td class="date-cell"></td>
+          <td>Ｎ－ｓｔａｇｅかしわ台</td>
+          <td>C-HRﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模300ワ5174</td>
+          <td>海老名市柏ケ谷 1133</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4680">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4680"></td>
+          <td class="date-cell"></td>
+          <td>タイムズかしわ台第３</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ4680</td>
+          <td>海老名市柏ケ谷555</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5721">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5721"></td>
+          <td class="date-cell"></td>
+          <td>タイムズかしわ台第３</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ5721</td>
+          <td>海老名市柏ケ谷555</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5783">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5783"></td>
+          <td class="date-cell"></td>
+          <td>タイムズかしわ台第３</td>
+          <td>ﾗｲｽﾞ 1000</td>
+          <td>相模501ワ5783</td>
+          <td>海老名市柏ケ谷555</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4782">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4782"></td>
+          <td class="date-cell"></td>
+          <td>タイムズかしわ台第３</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ4782</td>
+          <td>海老名市柏ケ谷555</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5332">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5332"></td>
+          <td class="date-cell"></td>
+          <td>かしわ台駅前</td>
+          <td>ｵｰﾗ e-POWER</td>
+          <td>相模300ワ5332</td>
+          <td>海老名市柏ケ谷640</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8150">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8150"></td>
+          <td class="date-cell"></td>
+          <td>かしわ台駅前</td>
+          <td>ｽｲﾌﾄ 1200以上</td>
+          <td>相模501ワ8150</td>
+          <td>海老名市柏ケ谷640</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ6019">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ6019"></td>
+          <td class="date-cell"></td>
+          <td>相鉄柏ケ谷月極パーキング</td>
+          <td>MAZDA3 5HB 1500</td>
+          <td>相模300ワ6019</td>
+          <td>海老名市柏ケ谷706</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9310">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9310"></td>
+          <td class="date-cell"></td>
+          <td>見上駐車場</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ9310</td>
+          <td>海老名市柏ケ谷865</td>
+          <td></td>
+        </tr>
+        
+      </tbody>
+    </table>
+    <div class="muted" style="margin-top:8px;">※ チェック・解除時は「よろしいですか？」の確認ダイアログを表示します。</div>
+  </div>
+</div>
+</body>
+</html>

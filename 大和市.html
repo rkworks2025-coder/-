@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大和市 巡回リスト</title>
+
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; margin: 0; background:#f7f7f9; }
+  header { position: sticky; top: 0; background: #fff; padding: 12px 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); display:flex; align-items:center; gap:12px; }
+  header a { text-decoration:none; }
+  .title { font-size: 18px; font-weight: 700; }
+  .sub { color:#666; font-size: 13px; }
+  .container { padding: 16px; }
+  .card { background:#fff; border-radius:12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 14px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; }
+  th { position: sticky; top: 56px; background: #fafafa; z-index: 1; }
+  tr.checked { background: #eaf7ea; }
+  .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#f0f0f5; font-size:12px; }
+  .progress { font-weight:700; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+  .btn { display:inline-block; padding: 8px 12px; border-radius: 10px; background:#f0f2ff; text-decoration:none; }
+  .muted { color:#777; font-size:12px; }
+</style>
+
+
+<script>
+// MM-DD 形式で日付文字列を返す
+function formatDateMMDD(date = new Date()) {
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${m}-${d}`;
+}
+
+// 都市ページ：チェック状態を読み書きするキー
+function makeKey(city, reg) {
+  return `巡回チェック:${city}:${reg}`;
+}
+
+// 行を適用
+function applyRowState(tr, city, reg) {
+  const key = makeKey(city, reg);
+  const saved = localStorage.getItem(key);
+  const checkbox = tr.querySelector('input[type="checkbox"]');
+  const dateCell = tr.querySelector('.date-cell');
+  if (saved) {
+    checkbox.checked = true;
+    tr.classList.add('checked');
+    dateCell.textContent = saved;
+  } else {
+    checkbox.checked = false;
+    tr.classList.remove('checked');
+    dateCell.textContent = '';
+  }
+}
+
+// 都市ページ：進捗更新
+function updateProgress(city) {
+  const rows = Array.from(document.querySelectorAll('tbody tr'));
+  const total = rows.length;
+  const done = rows.filter(r => r.classList.contains('checked')).length;
+  const percent = total ? Math.round(done * 100 / total) : 0;
+  document.querySelector('#progress').textContent = `${done}/${total}（${percent}%）`;
+}
+
+// 都市ページ：初期化
+function initCityPage(city) {
+  // 既存状態を反映
+  document.querySelectorAll('tbody tr').forEach(tr => {
+    const reg = tr.dataset.reg;
+    applyRowState(tr, city, reg);
+  });
+  updateProgress(city);
+
+  // 変更イベント
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const tr = e.target.closest('tr');
+      const reg = tr.dataset.reg;
+      const key = makeKey(city, reg);
+      const dateCell = tr.querySelector('.date-cell');
+
+      const proceed = confirm('よろしいですか？');
+      if (!proceed) {
+        e.target.checked = !e.target.checked; // 元に戻す
+        return;
+      }
+      if (e.target.checked) {
+        const mmdd = formatDateMMDD();
+        localStorage.setItem(key, mmdd);
+        tr.classList.add('checked');
+        dateCell.textContent = mmdd;
+      } else {
+        localStorage.removeItem(key);
+        tr.classList.remove('checked');
+        dateCell.textContent = '';
+      }
+      updateProgress(city);
+      // 全体進捗を更新（index側で再読込時に反映される想定）
+    });
+  });
+}
+
+// Index：全都市の進捗算出
+function computeCityProgress(city, regs) {
+  let done = 0;
+  regs.forEach(reg => {
+    const key = makeKey(city, reg);
+    if (localStorage.getItem(key)) done++;
+  });
+  const total = regs.length;
+  const percent = total ? Math.round(done * 100 / total) : 0;
+  return { done, total, percent };
+}
+
+</script>
+
+<body onload="initCityPage('大和市')">
+<header>
+  <a class="btn" href="index.html">← インデックス</a>
+  <div>
+    <div class="title">大和市 巡回リスト</div>
+    <div class="sub">チェックで背景色変更／列2にMM-DD表示</div>
+  </div>
+  <div style="margin-left:auto" class="badge">進捗 <span id="progress" class="progress"></span></div>
+</header>
+<div class="container">
+  <div class="card" style="overflow:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>✔</th>
+          <th>日付</th>
+          <th>ステーション名</th>
+          <th>車種名</th>
+          <th>登録番号</th>
+          <th>所在地</th>
+          <th>備考</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr data-reg="相模501ワ6171">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6171"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ高座渋谷駅前第２</td>
+          <td>ﾙｰﾐｰ 1000</td>
+          <td>相模501ワ6171</td>
+          <td>大和市下和田1159</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7871">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7871"></td>
+          <td class="date-cell"></td>
+          <td>イオン大和ショッピングセンター第３</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ7871</td>
+          <td>大和市下和田1216</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7546">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7546"></td>
+          <td class="date-cell"></td>
+          <td>イオン大和ショッピングセンター第３</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ7546</td>
+          <td>大和市下和田1216</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ3097">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ3097"></td>
+          <td class="date-cell"></td>
+          <td>イオン大和ショッピングセンター第３</td>
+          <td>N BOX</td>
+          <td>相模580ワ3097</td>
+          <td>大和市下和田1216</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ6124">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ6124"></td>
+          <td class="date-cell"></td>
+          <td>下和田駐車場</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ6124</td>
+          <td>大和市下和田983</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ6039">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ6039"></td>
+          <td class="date-cell"></td>
+          <td>Ｂ・Ｈパーキング</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ6039</td>
+          <td>大和市渋谷6-19</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4776">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4776"></td>
+          <td class="date-cell"></td>
+          <td>Ｂ・Ｈパーキング</td>
+          <td>MAZDA3 5HB 1500</td>
+          <td>相模300ワ4776</td>
+          <td>大和市渋谷6-19</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8699">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8699"></td>
+          <td class="date-cell"></td>
+          <td>上草柳駐車場</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ8699</td>
+          <td>大和市上草柳7-10</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8158">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8158"></td>
+          <td class="date-cell"></td>
+          <td>ギャザーコート１ＳＴ</td>
+          <td>ﾌｨｯﾄ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8158</td>
+          <td>大和市上草柳7-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7589">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7589"></td>
+          <td class="date-cell"></td>
+          <td>上和田月極駐車場</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ7589</td>
+          <td>大和市上和田 1790</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7590">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7590"></td>
+          <td class="date-cell"></td>
+          <td>上和田月極駐車場</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ7590</td>
+          <td>大和市上和田 1790</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7810">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7810"></td>
+          <td class="date-cell"></td>
+          <td>深見西１丁目</td>
+          <td>ｽｲﾌﾄ 1200以上</td>
+          <td>相模501ワ7810</td>
+          <td>大和市深見西1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5415">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5415"></td>
+          <td class="date-cell"></td>
+          <td>深見西１丁目</td>
+          <td>C-HRﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模300ワ5415</td>
+          <td>大和市深見西1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5170">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5170"></td>
+          <td class="date-cell"></td>
+          <td>深見西１丁目</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ5170</td>
+          <td>大和市深見西1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9437">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9437"></td>
+          <td class="date-cell"></td>
+          <td>ラークヴィラ</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9437</td>
+          <td>大和市深見西1-4</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6404">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6404"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和深見西</td>
+          <td>ﾙｰﾐｰ 1000</td>
+          <td>相模501ワ6404</td>
+          <td>大和市深見西2-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5882">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5882"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和深見西</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ5882</td>
+          <td>大和市深見西2-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6029">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6029"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和深見西</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ6029</td>
+          <td>大和市深見西2-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4332">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4332"></td>
+          <td class="date-cell"></td>
+          <td>大和深見台１丁目</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ4332</td>
+          <td>大和市深見台1-1172</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5304">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5304"></td>
+          <td class="date-cell"></td>
+          <td>大和深見台１丁目</td>
+          <td>C-HRﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模300ワ5304</td>
+          <td>大和市深見台1-1172</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5774">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5774"></td>
+          <td class="date-cell"></td>
+          <td>深見台１丁目第２</td>
+          <td>MAZDA3 5HB 1500</td>
+          <td>相模300ワ5774</td>
+          <td>大和市深見台1-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9194">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9194"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和東第３</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ9194</td>
+          <td>大和市大和東1-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8077">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8077"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和東第３</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ8077</td>
+          <td>大和市大和東1-11</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6630">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6630"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和駅前第２</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ6630</td>
+          <td>大和市大和東1-7</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8862">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8862"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和駅前第２</td>
+          <td>ｼｴﾝﾀ ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8862</td>
+          <td>大和市大和東1-7</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ4024">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ4024"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ相鉄大和第３</td>
+          <td>ﾊｽﾗｰ 660</td>
+          <td>相模580ワ4024</td>
+          <td>大和市大和東1-8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7725">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7725"></td>
+          <td class="date-cell"></td>
+          <td>アーバン長窪</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ7725</td>
+          <td>大和市大和東1-9</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7947">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7947"></td>
+          <td class="date-cell"></td>
+          <td>テーエス駐車場</td>
+          <td>ｿﾘｵ 1200</td>
+          <td>相模501ワ7947</td>
+          <td>大和市大和東2-10</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8451">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8451"></td>
+          <td class="date-cell"></td>
+          <td>テーエス駐車場</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8451</td>
+          <td>大和市大和東2-10</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6843">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6843"></td>
+          <td class="date-cell"></td>
+          <td>大和東公園</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ6843</td>
+          <td>大和市大和東2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7293">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7293"></td>
+          <td class="date-cell"></td>
+          <td>大和東公園</td>
+          <td>ﾙｰﾐｰ 1000</td>
+          <td>相模501ワ7293</td>
+          <td>大和市大和東2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ6189">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ6189"></td>
+          <td class="date-cell"></td>
+          <td>大和東公園</td>
+          <td>MAZDA3 5HB 1500</td>
+          <td>相模300ワ6189</td>
+          <td>大和市大和東2-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8272">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8272"></td>
+          <td class="date-cell"></td>
+          <td>リリーガーデン</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ8272</td>
+          <td>大和市大和東3-13</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8625">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8625"></td>
+          <td class="date-cell"></td>
+          <td>大和南１丁目月極</td>
+          <td>ﾌｨｯﾄ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8625</td>
+          <td>大和市大和南1-16</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8034">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8034"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和南第３</td>
+          <td>ﾙｰﾐｰ 1000</td>
+          <td>相模501ワ8034</td>
+          <td>大和市大和南1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6819">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6819"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和南第５</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ6819</td>
+          <td>大和市大和南1-7</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7772">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7772"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和駅前第５</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ7772</td>
+          <td>大和市中央1-1</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5566">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5566"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和駅前第３</td>
+          <td>ﾉｱ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ5566</td>
+          <td>大和市中央1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8779">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8779"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和駅前第３</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ8779</td>
+          <td>大和市中央1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8270">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8270"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和駅前第３</td>
+          <td>ﾌﾘｰﾄﾞ 1500</td>
+          <td>相模501ワ8270</td>
+          <td>大和市中央1-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9375">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9375"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ小田急大和第２</td>
+          <td>ｽｲﾌﾄ 1200ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ9375</td>
+          <td>大和市中央1-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ3578">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ3578"></td>
+          <td class="date-cell"></td>
+          <td>山口第１駐車場</td>
+          <td>ﾙｰｸｽ</td>
+          <td>相模580ワ3578</td>
+          <td>大和市中央3-7</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ3236">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ3236"></td>
+          <td class="date-cell"></td>
+          <td>山口第１駐車場</td>
+          <td>ﾙｰｸｽ</td>
+          <td>相模580ワ3236</td>
+          <td>大和市中央3-7</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9233">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9233"></td>
+          <td class="date-cell"></td>
+          <td>山口第５駐車場</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ9233</td>
+          <td>大和市中央3-8</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5652">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5652"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和徳洲会病院</td>
+          <td>CX-30 2000ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模300ワ5652</td>
+          <td>大和市中央4-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ5331">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ5331"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和徳洲会病院</td>
+          <td>ｵｰﾗ e-POWER</td>
+          <td>相模300ワ5331</td>
+          <td>大和市中央4-5</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9101">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9101"></td>
+          <td class="date-cell"></td>
+          <td>中央１号公園前</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9101</td>
+          <td>大和市中央5-14</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8234">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8234"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和中央第４</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ8234</td>
+          <td>大和市中央5-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ5884">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ5884"></td>
+          <td class="date-cell"></td>
+          <td>セソンレオ</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ5884</td>
+          <td>大和市中央5-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模300ワ4779">
+          <td><input type="checkbox" aria-label="チェック 相模300ワ4779"></td>
+          <td class="date-cell"></td>
+          <td>セソンレオ</td>
+          <td>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模300ワ4779</td>
+          <td>大和市中央5-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模580ワ3324">
+          <td><input type="checkbox" aria-label="チェック 相模580ワ3324"></td>
+          <td class="date-cell"></td>
+          <td>大和市中央５丁目３</td>
+          <td>ワｺﾞﾝRｽﾏｲﾙ 660</td>
+          <td>相模580ワ3324</td>
+          <td>大和市中央5-3</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8078">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8078"></td>
+          <td class="date-cell"></td>
+          <td>大和市中央５丁目</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8078</td>
+          <td>大和市中央5-453</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7865">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7865"></td>
+          <td class="date-cell"></td>
+          <td>大和市中央７丁目</td>
+          <td>ﾗｲｽﾞ 1000</td>
+          <td>相模501ワ7865</td>
+          <td>大和市中央7-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9395">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9395"></td>
+          <td class="date-cell"></td>
+          <td>大和市中央７丁目</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9395</td>
+          <td>大和市中央7-2</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9248">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9248"></td>
+          <td class="date-cell"></td>
+          <td>ウイングヤマシタ</td>
+          <td>ﾗｲｽﾞ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9248</td>
+          <td>大和市福田2590</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9121">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9121"></td>
+          <td class="date-cell"></td>
+          <td>ウイングヤマシタ</td>
+          <td>MAZDA2 1500</td>
+          <td>相模501ワ9121</td>
+          <td>大和市福田2590</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ8925">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ8925"></td>
+          <td class="date-cell"></td>
+          <td>スクエアパーキング</td>
+          <td>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</td>
+          <td>相模501ワ8925</td>
+          <td>大和市福田5528</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ7781">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ7781"></td>
+          <td class="date-cell"></td>
+          <td>桜ヶ丘パーキング</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ7781</td>
+          <td>大和市福田5531</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ9446">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ9446"></td>
+          <td class="date-cell"></td>
+          <td>桜ヶ丘パーキング</td>
+          <td>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</td>
+          <td>相模501ワ9446</td>
+          <td>大和市福田5531</td>
+          <td></td>
+        </tr>
+        
+
+        <tr data-reg="相模501ワ6380">
+          <td><input type="checkbox" aria-label="チェック 相模501ワ6380"></td>
+          <td class="date-cell"></td>
+          <td>タイムズ大和柳橋</td>
+          <td>ﾉｰﾄ 1200 e-POWER</td>
+          <td>相模501ワ6380</td>
+          <td>大和市柳橋3-11</td>
+          <td></td>
+        </tr>
+        
+      </tbody>
+    </table>
+    <div class="muted" style="margin-top:8px;">※ チェック・解除時は「よろしいですか？」の確認ダイアログを表示します。</div>
+  </div>
+</div>
+</body>
+</html>
