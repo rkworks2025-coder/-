@@ -1203,7 +1203,7 @@
 </main>
 
 <script>
-function goBack(e){ e.preventDefault(); location.href='index06.html'; return false; }
+function goBack(e){ e.preventDefault(); location.href="index.html"; return false; }
 function mmdd(){
   const d=new Date(); const m=('0'+(d.getMonth()+1)).slice(-2); const day=('0'+d.getDate()).slice(-2); return m+'-'+day;
 }
@@ -1233,7 +1233,7 @@ function updateCount(city){
   const cards = Array.from(document.querySelectorAll('.card'));
   const total = cards.length;
   const done = cards.filter(c=>c.classList.contains('checked')).length;
-  document.getElementById('count').textContent = done + 'index.html' + total;
+  document.getElementById('count').textContent = done + "/" + total;
 }
 function attachHandlers(city){
   document.querySelectorAll('.card').forEach((card,idx)=>{
