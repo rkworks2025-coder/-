@@ -33,7 +33,7 @@
 </style>
 
 <header>
-  <a class="back" href="index06.html" onclick="return goBack(event)">戻る</a>
+  <a class="back" href="/rkworks2025-coder/index.html" onclick="return goBack(event)">戻る</a>
   <h1 style="writing-mode:horizontal-tb; text-orientation:mixed; white-space:nowrap;">大和市 巡回</h1>
   <span class="count" id="count">0/60</span>
 </header>
@@ -826,7 +826,7 @@
 </main>
 
 <script>
-function goBack(e){ e.preventDefault(); location.href='index06.html'; return false; }
+function goBack(e){ e.preventDefault(); location.href="/rkworks2025-coder/index.html"; return false; }
 function mmdd(){
   const d=new Date(); const m=('0'+(d.getMonth()+1)).slice(-2); const day=('0'+d.getDate()).slice(-2); return m+'-'+day;
 }
