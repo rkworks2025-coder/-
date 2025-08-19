@@ -39,6 +39,7 @@
 </header>
 <main>
   <div class="toolbar">
+    <span class="pill" onclick="exportCheckedCSV()">エクスポート(CSV)</span>
     <span class="pill" onclick="checkAll()">全てチェック</span>
     <span class="pill" onclick="uncheckAll()">全て外す</span>
     <span class="pill danger" onclick="clearAll()">リセット</span>
@@ -1203,6 +1204,30 @@
 </main>
 
 <script>
+const CITY_NAME = '海老名市';
+
+function exportCheckedCSV(){
+  const rows = [];
+  rows.push(['市区町村','インデックス','ステーション名','車種等','登録番号','チェック日'].join(','));
+  const cards = Array.from(document.querySelectorAll('.card'));
+  cards.forEach((card, idx)=>{
+    if(!card.classList.contains('checked')) return;
+    const title = (card.querySelector('.title')?.innerText || '').replace(/\s+/g,' ').trim();
+    const metaLines = Array.from(card.querySelectorAll('.meta .line')).map(el=>el.innerText.replace(/\s+/g,' ').trim());
+    const car = metaLines[0] || '';
+    const plate = metaLines[1] || '';
+    const date = (card.querySelector('.date-badge')?.innerText || '').trim();
+    rows.push([CITY_NAME, idx, title, car, plate, date].map(v=>('"'+String(v).replace(/"/g,'""')+'"')).join(','));
+  });
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = CITY_NAME + '_チェック済み一覧.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 100);
+}
+
 function goBack(e){ e.preventDefault(); location.href='index06.html'; return false; }
 function mmdd(){
   const d=new Date(); const m=('0'+(d.getMonth()+1)).slice(-2); const day=('0'+d.getDate()).slice(-2); return m+'-'+day;
@@ -1272,5 +1297,29 @@ function attachHandlers(city){
 }
 </script>
 
-<script>document.addEventListener('DOMContentLoaded', ()=> attachHandlers('海老名市'));</script>
+<script>
+const CITY_NAME = '海老名市';
+
+function exportCheckedCSV(){
+  const rows = [];
+  rows.push(['市区町村','インデックス','ステーション名','車種等','登録番号','チェック日'].join(','));
+  const cards = Array.from(document.querySelectorAll('.card'));
+  cards.forEach((card, idx)=>{
+    if(!card.classList.contains('checked')) return;
+    const title = (card.querySelector('.title')?.innerText || '').replace(/\s+/g,' ').trim();
+    const metaLines = Array.from(card.querySelectorAll('.meta .line')).map(el=>el.innerText.replace(/\s+/g,' ').trim());
+    const car = metaLines[0] || '';
+    const plate = metaLines[1] || '';
+    const date = (card.querySelector('.date-badge')?.innerText || '').trim();
+    rows.push([CITY_NAME, idx, title, car, plate, date].map(v=>('"'+String(v).replace(/"/g,'""')+'"')).join(','));
+  });
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = CITY_NAME + '_チェック済み一覧.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 100);
+}
+document.addEventListener('DOMContentLoaded', ()=> attachHandlers('海老名市'));</script>
 </html>
