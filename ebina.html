@@ -36,7 +36,7 @@
   <a class="back" href="index06.html" onclick="return goBack(event)">戻る</a>
   <h1 style="writing-mode:horizontal-tb; text-orientation:mixed; white-space:nowrap;">海老名市 巡回</h1>
   <span class="count" id="count">0/89</span>
-<div style="text-align:center;font-size:12px;color:#6b7280;margin-top:-6px;margin-bottom:6px;">日付を編集→ 各行の日付ラベルをタップ</div></header>
+</header>
 <main>
   <div class="toolbar">
     <span class="pill" onclick="checkAll()">全てチェック</span>
@@ -1233,7 +1233,7 @@ function updateCount(city){
   const cards = Array.from(document.querySelectorAll('.card'));
   const total = cards.length;
   const done = cards.filter(c=>c.classList.contains('checked')).length;
-  document.getElementById('count').textContent = done + 'index.html' + total;
+  document.getElementById('count').textContent = done + '/' + total;
 }
 function attachHandlers(city){
   document.querySelectorAll('.card').forEach((card,idx)=>{
