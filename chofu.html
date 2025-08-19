@@ -34,7 +34,7 @@
 
 <header>
   <a class="back" href="index.html" onclick="return goBack(event)">戻る</a>
-  <h1>調布市 巡回</h1>
+  <h1 style="writing-mode:horizontal-tb; text-orientation:mixed; white-space:nowrap;">調布市 巡回</h1>
   <span class="count" id="count">0/54</span>
 <div style="text-align:center;font-size:12px;color:#6b7280;margin-top:-6px;margin-bottom:6px;">日付を編集→ 各行の日付ラベルをタップ</div></header>
 <main>
@@ -695,53 +695,6 @@
 </main>
 
 <script>
-function parseDateInput(s){
-  if(!s) return '';
-  s = s.trim().replace(/[^\d\-\/]/g,'');
-  // allow YYYY-MM-DD or MM-DD or M-D
-  const m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
-  if(m){
-    const mm = ('0'+m[2]).slice(-2), dd=('0'+m[3]).slice(-2);
-    return mm+'-'+dd;
-  }
-  const m2 = s.match(/^(\d{1,2})[\/-](\d{1,2})$/);
-  if(m2){
-    const mm=('0'+m2[1]).slice(-2), dd=('0'+m2[2]).slice(-2);
-    return mm+'-'+dd;
-  }
-  // 4桁連結(0819) or 3-4桁(819)
-  const m3 = s.match(/^(\d{3,4})$/);
-  if(m3){
-    let num = m3[1];
-    if(num.length===3){ num='0'+num; }
-    return num.slice(0,2)+'-'+num.slice(2,4);
-  }
-  return '';
-}
-function editDate(city, idx){
-  const keyStr = key(city, idx);
-  let st = loadCardState(city, idx) || {checked:false, date:''};
-  const current = st.date || '';
-  const input = prompt('日付を入力（MM-DD ／ YYYY-MM-DD ／ 0819）\n空でOK→日付クリア', current);
-  if(input===null) return; // cancel
-  const v = parseDateInput(input);
-  if(input.trim()===''){ // clear
-    st.date='';
-  }else if(v){
-    st.date = v;
-  }else{
-    alert('日付の形式が読めませんでした');
-    return;
-  }
-  // 保存（チェック状態は変更しない）
-  localStorage.setItem(keyStr, JSON.stringify(st));
-  // 画面反映
-  const cards = Array.from(document.querySelectorAll('.card'));
-  const card = cards[idx];
-  applyToCard(card, st);
-  updateCount(city);
-}
-
 function goBack(e){ e.preventDefault(); location.href='index.html'; return false; }
 function mmdd(){
   const d=new Date(); const m=('0'+(d.getMonth()+1)).slice(-2); const day=('0'+d.getDate()).slice(-2); return m+'-'+day;
@@ -756,10 +709,6 @@ function saveCardState(city, idx, checked){
 }
 function applyToCard(card, state){
   const cb = card.querySelector('.chk');
-    const dateEl = card.querySelector('.date-badge');
-    dateEl.style.cursor='pointer';
-    dateEl.title='タップで日付編集';
-    dateEl.addEventListener('click', ()=>editDate(city, idx));
   const dateEl = card.querySelector('.date-badge');
   if(state && state.checked){
     cb.checked = true;
@@ -776,17 +725,13 @@ function updateCount(city){
   const cards = Array.from(document.querySelectorAll('.card'));
   const total = cards.length;
   const done = cards.filter(c=>c.classList.contains('checked')).length;
-  document.getElementById('count').textContent = done + '/' + total;
+  document.getElementById('count').textContent = done + 'index.html' + total;
 }
 function attachHandlers(city){
   document.querySelectorAll('.card').forEach((card,idx)=>{
     const st = loadCardState(city, idx);
     applyToCard(card, st);
     const cb = card.querySelector('.chk');
-    const dateEl = card.querySelector('.date-badge');
-    dateEl.style.cursor='pointer';
-    dateEl.title='タップで日付編集';
-    dateEl.addEventListener('click', ()=>editDate(city, idx));
     cb.addEventListener('change', e=>{
       if(!confirmToggle()){ e.target.checked = !e.target.checked; return; }
       const checked = e.target.checked;
@@ -815,52 +760,5 @@ function attachHandlers(city){
 }
 </script>
 
-<script>
-function parseDateInput(s){
-  if(!s) return '';
-  s = s.trim().replace(/[^\d\-\/]/g,'');
-  // allow YYYY-MM-DD or MM-DD or M-D
-  const m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
-  if(m){
-    const mm = ('0'+m[2]).slice(-2), dd=('0'+m[3]).slice(-2);
-    return mm+'-'+dd;
-  }
-  const m2 = s.match(/^(\d{1,2})[\/-](\d{1,2})$/);
-  if(m2){
-    const mm=('0'+m2[1]).slice(-2), dd=('0'+m2[2]).slice(-2);
-    return mm+'-'+dd;
-  }
-  // 4桁連結(0819) or 3-4桁(819)
-  const m3 = s.match(/^(\d{3,4})$/);
-  if(m3){
-    let num = m3[1];
-    if(num.length===3){ num='0'+num; }
-    return num.slice(0,2)+'-'+num.slice(2,4);
-  }
-  return '';
-}
-function editDate(city, idx){
-  const keyStr = key(city, idx);
-  let st = loadCardState(city, idx) || {checked:false, date:''};
-  const current = st.date || '';
-  const input = prompt('日付を入力（MM-DD ／ YYYY-MM-DD ／ 0819）\n空でOK→日付クリア', current);
-  if(input===null) return; // cancel
-  const v = parseDateInput(input);
-  if(input.trim()===''){ // clear
-    st.date='';
-  }else if(v){
-    st.date = v;
-  }else{
-    alert('日付の形式が読めませんでした');
-    return;
-  }
-  // 保存（チェック状態は変更しない）
-  localStorage.setItem(keyStr, JSON.stringify(st));
-  // 画面反映
-  const cards = Array.from(document.querySelectorAll('.card'));
-  const card = cards[idx];
-  applyToCard(card, st);
-  updateCount(city);
-}
-document.addEventListener('DOMContentLoaded', ()=> attachHandlers('調布市'));</script>
+<script>document.addEventListener('DOMContentLoaded', ()=> attachHandlers('調布市'));</script>
 </html>
