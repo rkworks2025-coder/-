@@ -1274,157 +1274,76 @@ function attachHandlers(city){
 
 <script>document.addEventListener('DOMContentLoaded', ()=> attachHandlers('海老名市'));</script>
 
-<!-- ▼ バックアップ保険（スナップショット/復元 + 安全マージ + 事前バックアップ） -->
-<div class="sync-json" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0;">
-  <button id="btnSnapSave" style="padding:8px 12px;border:1px solid #e6e8ee;border-radius:8px;background:#fff;">今すぐ保存(スナップショット)</button>
-  <button id="btnSnapRestore" style="padding:8px 12px;border:1px solid #e6e8ee;border-radius:8px;background:#fff;">直前に戻す</button>
-  <button id="jsonExportBtn" style="padding:8px 12px;border:1px solid #e6e8ee;border-radius:8px;background:#fff;">保存(JSON)</button>
-  <button id="jsonImportBtn" style="padding:8px 12px;border:1px solid #e6e8ee;border-radius:8px;background:#fff;">読み込み(JSON)</button>
-  <input id="jsonFileInput" type="file" accept="application/json" style="display:none;">
-</div>
 <script>
 (function(){
-  const PREFIX = ['chk:','del:','巡回:stats:'];
-  const SNAP_IDX = 'snapshots:index';
-  const SNAP_MAX = 10;
-
-  function dump(){
-    const obj = {};
-    for(let i=0;i<localStorage.length;i++){
-      const k = localStorage.key(i);
-      if(PREFIX.some(p=>k.startsWith(p))) obj[k] = localStorage.getItem(k);
+  var CITY = (document.querySelector('header h1')?.textContent || '').replace(' 巡回','').trim();
+  function keyOf(card){
+    var k = card.getAttribute('data-key');
+    if(!k){
+      var id = card.querySelector('[data-id]')?.getAttribute('data-id') || card.textContent.trim().slice(0,40);
+      k = CITY + ':' + id;
+      card.setAttribute('data-key', k);
     }
-    return obj;
+    return k;
   }
-  function loadSnapIndex(){
-    try{ return JSON.parse(localStorage.getItem(SNAP_IDX) || '{"list":[]}'); }catch(_){ return {list:[]}; }
-  }
-  function saveSnapIndex(idx){ localStorage.setItem(SNAP_IDX, JSON.stringify(idx)); }
-  function saveSnapshot(){
-    const data = dump();
-    const ts = new Date().toISOString().replace(/[:.]/g,'-');
-    const key = 'snapshot:'+ts;
+  function renderCount(){
+    var countEl = document.getElementById('count');
+    if(!countEl) return;
+    var cards = document.querySelectorAll('.card');
+    var total = cards.length;
+    var checked = 0;
+    cards.forEach(function(c){
+      var cb = c.querySelector('.chk');
+      if(cb && cb.checked) checked++;
+    });
+    countEl.textContent = checked + '/' + total;
     try{
-      localStorage.setItem(key, JSON.stringify(data));
-      const idx = loadSnapIndex();
-      idx.list.unshift({ts:ts, size:Object.keys(data).length});
-      while(idx.list.length > SNAP_MAX){
-        const old = idx.list.pop();
-        localStorage.removeItem('snapshot:'+old.ts);
+      localStorage.setItem('巡回:stats:' + CITY, JSON.stringify({checked:checked,total:total,updatedAt:new Date().toISOString()}));
+    }catch(e){}
+  }
+  function applyInitialDeletions(){
+    var removedCards = 0, removedChecked = 0;
+    document.querySelectorAll('.card').forEach(function(card){
+      var k = keyOf(card);
+      if(localStorage.getItem('del:'+k) === '1'){
+        var cb = card.querySelector('.chk');
+        if(cb && cb.checked) removedChecked++;
+        card.remove();
+        removedCards++;
       }
-      saveSnapIndex(idx);
-      alert('スナップショット保存: ' + ts);
-    }catch(e){
-      alert('スナップショット保存エラー: '+e.message);
-    }
+    });
+    if(removedCards) renderCount();
   }
-  function restoreLatestSnapshot(){
-    const idx = loadSnapIndex();
-    if(!idx.list.length){ alert('復元できるスナップショットがありません'); return; }
-    const last = idx.list[0];
-    const raw = localStorage.getItem('snapshot:'+last.ts);
-    if(!raw){ alert('スナップショットが見つかりません'); return; }
-    try{
-      const obj = JSON.parse(raw);
-      const delKeys = [];
-      for(let i=0;i<localStorage.length;i++){
-        const k = localStorage.key(i);
-        if(PREFIX.some(p=>k.startsWith(p))) delKeys.push(k);
-      }
-      delKeys.forEach(k=>localStorage.removeItem(k));
-      Object.entries(obj).forEach(([k,v])=> localStorage.setItem(k, v));
-      alert('直前のスナップショットに戻しました: ' + last.ts + '（ページ再読み込み）');
-      location.reload();
-    }catch(e){
-      alert('復元エラー: '+e.message);
-    }
-  }
-  function download(name, text){
-    const a = document.createElement('a');
-    a.download = name;
-    a.href = URL.createObjectURL(new Blob([text], {type:'application/json'}));
-    document.body.appendChild(a); a.click(); a.remove();
-  }
-  function exportJSON(){
-    const ts = new Date().toISOString().replace(/[:.]/g,'-');
-    download('junkai-'+ts+'.json', JSON.stringify(dump(), null, 2));
-    alert('JSONを保存しました');
-  }
-  function safeMerge(curr, incoming){
-    const out = {...curr};
-    for(const k of Object.keys(incoming)){
-      if(k.startsWith('del:')){
-        if(incoming[k] === '1' || curr[k] === '1') out[k] = '1';
-      }
-    }
-    function isDeleted(k){
-      if(!k.startsWith('chk:')) return false;
-      const parts = k.split(':');
-      if(parts.length<3) return false;
-      const delKey = 'del:'+parts[1]+':'+parts[2];
-      return out[delKey] === '1';
-    }
-    for(const k of Object.keys(curr)){
-      if(k.startsWith('chk:') && !isDeleted(k)) out[k] = curr[k];
-    }
-    for(const k of Object.keys(incoming)){
-      if(k.startsWith('chk:') && !isDeleted(k)) out[k] = incoming[k];
-    }
-    for(const k of Object.keys(out)){
-      if(k.startsWith('巡回:stats:')) delete out[k];
-    }
-    return out;
-  }
-  function applyMerged(out){
-    saveSnapshot(); // 事前スナップショット
-    const toDelete = [];
-    for(let i=0;i<localStorage.length;i++){
-      const k = localStorage.key(i);
-      if(PREFIX.some(p=>k.startsWith(p))) toDelete.push(k);
-    }
-    toDelete.forEach(k=>localStorage.removeItem(k));
-    Object.entries(out).forEach(([k,v])=> localStorage.setItem(k, v));
-    alert('JSONを読み込みました（スナップショット自動保存済み）。ページを再読み込みします。');
-    location.reload();
-  }
-  function doImport(file){
-    const r = new FileReader();
-    r.onload = function(){
-      try{
-        const incoming = JSON.parse(r.result || '{}');
-        if(typeof incoming !== 'object'){ alert('JSONが不正です'); return; }
-        const curr = dump();
-        const currDel = Object.keys(curr).filter(k=>k.startsWith('del:') && curr[k]==='1').length;
-        const incDel = Object.keys(incoming).filter(k=>k.startsWith('del:') && incoming[k]==='1').length;
-        if(incDel < currDel){
-          if(!confirm('警告: 読み込むJSONの削除数が現在より少ないようです（'+incDel+' < '+currDel+'）。続行すると復活する可能性があります。続けますか？')) return;
-        }
-        const merged = safeMerge(curr, incoming);
-        applyMerged(merged);
-      }catch(e){
-        alert('読み込みエラー: ' + e.message);
-      }
-    };
-    r.readAsText(file);
-  }
-  function autoSnapshotOnFirstLoad(){
-    try{
-      const idx = loadSnapIndex();
-      if(!idx.list.length){ saveSnapshot(); return; }
-      // 単純化：常に一回だけ保存（初回）でOKにする
-    }catch(_){}
+  function ensureDeleteButtons(){
+    document.querySelectorAll('.card').forEach(function(card){
+      if(card.querySelector('.btn-delete')) return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '削除';
+      btn.className = 'btn-delete';
+      btn.style.cssText = 'margin-left:auto;padding:8px 10px;font-size:12px;border:1px solid #e6e8ee;border-radius:8px;background:#fff;';
+      card.appendChild(btn);
+      btn.addEventListener('click', function(){
+        if(!confirm('この車両を削除します。よろしいですか？')) return;
+        var k = keyOf(card);
+        try{
+          localStorage.setItem('del:'+k, '1');
+          localStorage.removeItem('chk:'+k);
+        }catch(e){}
+        card.remove();
+        renderCount();
+      });
+    });
   }
   document.addEventListener('DOMContentLoaded', function(){
-    document.getElementById('btnSnapSave')?.addEventListener('click', saveSnapshot);
-    document.getElementById('btnSnapRestore')?.addEventListener('click', restoreLatestSnapshot);
-    document.getElementById('jsonExportBtn')?.addEventListener('click', exportJSON);
-    const fi = document.getElementById('jsonFileInput');
-    document.getElementById('jsonImportBtn')?.addEventListener('click', ()=> fi && fi.click());
-    fi?.addEventListener('change', ()=>{ if(fi.files && fi.files[0]) doImport(fi.files[0]); });
-    autoSnapshotOnFirstLoad();
+    applyInitialDeletions();
+    ensureDeleteButtons();
+    renderCount();
+    document.querySelectorAll('.chk').forEach(function(cb){
+      cb.addEventListener('change', renderCount);
+    });
   });
 })();
 </script>
-<!-- ▲ バックアップ保険ここまで -->
 
 </html>
