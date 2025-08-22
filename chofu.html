@@ -5,7 +5,7 @@
 <title>調布市 巡回</title>
 
 <style>
-  :root{ --bg:#f6f7fb; --surface:#fff; --border:#e6e8ee; --text:#111; --muted:#6b7280; --accent:#111; --checked:#ffe8ef; }
+  :root{ --bg:#f6f7fb; --surface:#fff; --border:#e6e8ee; --text:#111; --muted:#6b7280; --accent:#111; --checked:#e8f7ff; }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
   header{position:sticky;top:0;background:var(--surface);padding:12px 16px;border-bottom:1px solid var(--border);z-index:10;display:flex;gap:8px;align-items:center}
@@ -761,77 +761,4 @@ function attachHandlers(city){
 </script>
 
 <script>document.addEventListener('DOMContentLoaded', ()=> attachHandlers('調布市'));</script>
-
-<script>
-(function(){
-  var CITY = (document.querySelector('header h1')?.textContent || '').replace(' 巡回','').trim();
-  function keyOf(card){
-    var k = card.getAttribute('data-key');
-    if(!k){
-      var id = card.querySelector('[data-id]')?.getAttribute('data-id') || card.textContent.trim().slice(0,40);
-      k = CITY + ':' + id;
-      card.setAttribute('data-key', k);
-    }
-    return k;
-  }
-  function renderCount(){
-    var countEl = document.getElementById('count');
-    if(!countEl) return;
-    var cards = document.querySelectorAll('.card');
-    var total = cards.length;
-    var checked = 0;
-    cards.forEach(function(c){
-      var cb = c.querySelector('.chk');
-      if(cb && cb.checked) checked++;
-    });
-    countEl.textContent = checked + '/' + total;
-    try{
-      localStorage.setItem('巡回:stats:' + CITY, JSON.stringify({checked:checked,total:total,updatedAt:new Date().toISOString()}));
-    }catch(e){}
-  }
-  function applyInitialDeletions(){
-    var removedCards = 0, removedChecked = 0;
-    document.querySelectorAll('.card').forEach(function(card){
-      var k = keyOf(card);
-      if(localStorage.getItem('del:'+k) === '1'){
-        var cb = card.querySelector('.chk');
-        if(cb && cb.checked) removedChecked++;
-        card.remove();
-        removedCards++;
-      }
-    });
-    if(removedCards) renderCount();
-  }
-  function ensureDeleteButtons(){
-    document.querySelectorAll('.card').forEach(function(card){
-      if(card.querySelector('.btn-delete')) return;
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = '削除';
-      btn.className = 'btn-delete';
-      btn.style.cssText = 'margin-left:auto;padding:8px 10px;font-size:12px;border:1px solid #e6e8ee;border-radius:8px;background:#fff;';
-      card.appendChild(btn);
-      btn.addEventListener('click', function(){
-        if(!confirm('この車両を削除します。よろしいですか？')) return;
-        var k = keyOf(card);
-        try{
-          localStorage.setItem('del:'+k, '1');
-          localStorage.removeItem('chk:'+k);
-        }catch(e){}
-        card.remove();
-        renderCount();
-      });
-    });
-  }
-  document.addEventListener('DOMContentLoaded', function(){
-    applyInitialDeletions();
-    ensureDeleteButtons();
-    renderCount();
-    document.querySelectorAll('.chk').forEach(function(cb){
-      cb.addEventListener('change', renderCount);
-    });
-  });
-})();
-</script>
-
 </html>
