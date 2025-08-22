@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大和市 巡回</title>
+
+<style>
+  :root{ --bg:#f6f7fb; --surface:#fff; --border:#e6e8ee; --text:#111; --muted:#6b7280; --accent:#111; --checked:#ffe8ef; }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{position:sticky;top:0;background:var(--surface);padding:12px 16px;border-bottom:1px solid var(--border);z-index:10;display:flex;gap:8px;align-items:center}
+  header .back{text-decoration:none;border:1px solid var(--border);padding:8px 12px;border-radius:12px;color:var(--text)}
+  header h1{margin:0;font-size:18px;flex:1;text-align:center}
+  header .count{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+  main{padding:12px 12px 24px;max-width:820px;margin:0 auto}
+  .toolbar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;justify-content:center}
+  .pill{padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:var(--surface);text-decoration:none;color:var(--text);cursor:pointer}
+  .danger{color:#b42318;border-color:#f2c6c4;background:#fff5f4}
+  .card{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:background .15s,border-color .15s}
+  .card.checked{background:var(--checked);border-color:#f8c9d7}
+  .chk-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex:none}
+  .chk{appearance:none;width:0;height:0;position:absolute;opacity:0}
+  .fake{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-radius:6px;background:#fff}
+  .chk:checked + .fake{border-color:var(--accent);background:var(--accent);
+    background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path fill="white" d="M6.6 11.6L3.5 8.5l1.1-1.1 2 2 4-4 1.1 1.1z"/></svg>');
+    background-repeat:no-repeat;background-position:center}
+  .body{flex:1;min-width:0}
+  .title{font-weight:700;white-space:normal;word-break:break-word;line-height:1.35;margin-bottom:2px}
+  .meta{margin-top:4px;color:var(--muted);font-size:14px;line-height:1.5}
+  .meta .line{white-space:normal;word-break:break-word}
+  .meta .line.small{font-size:12px}
+  .date-badge{min-width:54px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted);font-weight:700}
+</style>
+
+<header>
+  <a class="back" href="index.html" onclick="return goBack(event)">戻る</a>
+  <h1 style="writing-mode:horizontal-tb; text-orientation:mixed; white-space:nowrap;">大和市 巡回</h1>
+  <span class="count" id="count">0/60</span>
+<div style="text-align:center;font-size:12px;color:#6b7280;margin-top:-6px;margin-bottom:6px;">日付を編集→ 各行の日付ラベルをタップ</div></header>
+<main>
+  <div class="toolbar">
+    <span class="pill" onclick="checkAll()">全てチェック</span>
+    <span class="pill" onclick="uncheckAll()">全て外す</span>
+    <span class="pill danger" onclick="clearAll()">リセット</span>
+  </div>
+  
+        <div class="card" data-key="大和市:0">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ高座渋谷駅前第２</div>
+            <div class="meta"><div class='line'>ﾙｰﾐｰ 1000</div><div class='line'>相模501ワ6171</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:1">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">イオン大和ショッピングセンター第３</div>
+            <div class="meta"><div class='line'>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ7871</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:2">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">イオン大和ショッピングセンター第３</div>
+            <div class="meta"><div class='line'>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ7546</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:3">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">イオン大和ショッピングセンター第３</div>
+            <div class="meta"><div class='line'>N BOX</div><div class='line'>相模580ワ3097</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:4">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">下和田駐車場</div>
+            <div class="meta"><div class='line'>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模300ワ6124</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:5">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">Ｂ・Ｈパーキング</div>
+            <div class="meta"><div class='line'>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模300ワ6039</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:6">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">Ｂ・Ｈパーキング</div>
+            <div class="meta"><div class='line'>MAZDA3 5HB 1500</div><div class='line'>相模300ワ4776</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:7">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">上草柳駐車場</div>
+            <div class="meta"><div class='line'>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ8699</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:8">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">ギャザーコート１ＳＴ</div>
+            <div class="meta"><div class='line'>ﾌｨｯﾄ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ8158</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:9">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">上和田月極駐車場</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ7589</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:10">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">上和田月極駐車場</div>
+            <div class="meta"><div class='line'>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ7590</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:11">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">深見西１丁目</div>
+            <div class="meta"><div class='line'>ｽｲﾌﾄ 1200以上</div><div class='line'>相模501ワ7810</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:12">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">深見西１丁目</div>
+            <div class="meta"><div class='line'>C-HRﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模300ワ5415</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:13">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">深見西１丁目</div>
+            <div class="meta"><div class='line'>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模300ワ5170</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:14">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">ラークヴィラ</div>
+            <div class="meta"><div class='line'>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ9437</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:15">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和深見西</div>
+            <div class="meta"><div class='line'>ﾙｰﾐｰ 1000</div><div class='line'>相模501ワ6404</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:16">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和深見西</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ5882</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:17">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和深見西</div>
+            <div class="meta"><div class='line'>ｿﾘｵ 1200</div><div class='line'>相模501ワ6029</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:18">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和深見台１丁目</div>
+            <div class="meta"><div class='line'>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模300ワ4332</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:19">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和深見台１丁目</div>
+            <div class="meta"><div class='line'>C-HRﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模300ワ5304</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:20">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">深見台１丁目第２</div>
+            <div class="meta"><div class='line'>MAZDA3 5HB 1500</div><div class='line'>相模300ワ5774</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:21">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和東第３</div>
+            <div class="meta"><div class='line'>MAZDA2 1500</div><div class='line'>相模501ワ9194</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:22">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和東第３</div>
+            <div class="meta"><div class='line'>ｿﾘｵ 1200</div><div class='line'>相模501ワ8077</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:23">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和駅前第２</div>
+            <div class="meta"><div class='line'>ｿﾘｵ 1200</div><div class='line'>相模501ワ6630</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:24">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和駅前第２</div>
+            <div class="meta"><div class='line'>ｼｴﾝﾀ ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ8862</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:25">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ相鉄大和第３</div>
+            <div class="meta"><div class='line'>ﾊｽﾗｰ 660</div><div class='line'>相模580ワ4024</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:26">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">アーバン長窪</div>
+            <div class="meta"><div class='line'>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ7725</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:27">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">テーエス駐車場</div>
+            <div class="meta"><div class='line'>ｿﾘｵ 1200</div><div class='line'>相模501ワ7947</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:28">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">テーエス駐車場</div>
+            <div class="meta"><div class='line'>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ8451</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:29">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和東公園</div>
+            <div class="meta"><div class='line'>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ6843</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:30">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和東公園</div>
+            <div class="meta"><div class='line'>ﾙｰﾐｰ 1000</div><div class='line'>相模501ワ7293</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:31">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和東公園</div>
+            <div class="meta"><div class='line'>MAZDA3 5HB 1500</div><div class='line'>相模300ワ6189</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:32">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">リリーガーデン</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ8272</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:33">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和南１丁目月極</div>
+            <div class="meta"><div class='line'>ﾌｨｯﾄ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ8625</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:34">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和南第３</div>
+            <div class="meta"><div class='line'>ﾙｰﾐｰ 1000</div><div class='line'>相模501ワ8034</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:35">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和南第５</div>
+            <div class="meta"><div class='line'>MAZDA2 1500</div><div class='line'>相模501ワ6819</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:36">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和駅前第５</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ7772</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:37">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和駅前第３</div>
+            <div class="meta"><div class='line'>ﾉｱ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模300ワ5566</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:38">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和駅前第３</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ8779</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:39">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和駅前第３</div>
+            <div class="meta"><div class='line'>ﾌﾘｰﾄﾞ 1500</div><div class='line'>相模501ワ8270</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:40">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ小田急大和第２</div>
+            <div class="meta"><div class='line'>ｽｲﾌﾄ 1200ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ9375</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:41">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">山口第１駐車場</div>
+            <div class="meta"><div class='line'>ﾙｰｸｽ</div><div class='line'>相模580ワ3578</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:42">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">山口第１駐車場</div>
+            <div class="meta"><div class='line'>ﾙｰｸｽ</div><div class='line'>相模580ワ3236</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:43">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">山口第５駐車場</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ9233</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:44">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和徳洲会病院</div>
+            <div class="meta"><div class='line'>CX-30 2000ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模300ワ5652</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:45">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和徳洲会病院</div>
+            <div class="meta"><div class='line'>ｵｰﾗ e-POWER</div><div class='line'>相模300ワ5331</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:46">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">中央１号公園前</div>
+            <div class="meta"><div class='line'>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ9101</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:47">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和中央第４</div>
+            <div class="meta"><div class='line'>MAZDA2 1500</div><div class='line'>相模501ワ8234</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:48">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">セソンレオ</div>
+            <div class="meta"><div class='line'>MAZDA2 1500</div><div class='line'>相模501ワ5884</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:49">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">セソンレオ</div>
+            <div class="meta"><div class='line'>ﾔﾘｽｸﾛｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模300ワ4779</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:50">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和市中央５丁目３</div>
+            <div class="meta"><div class='line'>ワｺﾞﾝRｽﾏｲﾙ 660</div><div class='line'>相模580ワ3324</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:51">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和市中央５丁目</div>
+            <div class="meta"><div class='line'>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ8078</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:52">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和市中央７丁目</div>
+            <div class="meta"><div class='line'>ﾗｲｽﾞ 1000</div><div class='line'>相模501ワ7865</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:53">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">大和市中央７丁目</div>
+            <div class="meta"><div class='line'>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ9395</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:54">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">ウイングヤマシタ</div>
+            <div class="meta"><div class='line'>ﾗｲｽﾞ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ9248</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:55">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">ウイングヤマシタ</div>
+            <div class="meta"><div class='line'>MAZDA2 1500</div><div class='line'>相模501ワ9121</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:56">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">スクエアパーキング</div>
+            <div class="meta"><div class='line'>ｱｸｱ 1500ﾊｲﾌﾞﾘｯﾄﾞ</div><div class='line'>相模501ワ8925</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:57">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">桜ヶ丘パーキング</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ7781</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:58">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">桜ヶ丘パーキング</div>
+            <div class="meta"><div class='line'>ﾔﾘｽ(ﾊｲﾌﾞﾘｯﾄﾞ)</div><div class='line'>相模501ワ9446</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+
+        <div class="card" data-key="大和市:59">
+          <label class="chk-wrap">
+            <input type="checkbox" class="chk">
+            <span class="fake"></span>
+          </label>
+          <div class="body">
+            <div class="title">タイムズ大和柳橋</div>
+            <div class="meta"><div class='line'>ﾉｰﾄ 1200 e-POWER</div><div class='line'>相模501ワ6380</div></div>
+          </div>
+          <div class="date-badge"></div>
+        </div>
+        
+</main>
+
+<script>
+function goBack(e){ e.preventDefault(); location.href="index.html"; return false; }
+function mmdd(){
+  const d=new Date(); const m=('0'+(d.getMonth()+1)).slice(-2); const day=('0'+d.getDate()).slice(-2); return m+'-'+day;
+}
+function key(city, idx){ return 'chk:'+city+':'+idx; }
+function loadCardState(city, idx){
+  try{ return JSON.parse(localStorage.getItem(key(city, idx))) || null; }catch(e){ return null; }
+}
+function saveCardState(city, idx, checked){
+  const v = checked ? {checked:true, date:mmdd()} : {checked:false, date:''};
+  localStorage.setItem(key(city, idx), JSON.stringify(v));
+}
+function applyToCard(card, state){
+  const cb = card.querySelector('.chk');
+  const dateEl = card.querySelector('.date-badge');
+  if(state && state.checked){
+    cb.checked = true;
+    card.classList.add('checked');
+    dateEl.textContent = state.date || mmdd();
+  }else{
+    cb.checked = false;
+    card.classList.remove('checked');
+    dateEl.textContent = '';
+  }
+}
+function confirmToggle(){ return confirm('よろしいですか？'); }
+function updateCount(city){
+  const cards = Array.from(document.querySelectorAll('.card'));
+  const total = cards.length;
+  const done = cards.filter(c=>c.classList.contains('checked')).length;
+  document.getElementById('count').textContent = done + "/" + total;
+}
+function attachHandlers(city){
+  document.querySelectorAll('.card').forEach((card,idx)=>{
+    // 初期状態反映
+    const st = loadCardState(city, idx);
+    applyToCard(card, st);
+
+    // 変更イベント
+    const cb = card.querySelector('.chk');
+    cb.addEventListener('change', e=>{
+      if(!confirmToggle()){ e.target.checked = !e.target.checked; return; }
+      const checked = e.target.checked;
+      saveCardState(city, idx, checked);
+      applyToCard(card, loadCardState(city, idx));
+      updateCount(city);
+    });
+  });
+  updateCount(city);
+  // Toolbar actions
+  const cards = Array.from(document.querySelectorAll('.card'));
+  window.checkAll = ()=>{
+    if(!confirmToggle()) return;
+    cards.forEach((card,idx)=>{ saveCardState(city, idx, true); applyToCard(card, loadCardState(city, idx)); });
+    updateCount(city);
+  };
+  window.uncheckAll = ()=>{
+    if(!confirmToggle()) return;
+    cards.forEach((card,idx)=>{ saveCardState(city, idx, false); applyToCard(card, loadCardState(city, idx)); });
+    updateCount(city);
+  };
+  window.clearAll = ()=>{
+    if(!confirmToggle()) return;
+    cards.forEach((card,idx)=>{ localStorage.removeItem(key(city, idx)); applyToCard(card, null); });
+    updateCount(city);
+  };
+}
+</script>
+
+<script>document.addEventListener('DOMContentLoaded', ()=> attachHandlers('大和市'));</script>
+
+<script>
+(function(){
+  var CITY = (document.querySelector('header h1')?.textContent || '').replace(' 巡回','').trim();
+  var total = 0, checked = 0;
+  var countEl;
+
+  function setLiteStyles(){
+    var st = document.createElement('style');
+    st.textContent = `*{transition:none!important} .card{box-shadow:none!important}`;
+    document.head.appendChild(st);
+  }
+
+  function initialCount(){
+    var cards = document.querySelectorAll('.card');
+    total = cards.length;
+    checked = 0;
+    cards.forEach(function(card){
+      var cb = card.querySelector('.chk');
+      if(cb && cb.checked) checked++;
+    });
+    renderCount(); saveStats();
+  }
+
+  function renderCount(){
+    if(countEl){ countEl.textContent = checked + '/' + total; }
+    try{ localStorage.setItem('巡回:stats:' + CITY, JSON.stringify({checked:checked,total:total,updatedAt:new Date().toISOString()})); }catch(e){}
+  }
+
+  function onCheckboxChange(e){
+    if(!e.target.classList.contains('chk')) return;
+    checked += e.target.checked ? 1 : -1;
+    if(checked<0) checked=0; if(checked>total) checked=total;
+    renderCount();
+  }
+
+  function keyOf(card){ return card.getAttribute('data-key') || ''; }
+
+  function ensureDeleteButtons(){
+    document.querySelectorAll('.card').forEach(function(card){
+      var btn = card.querySelector('.delete-btn');
+      if(!btn){
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = '削除';
+        btn.className = 'delete-btn';
+        btn.style.cssText = 'margin-left:auto;padding:8px 10px;font-size:12px;border:1px solid #e6e8ee;border-radius:8px;background:#fff;';
+        card.appendChild(btn);
+      }
+      if(!btn._wired){
+        btn.addEventListener('click', function(){
+          if(!confirm('削除してよろしいですか？')) return;
+          var k = keyOf(card);
+          try{
+            localStorage.setItem('del:' + k, '1');
+            localStorage.removeItem('chk:' + k);
+            var i=k.indexOf(':'); if(i>-1){ var city=k.slice(0,i), id=k.slice(i+1); localStorage.removeItem('chk:'+city+':'+id); }
+          }catch(e){}
+          var cb = card.querySelector('.chk');
+          if(cb && cb.checked){ checked--; if(checked<0) checked=0; }
+          total--; if(total<0) total=0;
+          card.remove();
+          renderCount();
+        });
+        btn._wired = true;
+      }
+    });
+  }
+
+  function applyInitialDeletions(){
+    var removed=0, checkedRemoved=0;
+    document.querySelectorAll('.card').forEach(function(card){
+      var k = keyOf(card);
+      try{
+        if(localStorage.getItem('del:' + k) === '1'){
+          var cb = card.querySelector('.chk');
+          if(cb && cb.checked) checkedRemoved++;
+          card.remove();
+          removed++;
+        }
+      }catch(e){}
+    });
+    if(removed){ total -= removed; checked -= checkedRemoved; if(total<0) total=0; if(checked<0) checked=0; }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setLiteStyles();
+    countEl = document.getElementById('count');
+    initialCount();
+    applyInitialDeletions();
+    renderCount();
+    document.querySelectorAll('.chk').forEach(function(cb){ cb.addEventListener('change', onCheckboxChange); });
+    ensureDeleteButtons();
+  });
+})();
+</script>
+
+</html>
