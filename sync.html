@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>巡回リスト 同期ヘルパー（GAS）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{ --bg:#fafbff; --fg:#111; --muted:#667; --bd:#e6e8ee; --accent:#3b82f6; }
+  body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--fg); margin:0; }
+  .wrap{ max-width:880px; margin:32px auto; padding:0 16px; }
+  .card{ background:#fff; border:1px solid var(--bd); border-radius:14px; padding:16px; margin:12px 0; box-shadow:0 1px 0 rgba(0,0,0,.03) }
+  .row{ display:flex; gap:10px; flex-wrap:wrap }
+  .row>*{ flex:1 1 220px }
+  input{ width:100%; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; font-size:14px }
+  .btns{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px }
+  button{ padding:10px 14px; border:1px solid var(--bd); border-radius:10px; background:#fff; cursor:pointer }
+  button.primary{ background:var(--accent); color:#fff; border-color:var(--accent) }
+  .muted{ color:#667; font-size:12px }
+  .log{ font-family:ui-monospace,Menlo,monospace; white-space:pre-wrap; background:#f6f8ff; border:1px dashed var(--bd); padding:10px; border-radius:10px; height:120px; overflow:auto }
+  .pill{ display:inline-block; padding:2px 8px; border:1px solid var(--bd); border-radius:999px; font-size:12px; margin-left:6px }
+</style>
+
+<div class="wrap">
+  <h1>巡回リスト 同期ヘルパー（Google Apps Script）</h1>
+
+  <div class="card">
+    <div class="row">
+      <div><label>GAS Web App URL（/exec で終わる）</label><input id="url" placeholder="https://script.google.com/macros/s/XXXX/exec"></div>
+      <div><label>SECRET（GASのコード内と同じ値）</label><input id="secret" type="password" placeholder="mysync-12345"></div>
+      <div><label>同期グループ名（両端末で同じに）</label><input id="bucket" value="junkai-v1"></div>
+    </div>
+    <div class="btns">
+      <button class="primary" id="save">設定を保存</button>
+      <button id="load">設定を読み込み</button>
+      <span id="status" class="pill">未保存</span>
+    </div>
+    <p class="muted">設定はこのドメインのlocalStorageに保存（他ページと共有）</p>
+  </div>
+
+  <div class="card">
+    <b>同期</b>
+    <div class="btns">
+      <button id="push">同期アップ（この端末 → クラウド）</button>
+      <button id="pull">同期ダウン（クラウド → この端末）</button>
+      <button id="backup">JSONをダウンロード（控え）</button>
+    </div>
+    <p class="muted">対象キー：<code>chk:</code> / <code>del:</code> / <code>巡回:stats:</code></p>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const LS_KEY='junkai:sync:config', PREFIX=['chk:','del:','巡回:stats:'];
+  const $=id=>document.getElementById(id);
+  const log=(m,c)=>{const L=$('log'),d=document.createElement('div');d.textContent=m; if(c) d.style.color=c; L.appendChild(d); L.scrollTop=L.scrollHeight;}
+
+  function getCfg(){ try{const o=JSON.parse(localStorage.getItem(LS_KEY)||'{}'); return {url:o.url||'',secret:o.secret||'',bucket:o.bucket||'junkai-v1'};}catch(_){return {url:'',secret:'',bucket:'junkai-v1'};} }
+  function setCfg(c){ localStorage.setItem(LS_KEY, JSON.stringify(c)); }
+  function uiLoad(){ const c=getCfg(); $('url').value=c.url; $('secret').value=c.secret; $('bucket').value=c.bucket; $('status').textContent=c.url?'保存済み':'未保存'; }
+  function uiSave(){
+    const c={url:$('url').value.trim(), secret:$('secret').value.trim(), bucket:($('bucket').value.trim()||'junkai-v1')};
+    if(!/^https:/.test(c.url)||!/\/exec$/.test(c.url)) return alert('GASのURLを確認してください（https〜/exec）');
+    if(!c.secret) return alert('SECRETを入力してください');
+    setCfg(c); uiLoad(); log('設定を保存しました。','#16a34a');
+  }
+
+  function dumpLocal(){ const d={}; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(PREFIX.some(p=>k.startsWith(p))) d[k]=localStorage.getItem(k);} return d; }
+  function download(name,text){ const a=document.createElement('a'); a.download=name; a.href=URL.createObjectURL(new Blob([text],{type:'application/json'})); a.click(); }
+
+  async function push(){
+    const c=getCfg(); if(!c.url||!c.secret) return alert('先に設定を保存してください');
+    try{ log('同期アップ中...'); const r=await fetch(c.url,{method:'POST',body:JSON.stringify({secret:c.secret,id:c.bucket,data:dumpLocal()})}); const t=await r.text();
+      log(t==='ok'?'同期アップ完了':'同期アップ失敗: '+t, t==='ok'?'#16a34a':'#b91c1c'); }catch(e){ log('同期アップエラー: '+e.message,'#b91c1c'); }
+  }
+  async function pull(){
+    const c=getCfg(); if(!c.url||!c.secret) return alert('先に設定を保存してください');
+    try{ log('同期ダウン中...'); const r=await fetch(c.url+'?secret='+encodeURIComponent(c.secret)+'&id='+encodeURIComponent(c.bucket)); const obj=await r.json();
+      if(!obj||typeof obj!=='object'){ log('同期データなし','#b91c1c'); return; }
+      const del=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(PREFIX.some(p=>k.startsWith(p))) del.push(k); } del.forEach(k=>localStorage.removeItem(k));
+      Object.entries(obj).forEach(([k,v])=>localStorage.setItem(k,v));
+      log('同期ダウン完了。ページを再読み込みします。','#16a34a'); setTimeout(()=>location.reload(),300);
+    }catch(e){ log('同期ダウンエラー: '+e.message,'#b91c1c'); }
+  }
+
+  $('save').onclick=uiSave; $('load').onclick=uiLoad; $('push').onclick=push; $('pull').onclick=pull;
+  $('backup').onclick=()=>download('junkai-backup-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json', JSON.stringify(dumpLocal(),null,2));
+  uiLoad();
+})();
+</script>
