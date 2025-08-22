@@ -983,3 +983,214 @@ function attachHandlers(city){
 </script>
 
 </html>
+
+<script>
+
+// addon.js — 巡回リスト 追加/削除(追加分のみ)拡張・統計連動
+// 使い方: 各市ページ(yamato.html / ebina.html / chofu.html)の </body> 直前に
+// <script defer src="addon.js"></script> を追加して配置するだけ。
+
+(function(){
+  if (window.__巡回_addon_loaded__) return;
+  window.__巡回_addon_loaded__ = true;
+
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  function detectCity(){
+    // header h1 の "○○市 巡回" から取得
+    const h1 = $('header h1');
+    if (!h1) return null;
+    const m = h1.textContent.trim().match(/^(.+?)\s*市\s*巡回$/) || h1.textContent.trim().match(/^(.+?市)/);
+    if (m) {
+      return m[1].replace(/\s*巡回$/, '');
+    }
+    // フォールバック: data-key="○○市:idx" の先頭カード
+    const first = $('.card[data-key]');
+    if (first) {
+      const dk = first.getAttribute('data-key');
+      const c = dk.split(':')[0];
+      if (c) return c;
+    }
+    return null;
+  }
+
+  function readExtrasKey(city){ return '巡回:extras:'+city; }
+  function readStatsKey(city){ return '巡回:stats:'+city; }
+
+  function loadExtras(city){
+    try{
+      const raw = localStorage.getItem(readExtrasKey(city));
+      if(!raw) return [];
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)) return arr;
+    }catch(e){}
+    return [];
+  }
+
+  function saveExtras(city, arr){
+    localStorage.setItem(readExtrasKey(city), JSON.stringify(arr));
+  }
+
+  function updateStats(city){
+    // 既存カード + 追加カードのチェック数/総数を再計算して保存
+    const allCards = $$('.card');
+    const total = allCards.length;
+    const checked = allCards.filter(c => $('.chk', c)?.checked).length;
+    try{
+      localStorage.setItem(readStatsKey(city), JSON.stringify({checked, total}));
+    }catch(e){}
+    const countEl = $('#count');
+    if(countEl){
+      const fmt = (x,y)=> `${x}/${y}`;
+      countEl.textContent = fmt(checked, total);
+    }
+  }
+
+  function attachCheckboxHandlers(root=document){
+    $$('.card', root).forEach(card => {
+      const chk = $('.chk', card);
+      const badge = $('.date-badge', card);
+      if(!chk) return;
+      // 既に付けていたらスキップ
+      if (chk.__巡回_hooked__) return;
+      chk.__巡回_hooked__ = true;
+      chk.addEventListener('change', () => {
+        if(chk.checked){
+          card.classList.add('checked');
+          const now = new Date();
+          const mm = String(now.getMonth()+1).padStart(2,'0');
+          const dd = String(now.getDate()).padStart(2,'0');
+          if (badge) badge.textContent = `${mm}-${dd}`;
+        }else{
+          card.classList.remove('checked');
+          if (badge && badge.textContent === '') { /* no-op */ }
+        }
+        updateStats(city);
+      });
+    });
+  }
+
+  function buildCardDom(city, item){
+    // item: {id, title, car, plate}
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.setAttribute('data-key', city + ':' + item.id);
+    div.setAttribute('data-extra', '1'); // 追加分フラグ
+
+    div.innerHTML = `
+      <label class="chk-wrap">
+        <input type="checkbox" class="chk">
+        <span class="fake"></span>
+      </label>
+      <div class="body">
+        <div class="title"></div>
+        <div class="meta">
+          <div class='line'></div>
+          <div class='line'></div>
+          <div class='line small'>追加</div>
+        </div>
+      </div>
+      <div class="date-badge"></div>
+      <button class="del-btn" title="この追加行を削除">×</button>
+    `;
+    // 軽いスタイル(既存に馴染むよう最小限)
+    const style = document.createElement('style');
+    style.textContent = `.del-btn{margin-left:6px; border:1px solid var(--border); background:#fff; border-radius:8px; padding:4px 8px; cursor:pointer; flex:none;}
+    .del-btn:hover{filter:brightness(0.96);}`;
+    document.head.appendChild(style);
+
+    $('.title', div).textContent = item.title || '';
+    const lines = $$('.meta .line', div);
+    if (lines[0]) lines[0].textContent = item.car || '';
+    if (lines[1]) lines[1].textContent = item.plate || '';
+
+    const del = $('.del-btn', div);
+    del.addEventListener('click', () => {
+      if(!confirm('この「追加」行を削除します。よろしいですか？')) return;
+      // DOM から削除 & extras からも削除
+      div.remove();
+      const arr = loadExtras(city).filter(x => x.id !== item.id);
+      saveExtras(city, arr);
+      updateStats(city);
+    });
+
+    return div;
+  }
+
+  function nextExtraId(city){
+    const arr = loadExtras(city);
+    let maxId = -1;
+    arr.forEach(x => { if (typeof x.id === 'number') maxId = Math.max(maxId, x.id); });
+    // 既存 data-key の最大 idx も参考にする（重複防止）
+    $$('.card[data-key]').forEach(c => {
+      const dk = c.getAttribute('data-key')||'';
+      const m = dk.split(':');
+      const idx = Number(m[1]);
+      if(!Number.isNaN(idx)) maxId = Math.max(maxId, idx);
+    });
+    return maxId + 1;
+  }
+
+  function restoreExtras(city){
+    const main = $('main') || document.body;
+    const toolbar = $('.toolbar') || main;
+    const arr = loadExtras(city);
+    arr.forEach(item => {
+      const card = buildCardDom(city, item);
+      main.appendChild(card);
+    });
+    attachCheckboxHandlers();
+    updateStats(city);
+  }
+
+  function injectAddButton(city){
+    const toolbar = $('.toolbar');
+    const pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.textContent = '＋追加';
+    pill.title = '新しい行を追加します';
+    pill.addEventListener('click', async () => {
+      // シンプルに prompt で入力
+      const title = window.prompt('場所名（タイトル）を入力してください：');
+      if(!title) return;
+      const car = window.prompt('車種/メモ（任意）：') || '';
+      const plate = window.prompt('ナンバー（任意）：') || '';
+      const id = nextExtraId(city);
+      const item = {id, title, car, plate};
+      // 保存 & DOM 反映
+      const arr = loadExtras(city);
+      arr.push(item);
+      saveExtras(city, arr);
+      const main = $('main') || document.body;
+      const card = buildCardDom(city, item);
+      main.appendChild(card);
+      attachCheckboxHandlers(card);
+      updateStats(city);
+      alert('追加したわ。');
+    });
+    if (toolbar) {
+      toolbar.appendChild(pill);
+    } else {
+      // ツールバーが無い場合は main の先頭に
+      const main = $('main') || document.body;
+      const wrap = document.createElement('div');
+      wrap.className = 'toolbar';
+      wrap.appendChild(pill);
+      main.prepend(wrap);
+    }
+  }
+
+  const city = detectCity();
+  if(!city) return;
+
+  // 起動
+  document.addEventListener('DOMContentLoaded', function(){
+    injectAddButton(city);
+    attachCheckboxHandlers();
+    restoreExtras(city);
+  });
+
+})();
+
+</script>
