@@ -984,4 +984,159 @@ function attachHandlers(city){
 
 </html>
 
-<script>(function(){try{var c='CihmdW5jdGlvbigpewogIGlmICh3aW5kb3cuX19oZWxwdGV4dF9yZW1vdmVfbG9hZGVkX18pIHJldHVybjsgd2luZG93Ll9faGVscHRleHRfcmVtb3ZlX2xvYWRlZF9fID0gdHJ1ZTsKCiAgZnVuY3Rpb24gcmVtb3ZlQnlUZXh0KHJlZ2V4TGlzdCl7CiAgICBjb25zdCBub2RlcyA9IEFycmF5LmZyb20oZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnc21hbGwsIC5oaW50LCAuaGVscCwgLm5vdGUsIHAsIHNwYW4sIGRpdiwgYnV0dG9uLCBhJykpOwogICAgZm9yIChjb25zdCBlbCBvZiBub2Rlcyl7CiAgICAgIGNvbnN0IHR4dCA9IChlbC50ZXh0Q29udGVudCB8fCAnJykucmVwbGFjZSgvXHMrL2csJyAnKS50cmltKCk7CiAgICAgIGlmICghdHh0KSBjb250aW51ZTsKICAgICAgZm9yIChjb25zdCByeCBvZiByZWdleExpc3QpewogICAgICAgIHRyeXsKICAgICAgICAgIGlmIChyeC50ZXN0KHR4dCkpewogICAgICAgICAgICBlbC5yZW1vdmUoKTsKICAgICAgICAgICAgYnJlYWs7CiAgICAgICAgICB9CiAgICAgICAgfWNhdGNoKGUpe30KICAgICAgfQogICAgfQogIH0KCiAgZnVuY3Rpb24gcnVuKCl7CiAgICAvLyAxKSByZW1vdmUgIuaXpeS7mOOCkue3qOmbhuKGkiIgKHZhcmlhdGlvbiB0b2xlcmFudCkKICAgIGNvbnN0IHJ4MSA9IC/ml6Xku5jjgpI/57eo6ZuGLj8vOwogICAgLy8gMikgcmVtb3ZlICLml6Xku5jjg6njg5njg6vjgpLjgr/jg4Pjg5ciIHN0eWxlIGhpbnRzIChhbGxvd2luZyB2YXJpYXRpb25zIGxpa2Ug44CM5pel5LuY44Op44OZ44Or44KS44K/44OD44OX44GX44Gm4oCm44CNKQogICAgY29uc3QgcngyID0gL+aXpeS7mOODqeODmeODqy4q44K/44OD44OXLzsKICAgIHJlbW92ZUJ5VGV4dChbcngxLCByeDJdKTsKICB9CgogIGRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoJ0RPTUNvbnRlbnRMb2FkZWQnLCBydW4pOwogIC8vIGFsc28gb2JzZXJ2ZSBkeW5hbWljIGluamVjdGlvbnMsIGp1c3QgaW4gY2FzZQogIGNvbnN0IG1vID0gbmV3IE11dGF0aW9uT2JzZXJ2ZXIocnVuKTsKICBtby5vYnNlcnZlKGRvY3VtZW50LmRvY3VtZW50RWxlbWVudCwge2NoaWxkTGlzdDp0cnVlLCBzdWJ0cmVlOnRydWV9KTsKfSkoKTsK';var code=atob(c);(new Function(code))();}catch(e){console.error(e);}})();</script>
+<script>
+
+// addon_plus.js — 右上「＋追加」ボタン＆手入力カード追加（localStorage保存）
+(function(){
+  if (window.__巡回_addon_loaded__) return; window.__巡回_addon_loaded__ = true;
+  const $ = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+  function detectCity(){
+    const h1 = $('header h1');
+    if (!h1) return null;
+    const txt = h1.textContent.trim();
+    let m = txt.match(/^(.+?市)\s*巡回$/); if (m) return m[1];
+    m = txt.match(/^(.+?市)/); if (m) return m[1];
+    const first = $('.card[data-key]');
+    if (first) {
+      const dk = first.getAttribute('data-key')||'';
+      const c = dk.split(':')[0];
+      if (c) return c;
+    }
+    return null;
+  }
+  const city = detectCity(); if (!city) return;
+
+  const LS_EXTRAS = '巡回:extras:'+city;
+  const LS_STATS  = '巡回:stats:'+city;
+  const readExtras = ()=>{ try{const j=localStorage.getItem(LS_EXTRAS); return j?JSON.parse(j):[] }catch(_){return []} };
+  const saveExtras = (a)=>localStorage.setItem(LS_EXTRAS, JSON.stringify(a));
+
+  function updateStats(){
+    const all = $$('.card');
+    const total = all.length;
+    const checked = all.filter(c => $('.chk', c)?.checked).length;
+    try{ localStorage.setItem(LS_STATS, JSON.stringify({checked,total})); }catch(_){}
+    const countEl = $('#count'); if (countEl) countEl.textContent = `${checked}/${total}`;
+  }
+
+  function attachChkHandlers(root=document){
+    $$('.card', root).forEach(card=>{
+      const chk = $('.chk', card);
+      const badge = $('.date-badge', card);
+      if (!chk || chk.__hooked) return;
+      chk.__hooked = true;
+      chk.addEventListener('change', ()=>{
+        if (chk.checked){
+          card.classList.add('checked');
+          const now=new Date(); const mm=String(now.getMonth()+1).padStart(2,'0'); const dd=String(now.getDate()).padStart(2,'0');
+          if (badge) badge.textContent = `${mm}-${dd}`;
+        }else{
+          card.classList.remove('checked');
+        }
+        updateStats();
+      });
+    });
+  }
+
+  function buildCard(item){
+    const div = document.createElement('div');
+    div.className = 'card'; div.dataset.key = `${city}:${item.id}`; div.dataset.extra='1';
+    div.innerHTML = `
+      <label class="chk-wrap">
+        <input type="checkbox" class="chk"><span class="fake"></span>
+      </label>
+      <div class="body">
+        <div class="title"></div>
+        <div class="meta">
+          <div class="line line1"></div>
+          <div class="line line2"></div>
+          <div class="line small">追加</div>
+        </div>
+      </div>
+      <div class="date-badge"></div>
+      <button class="del-btn" title="この追加行を削除">×</button>
+    `;
+    $('.title', div).textContent = item.title || '';
+    $('.line1', div).textContent = item.car || '';
+    $('.line2', div).textContent = item.plate || '';
+    const style = document.createElement('style');
+    style.textContent = `.del-btn{margin-left:6px;border:1px solid var(--border);background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer}
+    .del-btn:hover{filter:brightness(0.96);} .add-fab{position:fixed;right:12px;top:12px;z-index:9999;border-radius:999px;padding:8px 14px;border:1px solid var(--border);background:#fff;cursor:pointer}
+    .add-fab:hover{filter:brightness(0.97);} .addon-modal-back{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:10000}
+    .addon-modal{background:#fff;border-radius:12px;padding:16px;width:min(92vw,480px);box-shadow:0 12px 32px rgba(0,0,0,.25)}
+    .addon-modal h3{margin:0 0 8px 0;font-size:1.05rem}
+    .addon-modal .row{display:flex;gap:8px;margin:8px 0}
+    .addon-modal .row label{width:6em}
+    .addon-modal input{flex:1;padding:8px;border:1px solid #ddd;border-radius:8px}
+    .addon-modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    .addon-modal button{padding:8px 14px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer}
+    .addon-modal .primary{border-color:#888}`;
+    document.head.appendChild(style);
+    $('.del-btn', div).addEventListener('click', ()=>{
+      if (!confirm('この「追加」行を削除します。よろしいですか？')) return;
+      const arr = readExtras().filter(x => x.id !== item.id);
+      saveExtras(arr); div.remove(); updateStats();
+    });
+    return div;
+  }
+
+  function nextId(){
+    let maxId = -1;
+    readExtras().forEach(x => { if (typeof x.id === 'number') maxId = Math.max(maxId, x.id); });
+    $$('.card[data-key]').forEach(c=>{
+      const dk=c.getAttribute('data-key')||''; const n = Number(dk.split(':')[1]); if(!Number.isNaN(n)) maxId=Math.max(maxId,n);
+    });
+    return maxId+1;
+  }
+
+  function openModal(){
+    const wrap = document.createElement('div'); wrap.className='addon-modal-back';
+    wrap.innerHTML = `
+      <div class="addon-modal">
+        <h3>新規カードを追加</h3>
+        <div class="row"><label>場所名*</label><input type="text" class="f-title" placeholder="例：〇〇駐車場 A-1" required></div>
+        <div class="row"><label>車種/メモ</label><input type="text" class="f-car" placeholder="例：軽/清掃のみ"></div>
+        <div class="row"><label>ナンバー</label><input type="text" class="f-plate" placeholder="例：相模500 あ 12-34"></div>
+        <div class="btns">
+          <button class="cancel">キャンセル</button>
+          <button class="primary create">追加する</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    $('.cancel', wrap).onclick = ()=> wrap.remove();
+    $('.create', wrap).onclick = ()=>{
+      const title = $('.f-title', wrap).value.trim();
+      const car   = $('.f-car', wrap).value.trim();
+      const plate = $('.f-plate', wrap).value.trim();
+      if(!title){ alert('場所名は必須よ。'); return; }
+      const id = nextId();
+      const item = {id, title, car, plate};
+      const arr = readExtras(); arr.push(item); saveExtras(arr);
+      const main = $('main') || document.body;
+      const card = buildCard(item); main.appendChild(card);
+      attachChkHandlers(card); updateStats();
+      wrap.remove();
+    };
+  }
+
+  function restore(){
+    const main = $('main') || document.body;
+    readExtras().forEach(item=>{ main.appendChild(buildCard(item)); });
+    attachChkHandlers(); updateStats();
+  }
+
+  function injectFab(){
+    const btn = document.createElement('button');
+    btn.className = 'add-fab'; btn.textContent = '＋追加';
+    btn.title='新しい行を追加'; btn.addEventListener('click', openModal);
+    document.body.appendChild(btn);
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    injectFab(); attachChkHandlers(); restore();
+  });
+})();
+
+</script>
