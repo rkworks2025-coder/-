@@ -1,3 +1,4 @@
+
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -55,7 +56,7 @@
       }
     }catch(e){}
     var checked = 0;
-    for(var i=0;i<localStorage.length;i++){ 
+    for(var i=0;i<localStorage.length;i++){
       var k = localStorage.key(i);
       if(k && k.indexOf('chk:'+jp+':') === 0){
         try{ var v = JSON.parse(localStorage.getItem(k)); if(v && v.checked) checked++; }catch(e){}
