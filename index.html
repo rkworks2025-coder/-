@@ -1,3 +1,4 @@
+
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -36,7 +37,6 @@
   </div>
 </main>
 
-
 <script>
 (function(){
   var CITIES = [
@@ -46,7 +46,6 @@
   ];
   function fmt(x,y){ var p = y ? Math.round((x/y)*100) : 0; return x + '/' + y + ' (' + p + '%)'; }
   function readStats(jp, fallbackTotal){
-    // 1) Prefer stats saved by city pages (supports deletions)
     try{
       var raw = localStorage.getItem('巡回:stats:' + jp);
       if(raw){
@@ -56,7 +55,6 @@
         }
       }
     }catch(e){}
-    // 2) Fallback: legacy count from chk:jp: keys (kept for compatibility)
     var checked = 0;
     for(var i=0;i<localStorage.length;i++){
       var k = localStorage.key(i);
@@ -81,4 +79,3 @@
   document.addEventListener('DOMContentLoaded', update);
 })();
 </script>
-
