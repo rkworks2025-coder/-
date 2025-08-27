@@ -711,7 +711,18 @@ var SECRET   = "rkw123";
   function fmtDate(d){return (d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0');}
   function nowISO(){return new Date().toISOString();}
   function updateCount(){ var checked=cards.filter(c=>c.classList.contains('checked')).length; if(countEl) countEl.textContent=checked+'/'+total; localStorage.setItem('巡回:stats:'+CITY, JSON.stringify({checked:checked,total:total})); }
-  function postToSheet(payload){ fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({secret:SECRET},payload))}).catch(function(){}); }
+
+  // text/plain で送信（プリフライト回避）
+  function postToSheet(payload){
+    try{
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(Object.assign({secret:SECRET}, payload))
+      }).catch(function(){});
+    }catch(e){}
+  }
+
   function cardPayload(card,i,checked,dateStr){return{ts:nowISO(),city:CITY,index:i,station_name:card.getAttribute('data-station'),vehicle_model:card.getAttribute('data-model'),plate_number:card.getAttribute('data-plate'),date_badge:dateStr,checked:!!checked};}
 
   cards.forEach(function(card,i){
