@@ -1371,11 +1371,13 @@ function attachHandlers(city){
     user-select: none;
   }
   .card .chk-wrap{ margin-left: 0; }
+  /* ヘッダー右上のヘルプテキストを非表示 */
+  .header .sub, .sub{display:none !important;}
 </style>
 <script>
-// ---- auto-log patch v8 (fix count x/y, reuse existing 削除 buttons) ----
+// ---- auto-log patch v9 (remove header help text) ----
 (function(){
-  if(window.__autoLogPatchedV8) return; window.__autoLogPatchedV8 = true;
+  if(window.__autoLogPatchedV9) return; window.__autoLogPatchedV9 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -1414,7 +1416,7 @@ function attachHandlers(city){
     }
 
     cards.forEach(function(card,i){
-      if(card.__patchedV8) return; card.__patchedV8=true;
+      if(card.__patchedV9) return; card.__patchedV9=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
 
       // index badge (1-start)
@@ -1451,7 +1453,6 @@ function attachHandlers(city){
         updateCount();
       });
 
-      // 既存の削除ボタンにイベントを紐付け
       var delBtn = card.querySelector('.del-btn');
       if(delBtn){
         delBtn.addEventListener('click', function(){
