@@ -874,9 +874,9 @@ function attachHandlers(city){
   }
 </style>
 <script>
-// ---- auto-log patch v18e (robust del button visibility + v18d base) ----
+// ---- auto-log patch v18f (stable numeric total + per-container sorting + robust del) ----
 (function(){
-  if(window.__autoLogPatchedV18e) return; window.__autoLogPatchedV18e = true;
+  if(window.__autoLogPatchedV18f) return; window.__autoLogPatchedV18f = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -922,27 +922,36 @@ function attachHandlers(city){
     if(allCards.length===0) return;
     var countEl=document.getElementById('count');
 
-    // Stable baseline from startup
-    var BASE = allCards.slice();
-    var BASE_TOTAL = BASE.length;
+    // Stable numeric baseline (total never decreases)
+    var BASE_TOTAL = allCards.length;
 
     function key(i){return 'chk:'+CITY+':'+i;} 
     function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}}
     function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
 
     function updateCount(){
-      var checked = BASE.filter(function(c){ return c.classList.contains('checked'); }).length;
+      var checked = document.querySelectorAll('.card.checked').length;
       if(countEl) countEl.textContent = checked + '/' + BASE_TOTAL;
       try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checked,total:BASE_TOTAL}))}catch(e){}
     }
 
     // Build container -> cards mapping and remember each original parent & nextSibling
     var containerMap = new Map();
-    allCards.forEach(function(card){
+    allCards.forEach(function(card, idx){
       var parent = card.parentNode;
       if(!containerMap.has(parent)) containerMap.set(parent, []);
       containerMap.get(parent).push(card);
       if(!card.__origParent){ card.__origParent = parent; card.__origNext = card.nextSibling; }
+      // store original and index meta
+      card.dataset.orig = idx;
+      card.dataset.idx  = idx+1;
+      // ensure index badge 1-start
+      if(!card.querySelector('.idx-badge')){
+        var idxSpan = document.createElement('span');
+        idxSpan.className = 'idx-badge';
+        idxSpan.textContent = String(idx+1);
+        if(card.firstElementChild){ card.insertBefore(idxSpan, card.firstElementChild); } else { card.prepend(idxSpan); }
+      }
     });
 
     function restoreToOriginal(card){
@@ -971,26 +980,15 @@ function attachHandlers(city){
       });
     }
 
-    // Initial per-container resort (for restored checks)
+    // Initial restore for any persisted checks
     containerMap.forEach(function(_, parent){ resortContainer(parent); });
 
     allCards.forEach(function(card,i){
-      if(card.__patchedV18e) return; card.__patchedV18e=true;
-      var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
+      if(card.__patchedV18f) return; card.__patchedV18f=true;
+      var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge');
 
-      // index/元順のメタを保持
-      card.dataset.orig = i;       // 元の並び用（0-based）
-      card.dataset.idx  = i+1;     // 表示インデックス（1-based）
-
-      // index badge (1-start)
-      if(!card.querySelector('.idx-badge')){
-        var idxSpan = document.createElement('span');
-        idxSpan.className = 'idx-badge';
-        idxSpan.textContent = String(i+1);
-        if(card.firstElementChild){ card.insertBefore(idxSpan, card.firstElementChild); } else { card.prepend(idxSpan); }
-      }
-
-      // 復元
+      // restore checked state display (localStorage)
+      var data=load(i);
       if(data && data.checked){
         card.classList.add('checked'); if(chk) chk.checked=true;
         if(badge){
@@ -1002,6 +1000,7 @@ function attachHandlers(city){
           }
         }
       }
+
       if(!chk) return;
 
       var fb = fallbackFields(card);
@@ -1033,8 +1032,8 @@ function attachHandlers(city){
       }
 
       function bindConfirmTarget(target){
-        if(!target || target.__patchedV18e) return;
-        target.__patchedV18e = true;
+        if(!target || target.__patchedV18f) return;
+        target.__patchedV18f = true;
         target.addEventListener('click', function(ev){
           ev.stopImmediatePropagation();
           ev.preventDefault();
@@ -1072,8 +1071,8 @@ function attachHandlers(city){
           delBtn.classList && delBtn.classList.remove('hidden','d-none','sr-only');
         }catch(e){}
       }
-      if(delBtn && !delBtn.__patchedV18e){
-        delBtn.__patchedV18e = true;
+      if(delBtn && !delBtn.__patchedV18f){
+        delBtn.__patchedV18f = true;
         delBtn.addEventListener('click', function(){
           if(!confirm('この項目を未チェックに戻してログも削除します。よろしいですか？')) return;
           applyToggle(false);
