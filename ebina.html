@@ -1374,13 +1374,12 @@ function attachHandlers(city){
   .date-badge{ line-height: 1.05; display:inline-block; text-align:center; white-space:normal; }
   .db-mmdd{ font-weight:700; }
   .db-hm{ font-size: 12px; opacity: .8; }
-  /* ensure delete button stays visible */
   .del-btn{ display:inline-block !important; visibility:visible !important; opacity:1 !important; }
 </style>
 <script>
-// ---- auto-log patch v18a (ensure delete button visible; keep v18 sorting) ----
+// ---- auto-log patch v18b (global count; keep v18a sorting & features) ----
 (function(){
-  if(window.__autoLogPatchedV18a) return; window.__autoLogPatchedV18a = true;
+  if(window.__autoLogPatchedV18b) return; window.__autoLogPatchedV18b = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -1430,13 +1429,15 @@ function attachHandlers(city){
     function key(i){return 'chk:'+CITY+':'+i;} 
     function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}}
     function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
+
     function updateCount(){
-      var c=[].filter.call(container.querySelectorAll('.card'), function(c){return c.classList.contains('checked')}).length;
-      if(countEl) countEl.textContent = c + '/' + container.querySelectorAll('.card').length;
-      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:container.querySelectorAll('.card').length}))}catch(e){}
+      var total = document.querySelectorAll('.card').length;
+      var checked = document.querySelectorAll('.card.checked').length;
+      if(countEl) countEl.textContent = checked + '/' + total;
+      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checked,total:total}))}catch(e){}
     }
 
-    // 並び替え：未チェックは元の順番、チェック済みはindex昇順で末尾に集約
+    // 並び替え：未チェックは元の順番、チェック済みはindex昇順で末尾に集約（同一container内）
     function resort(){
       var all = [].slice.call(container.querySelectorAll('.card'));
       var unchecked = all.filter(function(c){ return !c.classList.contains('checked'); });
@@ -1447,7 +1448,7 @@ function attachHandlers(city){
     }
 
     cards.forEach(function(card,i){
-      if(card.__patchedV18a) return; card.__patchedV18a=true;
+      if(card.__patchedV18b) return; card.__patchedV18b=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
 
       // index/元順のメタを保持
@@ -1505,8 +1506,8 @@ function attachHandlers(city){
       }
 
       function bindConfirmTarget(target){
-        if(!target || target.__patchedV18a) return;
-        target.__patchedV18a = true;
+        if(!target || target.__patchedV18b) return;
+        target.__patchedV18b = true;
         target.addEventListener('click', function(ev){
           ev.stopImmediatePropagation();
           ev.preventDefault();
@@ -1536,8 +1537,8 @@ function attachHandlers(city){
 
       // 既存の削除ボタン（クラス/属性のばらつきに配慮）
       var delBtn = card.querySelector('.del-btn, [data-role="delete"]');
-      if(delBtn && !delBtn.__patchedV18a){
-        delBtn.__patchedV18a = true;
+      if(delBtn && !delBtn.__patchedV18b){
+        delBtn.__patchedV18b = true;
         delBtn.addEventListener('click', function(){
           if(!confirm('この項目を未チェックに戻してログも削除します。よろしいですか？')) return;
           applyToggle(false);
@@ -1546,8 +1547,8 @@ function attachHandlers(city){
     });
 
     // 初回の並び補正（復元分を反映）
-    resort();
     updateCount();
+    resort();
   }
 
   if(document.readyState==='complete'||document.readyState==='interactive'){ setTimeout(setup,0); }
