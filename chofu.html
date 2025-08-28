@@ -669,188 +669,22 @@
       <div class="date-badge" title="タップで手入力"></div>
     </div></main><script>(function(){var CITY='調布市';var total=54;var cards=[].slice.call(document.querySelectorAll('.card'));var countEl=document.getElementById('count');function keyFor(i){return 'chk:'+CITY+':'+i;}function save(i,c,d){localStorage.setItem(keyFor(i),JSON.stringify({checked:c,date:d}));}function load(i){try{return JSON.parse(localStorage.getItem(keyFor(i)))||null}catch(e){return null}}function fmtDate(d){var m=('0'+(d.getMonth()+1)).slice(-2),day=('0'+d.getDate()).slice(-2);return m+'-'+day;}function nowISO(){return new Date().toISOString();}function updateCount(){var c=cards.filter(c=>c.classList.contains('checked')).length;if(countEl)countEl.textContent=c+'/'+total;try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:total}))}catch(e){}}function post(p){try{fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({secret:SECRET},p))})}catch(e){}}function onPayload(card,i,ds){return{ts:nowISO(),city:CITY,index:i,station_name:card.getAttribute('data-station')||'',vehicle_model:card.getAttribute('data-model')||'',plate_number:card.getAttribute('data-plate')||'',date_badge:ds||'',checked:true}}function offPayload(card){return{city:CITY,plate_number:card.getAttribute('data-plate')||'',delete:true}}cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');var data=load(i);if(data&&data.checked){card.classList.add('checked');if(badge)badge.textContent=data.date||'';chk.checked=true;}chk.addEventListener('change',function(){var ds=fmtDate(new Date());if(chk.checked){card.classList.add('checked');if(badge)badge.textContent=ds;save(i,true,ds);post(onPayload(card,i,ds));}else{card.classList.remove('checked');if(badge)badge.textContent='';save(i,false,'');post(offPayload(card));}updateCount();});if(badge){badge.addEventListener('click',function(){var input=prompt('MM-DD で入力（例: 08-27）',badge.textContent||fmtDate(new Date()));if(input){var isChecked=card.classList.contains('checked');badge.textContent=input;save(i,isChecked,input);if(isChecked)post(onPayload(card,i,input));}});}});updateCount();window.checkAll=function(){var ds=fmtDate(new Date());cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');if(!chk.checked){chk.checked=true;card.classList.add('checked');if(badge)badge.textContent=ds;save(i,true,ds);post(onPayload(card,i,ds));}});updateCount();};window.uncheckAll=function(){cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');if(chk.checked){chk.checked=false;card.classList.remove('checked');if(badge)badge.textContent='';save(i,false,'');post(offPayload(card));}});updateCount();};window.clearAll=function(){if(!confirm('よろしいですか？'))return;cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');var was=chk.checked;chk.checked=false;card.classList.remove('checked');if(badge)badge.textContent='';localStorage.removeItem(keyFor(i));if(was)post(offPayload(card));});updateCount();};})();</script>
 <style>
-  /* 障害となる既存UIの非表示 */
-  .toolbar,
-  .notice,
-  .header-note,
-  .help-text{ display:none !important; }
-  /* 既知の削除ボタン候補を全て非表示 */
-  .del-btn, .btn-delete, .delete-btn,
-  [data-role="delete"], [data-action="delete"],
-  button[aria-label="delete"], button[aria-label="削除"],
-  a[aria-label="delete"], a[aria-label="削除"]{ display:none !important; }
-  /* 既存のx/yは使わない想定だが見た目は現状維持。JXのみが真実のソース */
-  .idx-badge{
-    width: 28px; min-width:28px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    color: #6b7280; font-weight: 700; user-select: none;
-  }
-  .date-badge{ line-height: 1.05; display:inline-block; text-align:center; white-space:normal; }
-  .db-mmdd{ font-weight:700; } .db-hm{ font-size: 12px; opacity: .8; }
-  .jx-counter{
-    display:inline-block; margin-left:.6rem; padding:.1rem .4rem;
-    border-radius:.4rem; font-size:.9em; font-weight:700;
-    background:#f3f4f6; color:#374151; font-variant-numeric: tabular-nums; user-select:none;
-  }
-</style>
-<script>
-(function(){
-  if(window.__autoLogPatchedV20b) return; window.__autoLogPatchedV20b = true;
-  var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
-  window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
-
-  // 右上の注意書きテキスト（"日付を編集" を含む要素）を除去
-  try{
-    var header = document.querySelector('header') || document.body;
-    if(header){
-      Array.prototype.slice.call(header.querySelectorAll('*')).forEach(function(n){
-        var t = (n.textContent||'').replace(/\s+/g,'');
-        if(t.indexOf('日付を編集') !== -1){ n.remove(); }
-      });
-    }
-  }catch(_){}
-
-  // 文言ベースの削除ボタンも確実に非表示
-  try{
-    var candidates = [].slice.call(document.querySelectorAll('button, a, [role="button"]'));
-    candidates.forEach(function(el){
-      var txt = (el.textContent||'').trim().toLowerCase();
-      if(txt.indexOf('削除') >= 0 || txt.indexOf('delete') >= 0){
-        el.style.display = 'none';
-      }
-    });
-  }catch(_){}
-
-  function unique(arr){ return arr.filter(function(x,i){ return arr.indexOf(x)===i; }); }
-  function cardOf(el){ return el.closest('.card') || el.closest('.vehicle-card') || el.closest('li') || el.closest('.list-item') || el.parentElement; }
-  function getAllItems(){ return unique([].slice.call(document.querySelectorAll('input.chk')).map(cardOf)).filter(Boolean); }
-
-  var _q=[], _busy=false;
-  function enqueue(p){ _q.push(p); if(!_busy) pump(); }
-  async function pump(){ _busy=true; while(_q.length){ var body=JSON.stringify(Object.assign({secret:SECRET}, _q.shift())); try{ await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body}); }catch(e){} await new Promise(r=>setTimeout(r,120)); } _busy=false; }
-
-  function nowJST(){ var d=new Date(); function pad(n){return('0'+n).slice(-2);} return d.getFullYear()+'/'+pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
-  function partsNow(){ var d=new Date(); function pad(n){return('0'+n).slice(-2);} return { mmdd: pad(d.getMonth()+1)+'/'+pad(d.getDate()), hm: pad(d.getHours())+':'+pad(d.getMinutes()) }; }
-  function badgeHTML(mmdd,hm){ return '<div class="db-mmdd">'+mmdd+'</div><div class="db-hm">'+hm+'</div>'; }
-
-  function text(el, sel){ var t=el&&el.querySelector(sel); return t?(t.textContent||'').trim():''; }
-  function metaLines(card){ return Array.prototype.map.call(card.querySelectorAll('.meta .line'), function(x){return (x.textContent||'').trim();}); }
-  function fallbackFields(card){ var station=text(card,'.title'); var lines=metaLines(card); var model=lines.length?lines[0]:''; var plate=lines.length>1?lines[1]:''; return {station_name:station, vehicle_model:model, plate_number:plate}; }
-  function pickAttr(card, name, fb){ var v=card.getAttribute(name); return(v&&v.trim())?v.trim():(fb||''); }
-
-  function setup(){
-    var H1=document.querySelector('h1'); var CITY=(H1&&H1.textContent)?H1.textContent.replace(' 巡回','').trim():'';
-    var TOTAL=0;
-    if(CITY.indexOf("大和")!==-1) TOTAL=60;
-    else if(CITY.indexOf("海老名")!==-1) TOTAL=89;
-    else if(CITY.indexOf("調布")!==-1) TOTAL=54;
-
-    var allItems=getAllItems();
-    if(allItems.length===0) return;
-
-    var jx=document.createElement('span'); jx.className='jx-counter'; jx.id='jxCounter';
-    var h1=document.querySelector('h1'); if(h1){h1.appendChild(jx);}
-
-    var containerMap=new Map();
-    allItems.forEach(function(card, idx){
-      var parent=card.parentNode; if(!containerMap.has(parent)) containerMap.set(parent,{list:[]});
-      var rec=containerMap.get(parent); rec.list.push(card);
-      if(!card.__origParent){ card.__origParent=parent; card.__origNext=card.nextSibling; }
-      card.dataset.orig=idx; card.dataset.idx=idx+1;
-      if(!card.querySelector('.idx-badge')){
-        var idxSpan=document.createElement('span'); idxSpan.className='idx-badge'; idxSpan.textContent=String(idx+1);
-        if(card.firstElementChild){ card.insertBefore(idxSpan, card.firstElementChild);} else { card.prepend(idxSpan); }
-      }
-    });
-
-    function key(i){return 'chk:'+CITY+':'+i;}
-    function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}}
-    function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
-
-    function updateCount(){
-      var checkedNow=0; containerMap.forEach(function(rec){ checkedNow+=rec.list.filter(function(c){return c.classList.contains('checked');}).length; });
-      if(jx) jx.textContent=checkedNow+'/'+TOTAL;
-      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checkedNow,total:TOTAL}))}catch(e){};
-    }
-
-    function restoreToOriginal(card){ var p=card.__origParent,n=card.__origNext; if(!p)return; if(n&&n.parentNode===p){p.insertBefore(card,n);}else{p.appendChild(card);} }
-    function resortContainer(parent){
-      var rec=containerMap.get(parent); if(!rec)return;
-      var list=rec.list.slice();
-      var unchecked=list.filter(function(c){return !c.classList.contains('checked');});
-      var checked=list.filter(function(c){return c.classList.contains('checked');});
-      unchecked.sort(function(a,b){return(+a.dataset.orig)-(+b.dataset.orig);});
-      checked.sort(function(a,b){return(+a.dataset.idx)-(+b.dataset.idx);});
-      unchecked.concat(checked).forEach(function(c){ if(c.parentNode!==parent){restoreToOriginal(c);} parent.appendChild(c); });
-    }
-
-    // Restore persisted checks (並び替えはリロード時のみ)
-    containerMap.forEach(function(rec, parent){
-      rec.list.forEach(function(card,i){
-        var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
-        if(data && data.checked){ card.classList.add('checked'); if(chk) chk.checked=true;
-          if(badge){ if((data.date||'').indexOf('\\n')>=0){ var sp=data.date.split('\\n'); badge.innerHTML=badgeHTML(sp[0],sp[1]||''); } else { badge.textContent=data.date||''; } }
-        }
-      });
-      resortContainer(parent);
-    });
-    updateCount();
-
-    allItems.forEach(function(card,i){
-      var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge'); if(!chk)return;
-      var fb=fallbackFields(card);
-      var station_name=pickAttr(card,'data-station',fb.station_name);
-      var vehicle_model=pickAttr(card,'data-model',fb.vehicle_model);
-      var plate_number=pickAttr(card,'data-plate',fb.plate_number);
-
-      function applyToggle(makeChecked){
-        var p=partsNow();
-        if(makeChecked){
-          card.classList.add('checked'); chk.checked=true;
-          if(badge) badge.innerHTML=badgeHTML(p.mmdd,p.hm);
-          save(i,true,p.mmdd+'\\n'+p.hm);
-          enqueue({ ts: nowJST(), city: CITY, index:i+1, station_name:station_name, vehicle_model:vehicle_model, plate_number:plate_number, date_badge:p.mmdd, checked:true });
-        } else {
-          card.classList.remove('checked'); chk.checked=false; if(badge) badge.textContent='';
-          save(i,false,''); enqueue({ city:CITY, plate_number:plate_number, delete:true });
-        }
-        updateCount();
-      }
-
-      function bindConfirmTarget(target){
-        if(!target || target.__patchedV20b) return; target.__patchedV20b=true;
-        target.addEventListener('click', function(ev){
-          ev.stopImmediatePropagation(); ev.preventDefault();
-          var next=!chk.checked; if(!confirm('よろしいですか？')) return;
-          setTimeout(function(){ applyToggle(next); },0);
-        }, true);
-      }
-      bindConfirmTarget(chk);
-      var lbl=chk.closest && chk.closest('label'); if(lbl) bindConfirmTarget(lbl);
-      var wrap=card.querySelector('.chk-wrap'); if(wrap) bindConfirmTarget(wrap);
-      chk.addEventListener('keydown', function(ev){ if(ev.key===' '||ev.key==='Enter'){ ev.stopImmediatePropagation(); ev.preventDefault(); var next=!chk.checked; if(!confirm('よろしいですか？')) return; setTimeout(function(){applyToggle(next);},0);} }, true);
-    });
-  }
-
-  if(document.readyState==='complete'||document.readyState==='interactive'){setTimeout(setup,0);} else {document.addEventListener('DOMContentLoaded',setup);}
-})();
-</script>
-
-<style>
-/* --- layout fix: date badge vs 3-dot menu --- */
+/* --- layout fix v2: keep 3-dot visible, move date left, avoid overlap --- */
 .card{ position: relative; }
-.card .more-btn{ position:absolute; right:.6rem; top:.6rem; z-index: 5; }
+.card .more-btn{
+  position:absolute; right:.6rem; top:.6rem;
+  z-index:20; /* always on top */
+}
 .card .date-badge{
-  position:absolute; right:3.4rem; top:.6rem; z-index:4;
-  text-align:right; line-height:1.05;
-  font-size: 0.9em;
-  padding: .05rem .25rem;
+  position:absolute; right:3.9rem; top:.6rem;
+  z-index:5; text-align:right; line-height:1.05;
+  font-size: 0.9em; padding:.05rem .25rem;
   background: transparent;
+  pointer-events: none; /* don't block taps on ... */
 }
 .card .date-badge .db-mmdd{ font-weight:700; }
 .card .date-badge .db-hm{ font-size:.85em; opacity:.85; }
 @media (max-width: 390px){
-  .card .date-badge{ right:3.6rem; top:.55rem; }
+  .card .date-badge{ right:4.2rem; top:.55rem; }
 }
 </style>
