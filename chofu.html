@@ -864,9 +864,9 @@ function attachHandlers(city){
   .db-hm{ font-size: 12px; opacity: .8; }
 </style>
 <script>
-// ---- auto-log patch v16 (doc-level capture click; iOS-safe confirm->toggle) ----
+// ---- auto-log patch v17 (per-element capture; robust ON/OFF) ----
 (function(){
-  if(window.__autoLogPatchedV16) return; window.__autoLogPatchedV16 = true;
+  if(window.__autoLogPatchedV17) return; window.__autoLogPatchedV17 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -915,9 +915,8 @@ function attachHandlers(city){
     function updateCount(){
       var c=cards.filter(c=>c.classList.contains('checked')).length;
       if(countEl) countEl.textContent = c + '/' + cards.length;
-      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:cards.length}))}catch(e){}
-    }
-
+      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:cards.length}))}catch(e){}}
+    
     function applyToggle(card, chk, badge, i, station_name, vehicle_model, plate_number, makeChecked){
       var p = partsNow();
       if(makeChecked){
@@ -940,8 +939,20 @@ function attachHandlers(city){
       updateCount();
     }
 
+    function bindConfirmTarget(target, card, chk, badge, i, station_name, vehicle_model, plate_number){
+      if(!target || target.__patchedV17) return;
+      target.__patchedV17 = true;
+      target.addEventListener('click', function(ev){
+        ev.stopImmediatePropagation();
+        ev.preventDefault();
+        var next = !chk.checked;
+        if(!confirm('よろしいですか？')) return;
+        setTimeout(function(){ applyToggle(card, chk, badge, i, station_name, vehicle_model, plate_number, next); },0);
+      }, true);
+    }
+
     cards.forEach(function(card,i){
-      if(card.__patchedV16) return; card.__patchedV16=true;
+      if(card.__patchedV17Card) return; card.__patchedV17Card=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
 
       // index badge (1-start)
@@ -971,50 +982,28 @@ function attachHandlers(city){
       var vehicle_model = pickAttr(card,'data-model',   fb.vehicle_model);
       var plate_number  = pickAttr(card,'data-plate',   fb.plate_number);
 
-      // Document-level capture: handle taps on checkbox or its label/container
-      function isChkOrLabel(t){
-        if(!t) return null;
-        if(t === chk) return chk;
-        if(t.matches && (t.matches('label') || t.matches('.chk-wrap'))) return chk;
-        var lb = t.closest && t.closest('label,.chk-wrap');
-        if(lb) return chk;
-        return null;
-      }
+      // Bind to checkbox, its wrapping label and .chk-wrap (if present)
+      bindConfirmTarget(chk, card, chk, badge, i, station_name, vehicle_model, plate_number);
+      var lbl = chk.closest && chk.closest('label');
+      if(lbl) bindConfirmTarget(lbl, card, chk, badge, i, station_name, vehicle_model, plate_number);
+      var wrap = card.querySelector('.chk-wrap');
+      if(wrap) bindConfirmTarget(wrap, card, chk, badge, i, station_name, vehicle_model, plate_number);
 
-      document.addEventListener('click', function(ev){
-        var target = ev.target;
-        var hit = isChkOrLabel(target);
-        if(!hit) return;
-        if(!card.contains(target)) return; // only this card
-
-        ev.stopImmediatePropagation();
-        ev.preventDefault();
-
-        var next = !chk.checked;
-        if(!confirm('よろしいですか？')) return;
-        // iOS safeness: defer state change after confirm
-        setTimeout(function(){
-          applyToggle(card, chk, badge, i, station_name, vehicle_model, plate_number, next);
-        },0);
-      }, true);
-
-      // Keyboard support on checkbox
+      // Keyboard on checkbox
       chk.addEventListener('keydown', function(ev){
         if(ev.key === ' ' || ev.key === 'Enter'){
           ev.stopImmediatePropagation();
           ev.preventDefault();
           var next = !chk.checked;
           if(!confirm('よろしいですか？')) return;
-          setTimeout(function(){
-            applyToggle(card, chk, badge, i, station_name, vehicle_model, plate_number, next);
-          },0);
+          setTimeout(function(){ applyToggle(card, chk, badge, i, station_name, vehicle_model, plate_number, next); },0);
         }
       }, true);
 
       // 既存の削除ボタン（クラス/属性のばらつきに配慮）
       var delBtn = card.querySelector('.del-btn, [data-role="delete"]');
-      if(delBtn && !delBtn.__patchedV16){
-        delBtn.__patchedV16 = true;
+      if(delBtn && !delBtn.__patchedV17){
+        delBtn.__patchedV17 = true;
         delBtn.addEventListener('click', function(){
           if(!confirm('この項目を未チェックに戻してログも削除します。よろしいですか？')) return;
           applyToggle(card, chk, badge, i, station_name, vehicle_model, plate_number, false);
