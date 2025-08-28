@@ -994,16 +994,11 @@ function attachHandlers(city){
     user-select: none;
   }
   .card .chk-wrap{ margin-left: 0; }
-  .del-btn{
-    margin-left: 8px; padding: 6px 10px; border-radius: 10px;
-    border: 1px solid #e6e8ee; background: #fff; color: #6b7280;
-    font-size: 12px; flex: none;
-  }
 </style>
 <script>
-// ---- auto-log patch v7 (count x/y + per-card 削除ボタン) ----
+// ---- auto-log patch v8 (fix count x/y, reuse existing 削除 buttons) ----
 (function(){
-  if(window.__autoLogPatchedV7) return; window.__autoLogPatchedV7 = true;
+  if(window.__autoLogPatchedV8) return; window.__autoLogPatchedV8 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -1037,12 +1032,12 @@ function attachHandlers(city){
     function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
     function updateCount(){
       var c=cards.filter(c=>c.classList.contains('checked')).length;
-      if(countEl) countEl.textContent = c + '/' + cards.length; // x/y 表示
+      if(countEl) countEl.textContent = c + '/' + cards.length;
       try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:cards.length}))}catch(e){}
     }
 
     cards.forEach(function(card,i){
-      if(card.__patchedV7) return; card.__patchedV7=true;
+      if(card.__patchedV8) return; card.__patchedV8=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
 
       // index badge (1-start)
@@ -1051,15 +1046,6 @@ function attachHandlers(city){
         idxSpan.className = 'idx-badge';
         idxSpan.textContent = String(i+1);
         if(card.firstElementChild){ card.insertBefore(idxSpan, card.firstElementChild); } else { card.prepend(idxSpan); }
-      }
-
-      // 削除ボタン（右端）
-      if(!card.querySelector('.del-btn')){
-        var del = document.createElement('button');
-        del.className = 'del-btn';
-        del.type = 'button';
-        del.textContent = '削除';
-        card.appendChild(del);
       }
 
       if(data&&data.checked){card.classList.add('checked'); if(chk) chk.checked=true; if(badge) badge.textContent=data.date||'';}
@@ -1088,7 +1074,7 @@ function attachHandlers(city){
         updateCount();
       });
 
-      // 削除ボタンの挙動：確認後にOFF + ローカル消去 + GAS削除
+      // 既存の削除ボタンにイベントを紐付け
       var delBtn = card.querySelector('.del-btn');
       if(delBtn){
         delBtn.addEventListener('click', function(){
