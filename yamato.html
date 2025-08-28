@@ -985,7 +985,6 @@ function attachHandlers(city){
 
 <style>
   .toolbar{display:none !important;}
-  /* Hide legacy counters to prevent confusion */
   #count, .count, .counter-badge{ display:none !important; }
   .idx-badge{
     width: 28px; min-width:28px;
@@ -999,20 +998,6 @@ function attachHandlers(city){
   .date-badge{ line-height: 1.05; display:inline-block; text-align:center; white-space:normal; }
   .db-mmdd{ font-weight:700; }
   .db-hm{ font-size: 12px; opacity: .8; }
-  /* Robust force-visible for delete buttons with varied classes/attrs */
-  .del-btn,
-  .btn-delete,
-  [data-role="delete"],
-  [data-action="delete"],
-  button[aria-label="delete"],
-  button[aria-label="削除"],
-  a[aria-label="delete"],
-  a[aria-label="削除"]{
-    display:inline-block !important;
-    visibility:visible !important;
-    opacity:1 !important;
-  }
-  /* Independent JX counter badge */
   .jx-counter{
     display:inline-block;
     margin-left:.6rem;
@@ -1027,244 +1012,123 @@ function attachHandlers(city){
   }
 </style>
 <script>
-// ---- auto-log patch v19 (isolate features; JX counter; per-container sorting) ----
 (function(){
-  if(window.__autoLogPatchedV19) return; window.__autoLogPatchedV19 = true;
+  if(window.__autoLogPatchedV20) return; window.__autoLogPatchedV20 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
-
-  // no-op legacy global handlers to avoid accidental triggers
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
-  // Remove header help text containing "日付を編集"
-  var header = document.querySelector('header');
-  if(header){
-    Array.prototype.slice.call(header.querySelectorAll('*')).forEach(function(n){
-      var t = (n.textContent||'').replace(/\s+/g,'');
-      if(t.indexOf('日付を編集') !== -1){ n.remove(); }
-    });
-  }
-
-  // Helper: unique array
   function unique(arr){ return arr.filter(function(x,i){ return arr.indexOf(x)===i; }); }
-  function cardOf(el){
-    return el.closest('.card') || el.closest('.vehicle-card') || el.closest('li') || el.closest('.list-item') || el.parentElement;
-  }
-  function getAllItems(){
-    var chks = [].slice.call(document.querySelectorAll('input.chk'));
-    var items = chks.map(cardOf);
-    return unique(items).filter(Boolean);
-  }
+  function cardOf(el){ return el.closest('.card') || el.closest('.vehicle-card') || el.closest('li') || el.closest('.list-item') || el.parentElement; }
+  function getAllItems(){ return unique([].slice.call(document.querySelectorAll('input.chk')).map(cardOf)).filter(Boolean); }
 
   var _q=[], _busy=false;
   function enqueue(p){ _q.push(p); if(!_busy) pump(); }
   async function pump(){ _busy=true; while(_q.length){ var body=JSON.stringify(Object.assign({secret:SECRET}, _q.shift())); try{ await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body}); }catch(e){} await new Promise(r=>setTimeout(r,120)); } _busy=false; }
 
-  function nowJST(){
-    var d = new Date();
-    function pad(n){ return ('0'+n).slice(-2); }
-    return d.getFullYear() + '/' + pad(d.getMonth()+1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-  }
-  function partsNow(){
-    var d = new Date();
-    function pad(n){ return ('0'+n).slice(-2); }
-    return { mmdd: pad(d.getMonth()+1)+'/'+pad(d.getDate()), hm: pad(d.getHours())+':'+pad(d.getMinutes()) };
-  }
+  function nowJST(){ var d=new Date(); function pad(n){return('0'+n).slice(-2);} return d.getFullYear()+'/'+pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
+  function partsNow(){ var d=new Date(); function pad(n){return('0'+n).slice(-2);} return { mmdd: pad(d.getMonth()+1)+'/'+pad(d.getDate()), hm: pad(d.getHours())+':'+pad(d.getMinutes()) }; }
   function badgeHTML(mmdd,hm){ return '<div class="db-mmdd">'+mmdd+'</div><div class="db-hm">'+hm+'</div>'; }
 
-  function text(el, sel){ var t = el && el.querySelector(sel); return t ? (t.textContent||'').trim() : ''; }
+  function text(el, sel){ var t=el&&el.querySelector(sel); return t?(t.textContent||'').trim():''; }
   function metaLines(card){ return Array.prototype.map.call(card.querySelectorAll('.meta .line'), function(x){return (x.textContent||'').trim();}); }
-  function fallbackFields(card){
-    var station = text(card,'.title');
-    var lines = metaLines(card);
-    var model = lines.length ? lines[0] : '';
-    var plate = lines.length>1 ? lines[1] : '';
-    return {station_name:station, vehicle_model:model, plate_number:plate};
-  }
-  function pickAttr(card, name, fb){ var v = card.getAttribute(name); return (v && v.trim()) ? v.trim() : (fb || ''); }
+  function fallbackFields(card){ var station=text(card,'.title'); var lines=metaLines(card); var model=lines.length?lines[0]:''; var plate=lines.length>1?lines[1]:''; return {station_name:station, vehicle_model:model, plate_number:plate}; }
+  function pickAttr(card, name, fb){ var v=card.getAttribute(name); return(v&&v.trim())?v.trim():(fb||''); }
 
   function setup(){
     var H1=document.querySelector('h1'); var CITY=(H1&&H1.textContent)?H1.textContent.replace(' 巡回','').trim():'';
+    var TOTAL=0;
+    if(CITY.indexOf("大和")!==-1) TOTAL=60;
+    else if(CITY.indexOf("海老名")!==-1) TOTAL=89;
+    else if(CITY.indexOf("調布")!==-1) TOTAL=54;
+
     var allItems=getAllItems();
     if(allItems.length===0) return;
 
-    // Independent JX counter next to <h1>
-    var jx = document.createElement('span');
-    jx.className = 'jx-counter';
-    jx.id = 'jxCounter';
-    var h1 = document.querySelector('h1');
-    if(h1){ h1.appendChild(jx); }
+    var jx=document.createElement('span'); jx.className='jx-counter'; jx.id='jxCounter';
+    var h1=document.querySelector('h1'); if(h1){h1.appendChild(jx);}
 
-    // Container mapping & baseline
-    var containerMap = new Map();
+    var containerMap=new Map();
     allItems.forEach(function(card, idx){
-      var parent = card.parentNode;
-      if(!containerMap.has(parent)) containerMap.set(parent, {list:[], total:0});
-      var rec = containerMap.get(parent);
-      rec.list.push(card);
-      rec.total++;
-      if(!card.__origParent){ card.__origParent = parent; card.__origNext = card.nextSibling; }
-      card.dataset.orig = idx;
-      card.dataset.idx  = idx+1;
-      // index badge
+      var parent=card.parentNode; if(!containerMap.has(parent)) containerMap.set(parent,{list:[]});
+      var rec=containerMap.get(parent); rec.list.push(card);
+      if(!card.__origParent){ card.__origParent=parent; card.__origNext=card.nextSibling; }
+      card.dataset.orig=idx; card.dataset.idx=idx+1;
       if(!card.querySelector('.idx-badge')){
-        var idxSpan = document.createElement('span');
-        idxSpan.className = 'idx-badge';
-        idxSpan.textContent = String(idx+1);
-        if(card.firstElementChild){ card.insertBefore(idxSpan, card.firstElementChild); } else { card.prepend(idxSpan); }
+        var idxSpan=document.createElement('span'); idxSpan.className='idx-badge'; idxSpan.textContent=String(idx+1);
+        if(card.firstElementChild){ card.insertBefore(idxSpan, card.firstElementChild);} else { card.prepend(idxSpan); }
       }
     });
-
-    var BASE_TOTAL = 0;
-    containerMap.forEach(function(rec){ BASE_TOTAL += rec.total; });
 
     function key(i){return 'chk:'+CITY+':'+i;}
     function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}}
     function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
 
     function updateCount(){
-      var checkedNow = 0;
-      containerMap.forEach(function(rec){
-        checkedNow += rec.list.filter(function(c){ return c.classList.contains('checked'); }).length;
-      });
-      var label = checkedNow + '/' + BASE_TOTAL;
-      jx && (jx.textContent = label);
-      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checkedNow,total:BASE_TOTAL}))}catch(e){}
+      var checkedNow=0; containerMap.forEach(function(rec){ checkedNow+=rec.list.filter(function(c){return c.classList.contains('checked');}).length; });
+      if(jx) jx.textContent=checkedNow+'/'+TOTAL;
+      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checkedNow,total:TOTAL}))}catch(e){}
     }
 
-    function restoreToOriginal(card){
-      var p = card.__origParent, n = card.__origNext;
-      if(!p) return;
-      if(n && n.parentNode === p){ p.insertBefore(card, n); } else { p.appendChild(card); }
-    }
-
+    function restoreToOriginal(card){ var p=card.__origParent,n=card.__origNext; if(!p)return; if(n&&n.parentNode===p){p.insertBefore(card,n);}else{p.appendChild(card);} }
     function resortContainer(parent){
-      var rec = containerMap.get(parent);
-      if(!rec) return;
-      var list = rec.list.slice();
-      var unchecked = list.filter(function(c){ return !c.classList.contains('checked'); });
-      var checked = list.filter(function(c){ return c.classList.contains('checked'); });
-      unchecked.sort(function(a,b){ return (+a.dataset.orig) - (+b.dataset.orig); });
-      checked.sort(function(a,b){ return (+a.dataset.idx) - (+b.dataset.idx); });
-      unchecked.concat(checked).forEach(function(c){
-        if(c.parentNode !== parent){ restoreToOriginal(c); }
-        parent.appendChild(c);
-      });
+      var rec=containerMap.get(parent); if(!rec)return;
+      var list=rec.list.slice();
+      var unchecked=list.filter(function(c){return !c.classList.contains('checked');});
+      var checked=list.filter(function(c){return c.classList.contains('checked');});
+      unchecked.sort(function(a,b){return(+a.dataset.orig)-(+b.dataset.orig);});
+      checked.sort(function(a,b){return(+a.dataset.idx)-(+b.dataset.idx);});
+      unchecked.concat(checked).forEach(function(c){ if(c.parentNode!==parent){restoreToOriginal(c);} parent.appendChild(c); });
     }
 
-    // Restore persisted checks and first resort
+    // Restore persisted checks (並び替えはここでのみ行う)
     containerMap.forEach(function(rec, parent){
-      rec.list.forEach(function(card, i){
-        var chk=card.querySelector('input.chk');
-        var badge=card.querySelector('.date-badge');
-        var data=load(i);
-        if(data && data.checked){
-          card.classList.add('checked'); if(chk) chk.checked=true;
-          if(badge){
-            if((data.date||'').indexOf('\\n')>=0){
-              var sp = data.date.split('\\n');
-              badge.innerHTML = badgeHTML(sp[0], sp[1]||'');
-            }else{
-              badge.textContent = data.date||'';
-            }
-          }
+      rec.list.forEach(function(card,i){
+        var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
+        if(data && data.checked){ card.classList.add('checked'); if(chk) chk.checked=true;
+          if(badge){ if((data.date||'').indexOf('\\n')>=0){ var sp=data.date.split('\\n'); badge.innerHTML=badgeHTML(sp[0],sp[1]||''); } else { badge.textContent=data.date||''; } }
         }
       });
-      resortContainer(parent);
+      resortContainer(parent); // 並び替えはリロード時のみ
     });
     updateCount();
 
-    // Bind per-item
     allItems.forEach(function(card,i){
-      var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge');
-      if(!chk) return;
-
-      var fb = fallbackFields(card);
-      var station_name = pickAttr(card,'data-station', fb.station_name);
-      var vehicle_model = pickAttr(card,'data-model',   fb.vehicle_model);
-      var plate_number  = pickAttr(card,'data-plate',   fb.plate_number);
+      var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge'); if(!chk)return;
+      var fb=fallbackFields(card);
+      var station_name=pickAttr(card,'data-station',fb.station_name);
+      var vehicle_model=pickAttr(card,'data-model',fb.vehicle_model);
+      var plate_number=pickAttr(card,'data-plate',fb.plate_number);
 
       function applyToggle(makeChecked){
-        var p = partsNow();
+        var p=partsNow();
         if(makeChecked){
-          card.classList.add('checked'); chk.checked = true;
-          if(badge) badge.innerHTML = badgeHTML(p.mmdd, p.hm);
-          save(i,true, p.mmdd + '\\n' + p.hm);
-          enqueue({ ts: nowJST(), city: CITY, index: i+1,
-            station_name: station_name, vehicle_model: vehicle_model, plate_number: plate_number,
-            date_badge: p.mmdd, checked: true });
+          card.classList.add('checked'); chk.checked=true;
+          if(badge) badge.innerHTML=badgeHTML(p.mmdd,p.hm);
+          save(i,true,p.mmdd+'\\n'+p.hm);
+          enqueue({ ts: nowJST(), city: CITY, index:i+1, station_name:station_name, vehicle_model:vehicle_model, plate_number:plate_number, date_badge:p.mmdd, checked:true });
         } else {
-          card.classList.remove('checked'); chk.checked = false;
-          if(badge) badge.textContent='';
-          save(i,false,'');
-          enqueue({ city: CITY, plate_number: plate_number, delete: true });
+          card.classList.remove('checked'); chk.checked=false; if(badge) badge.textContent='';
+          save(i,false,''); enqueue({ city:CITY, plate_number:plate_number, delete:true });
         }
         updateCount();
-        resortContainer(card.__origParent || card.parentNode);
       }
 
       function bindConfirmTarget(target){
-        if(!target || target.__patchedV19) return;
-        target.__patchedV19 = true;
+        if(!target || target.__patchedV20) return; target.__patchedV20=true;
         target.addEventListener('click', function(ev){
-          ev.stopImmediatePropagation();
-          ev.preventDefault();
-          var next = !chk.checked;
-          if(!confirm('よろしいですか？')) return;
+          ev.stopImmediatePropagation(); ev.preventDefault();
+          var next=!chk.checked; if(!confirm('よろしいですか？')) return;
           setTimeout(function(){ applyToggle(next); },0);
         }, true);
       }
       bindConfirmTarget(chk);
-      var lbl = chk.closest && chk.closest('label');
-      if(lbl) bindConfirmTarget(lbl);
-      var wrap = card.querySelector('.chk-wrap');
-      if(wrap) bindConfirmTarget(wrap);
-
-      // Keyboard
-      chk.addEventListener('keydown', function(ev){
-        if(ev.key === ' ' || ev.key === 'Enter'){
-          ev.stopImmediatePropagation();
-          ev.preventDefault();
-          var next = !chk.checked;
-          if(!confirm('よろしいですか？')) return;
-          setTimeout(function(){ applyToggle(next); },0);
-        }
-      }, true);
-
-      // Robust delete button (selector + text fallback)
-      function findDeleteButton(card){
-        var sel = '.del-btn, .btn-delete, [data-role="delete"], [data-action="delete"], button[aria-label="delete"], button[aria-label="削除"], a[aria-label="delete"], a[aria-label="削除"]';
-        var btn = card.querySelector(sel);
-        if(btn) return btn;
-        var candidates = [].slice.call(card.querySelectorAll('button, a, [role="button"]'));
-        for(var i=0;i<candidates.length;i++){
-          var t = (candidates[i].textContent||'').trim();
-          if(t === '削除' || t.toLowerCase() === 'delete' || t.indexOf('削除')>=0 || t.toLowerCase().indexOf('delete')>=0){
-            return candidates[i];
-          }
-        }
-        return null;
-      }
-      var delBtn = findDeleteButton(card);
-      if(delBtn){
-        try{
-          delBtn.style.display='inline-block'; delBtn.style.visibility='visible'; delBtn.style.opacity='1';
-          delBtn.classList && delBtn.classList.remove('hidden','d-none','sr-only');
-        }catch(e){}
-      }
-      if(delBtn && !delBtn.__patchedV19){
-        delBtn.__patchedV19 = true;
-        delBtn.addEventListener('click', function(){
-          if(!confirm('この項目を未チェックに戻してログも削除します。よろしいですか？')) return;
-          applyToggle(false);
-        });
-      }
+      var lbl=chk.closest && chk.closest('label'); if(lbl) bindConfirmTarget(lbl);
+      var wrap=card.querySelector('.chk-wrap'); if(wrap) bindConfirmTarget(wrap);
+      chk.addEventListener('keydown', function(ev){ if(ev.key===' '||ev.key==='Enter'){ ev.stopImmediatePropagation(); ev.preventDefault(); var next=!chk.checked; if(!confirm('よろしいですか？')) return; setTimeout(function(){applyToggle(next);},0);} }, true);
     });
-
-    // No periodic timer needed; but if other scripts try to change our JX, it won't matter since it's independent.
   }
 
-  if(document.readyState==='complete'||document.readyState==='interactive'){ setTimeout(setup,0); }
-  else { document.addEventListener('DOMContentLoaded', setup); }
+  if(document.readyState==='complete'||document.readyState==='interactive'){setTimeout(setup,0);} else {document.addEventListener('DOMContentLoaded',setup);}
 })();
 </script>
 </html>
