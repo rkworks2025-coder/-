@@ -669,43 +669,53 @@
       <div class="date-badge" title="タップで手入力"></div>
     </div></main><script>(function(){var CITY='調布市';var total=54;var cards=[].slice.call(document.querySelectorAll('.card'));var countEl=document.getElementById('count');function keyFor(i){return 'chk:'+CITY+':'+i;}function save(i,c,d){localStorage.setItem(keyFor(i),JSON.stringify({checked:c,date:d}));}function load(i){try{return JSON.parse(localStorage.getItem(keyFor(i)))||null}catch(e){return null}}function fmtDate(d){var m=('0'+(d.getMonth()+1)).slice(-2),day=('0'+d.getDate()).slice(-2);return m+'-'+day;}function nowISO(){return new Date().toISOString();}function updateCount(){var c=cards.filter(c=>c.classList.contains('checked')).length;if(countEl)countEl.textContent=c+'/'+total;try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:total}))}catch(e){}}function post(p){try{fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({secret:SECRET},p))})}catch(e){}}function onPayload(card,i,ds){return{ts:nowISO(),city:CITY,index:i,station_name:card.getAttribute('data-station')||'',vehicle_model:card.getAttribute('data-model')||'',plate_number:card.getAttribute('data-plate')||'',date_badge:ds||'',checked:true}}function offPayload(card){return{city:CITY,plate_number:card.getAttribute('data-plate')||'',delete:true}}cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');var data=load(i);if(data&&data.checked){card.classList.add('checked');if(badge)badge.textContent=data.date||'';chk.checked=true;}chk.addEventListener('change',function(){var ds=fmtDate(new Date());if(chk.checked){card.classList.add('checked');if(badge)badge.textContent=ds;save(i,true,ds);post(onPayload(card,i,ds));}else{card.classList.remove('checked');if(badge)badge.textContent='';save(i,false,'');post(offPayload(card));}updateCount();});if(badge){badge.addEventListener('click',function(){var input=prompt('MM-DD で入力（例: 08-27）',badge.textContent||fmtDate(new Date()));if(input){var isChecked=card.classList.contains('checked');badge.textContent=input;save(i,isChecked,input);if(isChecked)post(onPayload(card,i,input));}});}});updateCount();window.checkAll=function(){var ds=fmtDate(new Date());cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');if(!chk.checked){chk.checked=true;card.classList.add('checked');if(badge)badge.textContent=ds;save(i,true,ds);post(onPayload(card,i,ds));}});updateCount();};window.uncheckAll=function(){cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');if(chk.checked){chk.checked=false;card.classList.remove('checked');if(badge)badge.textContent='';save(i,false,'');post(offPayload(card));}});updateCount();};window.clearAll=function(){if(!confirm('よろしいですか？'))return;cards.forEach(function(card,i){var chk=card.querySelector('.chk');var badge=card.querySelector('.date-badge');var was=chk.checked;chk.checked=false;card.classList.remove('checked');if(badge)badge.textContent='';localStorage.removeItem(keyFor(i));if(was)post(offPayload(card));});updateCount();};})();</script>
 <style>
-  /* 障害となる既存UIの非表示 */
+  /* 既存の注意書き/削除UIは使わない */
   .toolbar,
   .notice,
   .header-note,
   .help-text{ display:none !important; }
-  /* 既知の削除ボタン候補を全て非表示 */
   .del-btn, .btn-delete, .delete-btn,
   [data-role="delete"], [data-action="delete"],
   button[aria-label="delete"], button[aria-label="削除"],
   a[aria-label="delete"], a[aria-label="削除"]{ display:none !important; }
-  /* 既存のx/yは使わない想定だが見た目は現状維持。JXのみが真実のソース */
+
+  /* 新機能の見た目 */
   .idx-badge{
-    width: 28px; min-width:28px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    color: #6b7280; font-weight: 700; user-select: none;
+    width: 28px; min-width:28px; text-align:center;
+    font-variant-numeric: tabular-nums; color:#6b7280; font-weight:700; user-select:none;
   }
-  .date-badge{ line-height: 1.05; display:inline-block; text-align:center; white-space:normal; }
-  .db-mmdd{ font-weight:700; } .db-hm{ font-size: 12px; opacity: .8; }
+  .date-badge{ line-height:1.05; display:inline-block; text-align:center; white-space:normal; }
+  .db-mmdd{ font-weight:700; } .db-hm{ font-size:12px; opacity:.8; }
   .jx-counter{
-    display:inline-block; margin-left:.6rem; padding:.1rem .4rem;
+    display:inline-block; margin-left:.6rem; padding:.1rem .5rem;
     border-radius:.4rem; font-size:.9em; font-weight:700;
-    background:#f3f4f6; color:#374151; font-variant-numeric: tabular-nums; user-select:none;
+    background:#f3f4f6; color:#374151; font-variant-numeric:tabular-nums; user-select:none;
   }
+  .jx-counter .sep{ padding:0 .25em; opacity:.6; }
+  .state-btns{ display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; margin-top:.25rem; }
+  .btn-mini{
+    display:inline-block; padding:.15rem .5rem; border:1px solid #d1d5db; border-radius:.35rem;
+    background:#fff; color:#374151; font-size:.85em; line-height:1.6; cursor:pointer; user-select:none;
+  }
+  .btn-mini.is-on{ background:#e5e7eb; }
+  .status-badges{ margin-left:.4rem; display:inline-flex; gap:.3rem; vertical-align:middle; }
+  .badge{ display:inline-block; padding:.05rem .35rem; border-radius:.35rem; font-size:.75em; background:#e5e7eb; color:#374151; }
+  .badge.badge-skipped{ background:#fde68a; color:#92400e; }
+  .badge.badge-paused{ background:#e5e7eb; color:#374151; }
+  .paused{ filter:grayscale(0.35); background:#f3f4f6; }
 </style>
 <script>
 (function(){
-  if(window.__autoLogPatchedV20b) return; window.__autoLogPatchedV20b = true;
+  if(window.__autoLogPatchedV21) return; window.__autoLogPatchedV21 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
-  // 右上の注意書きテキスト（"日付を編集" を含む要素）を除去
+  // 右上の注意書きを念のため除去（「日付を編集」を含む要素）
   try{
     var header = document.querySelector('header') || document.body;
     if(header){
       Array.prototype.slice.call(header.querySelectorAll('*')).forEach(function(n){
-        var t = (n.textContent||'').replace(/\s+/g,'');
+        var t = (n.textContent||'').replace(/\\s+/g,'');
         if(t.indexOf('日付を編集') !== -1){ n.remove(); }
       });
     }
@@ -749,8 +759,10 @@
     var allItems=getAllItems();
     if(allItems.length===0) return;
 
+    // 見出し横の 4連カウンター：checked / paused / skipped / total
     var jx=document.createElement('span'); jx.className='jx-counter'; jx.id='jxCounter';
     var h1=document.querySelector('h1'); if(h1){h1.appendChild(jx);}
+    function setJX(checked, paused, skipped){ jx.textContent = checked+' / '+paused+' / '+skipped+' / '+TOTAL; }
 
     var containerMap=new Map();
     allItems.forEach(function(card, idx){
@@ -762,16 +774,40 @@
         var idxSpan=document.createElement('span'); idxSpan.className='idx-badge'; idxSpan.textContent=String(idx+1);
         if(card.firstElementChild){ card.insertBefore(idxSpan, card.firstElementChild);} else { card.prepend(idxSpan); }
       }
+      // ステータスバッジ置き場
+      if(!card.querySelector('.status-badges')){
+        var sb=document.createElement('span'); sb.className='status-badges';
+        var title=card.querySelector('.title') || card.firstElementChild;
+        if(title){ title.appendChild(sb); } else { card.appendChild(sb); }
+      }
+      // 稼働停止/巡回不要ボタン置き場（チェック横）
+      var wrap = card.querySelector('.chk-wrap') || card;
+      if(!wrap.querySelector('.state-btns')){
+        var row = document.createElement('div'); row.className='state-btns';
+        var bp = document.createElement('button'); bp.type='button'; bp.className='btn-mini btn-pause'; bp.textContent='稼働停止';
+        var bs = document.createElement('button'); bs.type='button'; bs.className='btn-mini btn-skip';  bs.textContent='巡回不要';
+        row.appendChild(bp); row.appendChild(bs); wrap.appendChild(row);
+      }
     });
 
     function key(i){return 'chk:'+CITY+':'+i;}
+    function keySt(i){return 'state:'+CITY+':'+i;}
     function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}}
     function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
+    function saveSt(i,obj){try{localStorage.setItem(keySt(i),JSON.stringify(obj))}catch(e){}}
+    function loadSt(i){try{return JSON.parse(localStorage.getItem(keySt(i)))||{paused:false, skipped:false}}catch(e){return {paused:false, skipped:false}}}
 
     function updateCount(){
-      var checkedNow=0; containerMap.forEach(function(rec){ checkedNow+=rec.list.filter(function(c){return c.classList.contains('checked');}).length; });
-      if(jx) jx.textContent=checkedNow+'/'+TOTAL;
-      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checkedNow,total:TOTAL}))}catch(e){};
+      var checkedNow=0, pausedNow=0, skippedNow=0;
+      containerMap.forEach(function(rec){
+        rec.list.forEach(function(c){
+          if(c.classList.contains('checked')) checkedNow++;
+          if(c.classList.contains('paused')) pausedNow++;
+          if(c.classList.contains('skipped')) skippedNow++;
+        });
+      });
+      setJX(checkedNow, pausedNow, skippedNow);
+      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checkedNow,paused:pausedNow,skipped:skippedNow,total:TOTAL}))}catch(e){}
     }
 
     function restoreToOriginal(card){ var p=card.__origParent,n=card.__origNext; if(!p)return; if(n&&n.parentNode===p){p.insertBefore(card,n);}else{p.appendChild(card);} }
@@ -785,18 +821,54 @@
       unchecked.concat(checked).forEach(function(c){ if(c.parentNode!==parent){restoreToOriginal(c);} parent.appendChild(c); });
     }
 
-    // Restore persisted checks (並び替えはリロード時のみ)
+    // Restore persisted checks & states（並び替えはここでのみ）
     containerMap.forEach(function(rec, parent){
       rec.list.forEach(function(card,i){
-        var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
+        var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge');
+        var data=load(i); var st=loadSt(i);
+        // check
         if(data && data.checked){ card.classList.add('checked'); if(chk) chk.checked=true;
           if(badge){ if((data.date||'').indexOf('\\n')>=0){ var sp=data.date.split('\\n'); badge.innerHTML=badgeHTML(sp[0],sp[1]||''); } else { badge.textContent=data.date||''; } }
         }
+        // state: paused/skipped
+        applyStateVisual(card, st);
       });
       resortContainer(parent);
     });
     updateCount();
 
+    function applyStateVisual(card, st){
+      var sb = card.querySelector('.status-badges');
+      if(sb){ sb.textContent=''; }
+      card.classList.toggle('paused', !!st.paused);
+      card.classList.toggle('skipped', !!st.skipped);
+      // ボタンのON表示切替
+      var bp = card.querySelector('.btn-pause'); var bs = card.querySelector('.btn-skip');
+      if(bp){ bp.classList.toggle('is-on', !!st.paused); bp.textContent = st.paused ? '解除（稼働停止）' : '稼働停止'; }
+      if(bs){ bs.classList.toggle('is-on', !!st.skipped); bs.textContent = st.skipped ? '解除（巡回不要）' : '巡回不要'; }
+      // バッジ表示
+      if(sb){
+        if(st.paused){ var b1=document.createElement('span'); b1.className='badge badge-paused'; b1.textContent='稼働停止'; sb.appendChild(b1); }
+        if(st.skipped){ var b2=document.createElement('span'); b2.className='badge badge-skipped'; b2.textContent='巡回不要'; sb.appendChild(b2); }
+      }
+      // 排他制御：paused/skippedの間とcheckedの関係
+      var chk = card.querySelector('input.chk');
+      if(chk){
+        if(st.paused || st.skipped){
+          // チェックは不可にする（既にONならOFFへ）
+          if(chk.checked || card.classList.contains('checked')){
+            chk.checked=false; card.classList.remove('checked'); save(getIndex(card), false, '');
+          }
+          chk.disabled = true;
+        }else{
+          chk.disabled = false;
+        }
+      }
+    }
+
+    function getIndex(card){ return parseInt(card.dataset.idx, 10)-1; }
+
+    // Per-item bindings
     allItems.forEach(function(card,i){
       var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge'); if(!chk)return;
       var fb=fallbackFields(card);
@@ -819,9 +891,11 @@
       }
 
       function bindConfirmTarget(target){
-        if(!target || target.__patchedV20b) return; target.__patchedV20b=true;
+        if(!target || target.__patchedV21chk) return; target.__patchedV21chk=true;
         target.addEventListener('click', function(ev){
           ev.stopImmediatePropagation(); ev.preventDefault();
+          var st=loadSt(i);
+          if(st.paused || st.skipped){ alert('稼働停止または巡回不要のため点検チェックはできません。'); return; }
           var next=!chk.checked; if(!confirm('よろしいですか？')) return;
           setTimeout(function(){ applyToggle(next); },0);
         }, true);
@@ -829,7 +903,49 @@
       bindConfirmTarget(chk);
       var lbl=chk.closest && chk.closest('label'); if(lbl) bindConfirmTarget(lbl);
       var wrap=card.querySelector('.chk-wrap'); if(wrap) bindConfirmTarget(wrap);
-      chk.addEventListener('keydown', function(ev){ if(ev.key===' '||ev.key==='Enter'){ ev.stopImmediatePropagation(); ev.preventDefault(); var next=!chk.checked; if(!confirm('よろしいですか？')) return; setTimeout(function(){applyToggle(next);},0);} }, true);
+      chk.addEventListener('keydown', function(ev){
+        if(ev.key===' '||ev.key==='Enter'){
+          ev.stopImmediatePropagation(); ev.preventDefault();
+          var st=loadSt(i);
+          if(st.paused || st.skipped){ alert('稼働停止または巡回不要のため点検チェックはできません。'); return; }
+          var next=!chk.checked; if(!confirm('よろしいですか？')) return;
+          setTimeout(function(){ applyToggle(next); },0);
+        }
+      }, true);
+
+      // 稼働停止ボタン
+      var bp = card.querySelector('.btn-pause');
+      if(bp && !bp.__patchedV21){
+        bp.__patchedV21 = true;
+        bp.addEventListener('click', function(){
+          var st=loadSt(i);
+          var makeOn = !st.paused;
+          if(!confirm(makeOn ? 'この車両を稼働停止にします。よろしいですか？' : '稼働停止を解除します。よろしいですか？')) return;
+          st.paused = makeOn;
+          if(makeOn) st.skipped = false; // 排他
+          saveSt(i, st);
+          applyStateVisual(card, st);
+          enqueue({ ts: nowJST(), city: CITY, index:i+1, plate_number:plate_number, status: makeOn?'paused':'unpaused' });
+          updateCount();
+        });
+      }
+
+      // 巡回不要ボタン
+      var bs = card.querySelector('.btn-skip');
+      if(bs && !bs.__patchedV21){
+        bs.__patchedV21 = true;
+        bs.addEventListener('click', function(){
+          var st=loadSt(i);
+          var makeOn = !st.skipped;
+          if(!confirm(makeOn ? 'この車両を巡回不要にします。よろしいですか？' : '巡回不要を解除します。よろしいですか？')) return;
+          st.skipped = makeOn;
+          if(makeOn) st.paused = false; // 排他
+          saveSt(i, st);
+          applyStateVisual(card, st);
+          enqueue({ ts: nowJST(), city: CITY, index:i+1, plate_number:plate_number, status: makeOn?'skipped':'unskipped' });
+          updateCount();
+        });
+      }
     });
   }
 
