@@ -1362,72 +1362,72 @@ function attachHandlers(city){
 
 <style>.toolbar{display:none !important;}</style>
 <script>
-// ---- auto-log patch (non-destructive) ----
+// ---- auto-log patch v2 (DOM fallback採用) ----
 (function(){
-  if(window.__autoLogPatched) return; // guard
-  window.__autoLogPatched = true;
+  if(window.__autoLogPatchedV2) return; window.__autoLogPatchedV2 = true;
+  var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
+  window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
-  var ENDPOINT = "https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec";
-  var SECRET   = "rkw123";
-
-  // Disable bulk ops just in case
-  window.checkAll = function(){};
-  window.uncheckAll = function(){};
-  window.clearAll = function(){};
-
-  // Small send queue to avoid burst loss
-  var _q = [], _busy = false;
+  var _q=[], _busy=false;
   function enqueue(p){ _q.push(p); if(!_busy) pump(); }
-  async function pump(){ _busy = true; while(_q.length){ var body = JSON.stringify(Object.assign({secret:SECRET}, _q.shift())); try{ await fetch(ENDPOINT, {method:'POST', headers:{'Content-Type':'text/plain'}, body}); }catch(e){} await new Promise(r=>setTimeout(r,120)); } _busy = false; }
+  async function pump(){ _busy=true; while(_q.length){ var body=JSON.stringify(Object.assign({secret:SECRET}, _q.shift())); try{ await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body}); }catch(e){} await new Promise(r=>setTimeout(r,120)); } _busy=false; }
 
-  function fmt(d){var m=('0'+(d.getMonth()+1)).slice(-2), day=('0'+d.getDate()).slice(-2); return m+'-'+day;}
-  function nowISO(){ return new Date().toISOString(); }
+  function fmt(d){var m=('0'+(d.getMonth()+1)).slice(-2),day=('0'+d.getDate()).slice(-2);return m+'-'+day;}
+  function nowISO(){return new Date().toISOString();}
+
+  function text(el, sel){ var t = el && el.querySelector(sel); return t ? (t.textContent||'').trim() : ''; }
+  function metaLines(card){ return Array.prototype.map.call(card.querySelectorAll('.meta .line'), function(x){return (x.textContent||'').trim();}); }
+  function fallbackFields(card){
+    var station = text(card,'.title');
+    var lines = metaLines(card);
+    var model = lines.length ? lines[0] : '';
+    var plate = lines.length>1 ? lines[1] : '';
+    return {station_name:station, vehicle_model:model, plate_number:plate};
+  }
+  function pickAttr(card, name, fb){
+    var v = card.getAttribute(name);
+    if(v && v.trim()) return v.trim();
+    return fb || '';
+  }
 
   function setup(){
-    var H1 = document.querySelector('h1');
-    var CITY = (H1 && H1.textContent) ? H1.textContent.replace(' 巡回','').trim() : '';
-    var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
-    var countEl = document.getElementById('count');
-
-    function key(i){ return 'chk:'+CITY+':'+i; }
-    function save(i,c,d){ try{localStorage.setItem(key(i), JSON.stringify({checked:c,date:d}));}catch(e){} }
-    function load(i){ try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null} }
-    function updateCount(){ var c = cards.filter(c=>c.classList.contains('checked')).length; if(countEl) countEl.textContent = c; try{localStorage.setItem('巡回:stats:'+CITY, JSON.stringify({checked:c,total:cards.length}));}catch(e){} }
+    var H1=document.querySelector('h1'); var CITY=(H1&&H1.textContent)?H1.textContent.replace(' 巡回','').trim():'';
+    var cards=[].slice.call(document.querySelectorAll('.card')); var countEl=document.getElementById('count');
+    function key(i){return 'chk:'+CITY+':'+i;} function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}} function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
+    function updateCount(){var c=cards.filter(c=>c.classList.contains('checked')).length; if(countEl) countEl.textContent=c; try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:cards.length}))}catch(e){}}
 
     cards.forEach(function(card,i){
-      if(card.__patched) return; // avoid double-binding
-      card.__patched = true;
-
-      var chk   = card.querySelector('.chk');
-      var badge = card.querySelector('.date-badge');
-      var data  = load(i);
-
-      if(data && data.checked){ card.classList.add('checked'); if(chk) chk.checked = true; if(badge) badge.textContent = data.date || ''; }
+      if(card.__patchedV2) return; card.__patchedV2=true;
+      var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
+      if(data&&data.checked){card.classList.add('checked'); if(chk) chk.checked=true; if(badge) badge.textContent=data.date||'';}
       if(!chk) return;
 
-      chk.addEventListener('change', function(){ 
-        var ds = fmt(new Date());
+      var fb = fallbackFields(card);
+      var station_name = pickAttr(card,'data-station', fb.station_name);
+      var vehicle_model = pickAttr(card,'data-model',   fb.vehicle_model);
+      var plate_number  = pickAttr(card,'data-plate',   fb.plate_number);
+
+      chk.addEventListener('change', function(){ var ds=fmt(new Date());
         if(chk.checked){ 
-          card.classList.add('checked'); if(badge) badge.textContent = ds; save(i,true,ds);
+          card.classList.add('checked'); if(badge) badge.textContent=ds; save(i,true,ds);
           enqueue({
             ts: nowISO(), city: CITY, index: i,
-            station_name: card.getAttribute('data-station')||'',
-            vehicle_model: card.getAttribute('data-model')||'',
-            plate_number: card.getAttribute('data-plate')||'',
+            station_name: station_name,
+            vehicle_model: vehicle_model,
+            plate_number: plate_number,
             date_badge: ds, checked: true
           });
-        } else {
+        } else { 
           card.classList.remove('checked'); if(badge) badge.textContent=''; save(i,false,'');
-          enqueue({ city: CITY, plate_number: card.getAttribute('data-plate')||'', delete: true });
+          enqueue({ city: CITY, plate_number: plate_number, delete: true });
         }
         updateCount();
       });
     });
-
     updateCount();
   }
 
-  if(document.readyState === 'complete' || document.readyState === 'interactive'){ setTimeout(setup, 0); }
+  if(document.readyState==='complete'||document.readyState==='interactive'){ setTimeout(setup,0); }
   else { document.addEventListener('DOMContentLoaded', setup); }
 })();
 </script>
