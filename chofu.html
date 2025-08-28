@@ -848,14 +848,28 @@ function attachHandlers(city){
 </script>
 
 
-<style>.toolbar{display:none !important;}</style>
+<style>
+  .toolbar{display:none !important;}
+  /* 左側にインデックスの小バッジを表示 */
+  .idx-badge{
+    width: 28px; min-width:28px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: #6b7280;
+    font-weight: 700;
+    user-select: none;
+  }
+  .card .chk-wrap{ margin-left: 0; } /* 余白はバッジ側に任せる */
+</style>
 <script>
-// ---- auto-log patch v2 (DOM fallback採用) ----
+// ---- auto-log patch v4 (index 1-start + index badge) ----
 (function(){
-  if(window.__autoLogPatchedV2) return; window.__autoLogPatchedV2 = true;
+  if(window.__autoLogPatchedV4) return; window.__autoLogPatchedV4 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
+  // 保険：一斉操作は無効化
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
+  // 送信キュー
   var _q=[], _busy=false;
   function enqueue(p){ _q.push(p); if(!_busy) pump(); }
   async function pump(){ _busy=true; while(_q.length){ var body=JSON.stringify(Object.assign({secret:SECRET}, _q.shift())); try{ await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body}); }catch(e){} await new Promise(r=>setTimeout(r,120)); } _busy=false; }
@@ -872,21 +886,33 @@ function attachHandlers(city){
     var plate = lines.length>1 ? lines[1] : '';
     return {station_name:station, vehicle_model:model, plate_number:plate};
   }
-  function pickAttr(card, name, fb){
-    var v = card.getAttribute(name);
-    if(v && v.trim()) return v.trim();
-    return fb || '';
-  }
+  function pickAttr(card, name, fb){ var v = card.getAttribute(name); return (v && v.trim()) ? v.trim() : (fb || ''); }
 
   function setup(){
     var H1=document.querySelector('h1'); var CITY=(H1&&H1.textContent)?H1.textContent.replace(' 巡回','').trim():'';
     var cards=[].slice.call(document.querySelectorAll('.card')); var countEl=document.getElementById('count');
-    function key(i){return 'chk:'+CITY+':'+i;} function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}} function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
+    function key(i){return 'chk:'+CITY+':'+i;} 
+    function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}}
+    function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
     function updateCount(){var c=cards.filter(c=>c.classList.contains('checked')).length; if(countEl) countEl.textContent=c; try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:c,total:cards.length}))}catch(e){}}
 
     cards.forEach(function(card,i){
-      if(card.__patchedV2) return; card.__patchedV2=true;
+      if(card.__patchedV4) return; card.__patchedV4=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
+
+      // 左にインデックス表示を追加（i+1）
+      if(!card.querySelector('.idx-badge')){
+        var idxSpan = document.createElement('span');
+        idxSpan.className = 'idx-badge';
+        idxSpan.textContent = String(i+1);
+        // チェックボックスのlabelの前に差し込む（左側）
+        if(card.firstElementChild){
+          card.insertBefore(idxSpan, card.firstElementChild);
+        }else{
+          card.prepend(idxSpan);
+        }
+      }
+
       if(data&&data.checked){card.classList.add('checked'); if(chk) chk.checked=true; if(badge) badge.textContent=data.date||'';}
       if(!chk) return;
 
@@ -896,16 +922,16 @@ function attachHandlers(city){
       var plate_number  = pickAttr(card,'data-plate',   fb.plate_number);
 
       chk.addEventListener('change', function(){ var ds=fmt(new Date());
-        if(chk.checked){ 
+        if(chk.checked){
           card.classList.add('checked'); if(badge) badge.textContent=ds; save(i,true,ds);
           enqueue({
-            ts: nowISO(), city: CITY, index: i,
+            ts: nowISO(), city: CITY, index: i+1,
             station_name: station_name,
             vehicle_model: vehicle_model,
             plate_number: plate_number,
             date_badge: ds, checked: true
           });
-        } else { 
+        } else {
           card.classList.remove('checked'); if(badge) badge.textContent=''; save(i,false,'');
           enqueue({ city: CITY, plate_number: plate_number, delete: true });
         }
