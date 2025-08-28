@@ -1377,9 +1377,9 @@ function attachHandlers(city){
   .del-btn{ display:inline-block !important; visibility:visible !important; opacity:1 !important; }
 </style>
 <script>
-// ---- auto-log patch v18b (global count; keep v18a sorting & features) ----
+// ---- auto-log patch v18c (stable baseline total) ----
 (function(){
-  if(window.__autoLogPatchedV18b) return; window.__autoLogPatchedV18b = true;
+  if(window.__autoLogPatchedV18c) return; window.__autoLogPatchedV18c = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -1421,20 +1421,23 @@ function attachHandlers(city){
 
   function setup(){
     var H1=document.querySelector('h1'); var CITY=(H1&&H1.textContent)?H1.textContent.replace(' 巡回','').trim():'';
-    var cards=[].slice.call(document.querySelectorAll('.card')); 
-    if(cards.length===0) return;
-    var container = cards[0].parentNode;
+    var allCards=[].slice.call(document.querySelectorAll('.card')); 
+    if(allCards.length===0) return;
+    var container = allCards[0].parentNode;
     var countEl=document.getElementById('count');
+
+    // Stable baseline
+    var BASE = allCards.slice(); // fixed set
+    var BASE_TOTAL = BASE.length;
 
     function key(i){return 'chk:'+CITY+':'+i;} 
     function save(i,c,d){try{localStorage.setItem(key(i),JSON.stringify({checked:c,date:d}))}catch(e){}}
     function load(i){try{return JSON.parse(localStorage.getItem(key(i)))||null}catch(e){return null}}
 
     function updateCount(){
-      var total = document.querySelectorAll('.card').length;
-      var checked = document.querySelectorAll('.card.checked').length;
-      if(countEl) countEl.textContent = checked + '/' + total;
-      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checked,total:total}))}catch(e){}
+      var checked = BASE.filter(function(c){ return c.classList.contains('checked'); }).length;
+      if(countEl) countEl.textContent = checked + '/' + BASE_TOTAL;
+      try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checked,total:BASE_TOTAL}))}catch(e){}
     }
 
     // 並び替え：未チェックは元の順番、チェック済みはindex昇順で末尾に集約（同一container内）
@@ -1447,8 +1450,8 @@ function attachHandlers(city){
       unchecked.concat(checked).forEach(function(c){ container.appendChild(c); });
     }
 
-    cards.forEach(function(card,i){
-      if(card.__patchedV18b) return; card.__patchedV18b=true;
+    allCards.forEach(function(card,i){
+      if(card.__patchedV18c) return; card.__patchedV18c=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
 
       // index/元順のメタを保持
@@ -1506,8 +1509,8 @@ function attachHandlers(city){
       }
 
       function bindConfirmTarget(target){
-        if(!target || target.__patchedV18b) return;
-        target.__patchedV18b = true;
+        if(!target || target.__patchedV18c) return;
+        target.__patchedV18c = true;
         target.addEventListener('click', function(ev){
           ev.stopImmediatePropagation();
           ev.preventDefault();
@@ -1537,8 +1540,8 @@ function attachHandlers(city){
 
       // 既存の削除ボタン（クラス/属性のばらつきに配慮）
       var delBtn = card.querySelector('.del-btn, [data-role="delete"]');
-      if(delBtn && !delBtn.__patchedV18b){
-        delBtn.__patchedV18b = true;
+      if(delBtn && !delBtn.__patchedV18c){
+        delBtn.__patchedV18c = true;
         delBtn.addEventListener('click', function(){
           if(!confirm('この項目を未チェックに戻してログも削除します。よろしいですか？')) return;
           applyToggle(false);
