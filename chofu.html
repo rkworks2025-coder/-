@@ -864,9 +864,9 @@ function attachHandlers(city){
   .db-hm{ font-size: 12px; opacity: .8; }
 </style>
 <script>
-// ---- auto-log patch v12 (2-line badge + alerts + reuse existing del button) ----
+// ---- auto-log patch v13 (confirm only, no info alerts) ----
 (function(){
-  if(window.__autoLogPatchedV12) return; window.__autoLogPatchedV12 = true;
+  if(window.__autoLogPatchedV13) return; window.__autoLogPatchedV13 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -910,7 +910,7 @@ function attachHandlers(city){
     }
 
     cards.forEach(function(card,i){
-      if(card.__patchedV12) return; card.__patchedV12=true;
+      if(card.__patchedV13) return; card.__patchedV13=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
 
       // index badge (1-start)
@@ -941,6 +941,10 @@ function attachHandlers(city){
       var plate_number  = pickAttr(card,'data-plate',   fb.plate_number);
 
       chk.addEventListener('change', function(){
+        // 事前確認（キャンセルなら元に戻す）
+        var prev = !chk.checked; // 変更前の状態
+        if(!confirm('よろしいですか？')){ chk.checked = prev; return; }
+
         var p = partsNow(); // {mmdd, hm}
         if(chk.checked){
           card.classList.add('checked'); 
@@ -953,18 +957,16 @@ function attachHandlers(city){
             plate_number: plate_number,
             date_badge: p.mmdd, checked: true
           });
-          alert('記録しました');
         } else {
           card.classList.remove('checked'); 
           if(badge) badge.textContent='';
           save(i,false,'');
           enqueue({ city: CITY, plate_number: plate_number, delete: true });
-          alert('解除しました');
         }
         updateCount();
       });
 
-      // 既存の削除ボタンにイベントを付与
+      // 既存の削除ボタンにイベントを付与（こちらも確認ダイアログのみ）
       var delBtn = card.querySelector('.del-btn');
       if(delBtn){
         delBtn.addEventListener('click', function(){
@@ -974,7 +976,6 @@ function attachHandlers(city){
           if(badge) badge.textContent='';
           save(i,false,'');
           enqueue({ city: CITY, plate_number: plate_number, delete: true });
-          alert('解除しました');
           updateCount();
         });
       }
