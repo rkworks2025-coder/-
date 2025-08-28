@@ -1371,13 +1371,11 @@ function attachHandlers(city){
     user-select: none;
   }
   .card .chk-wrap{ margin-left: 0; }
-  /* ヘッダー右上のヘルプテキストを非表示 */
-  .header .sub, .sub{display:none !important;}
 </style>
 <script>
-// ---- auto-log patch v9 (remove header help text) ----
+// ---- auto-log patch v10 (remove header help text by content) ----
 (function(){
-  if(window.__autoLogPatchedV9) return; window.__autoLogPatchedV9 = true;
+  if(window.__autoLogPatchedV10) return; window.__autoLogPatchedV10 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
@@ -1386,7 +1384,7 @@ function attachHandlers(city){
   async function pump(){ _busy=true; while(_q.length){ var body=JSON.stringify(Object.assign({secret:SECRET}, _q.shift())); try{ await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body}); }catch(e){} await new Promise(r=>setTimeout(r,120)); } _busy=false; }
 
   function nowJST(){
-    var d = new Date(); // ローカル時刻
+    var d = new Date();
     function pad(n){ return ('0'+n).slice(-2); }
     return d.getFullYear() + '/' + pad(d.getMonth()+1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
@@ -1404,6 +1402,15 @@ function attachHandlers(city){
   function pickAttr(card, name, fb){ var v = card.getAttribute(name); return (v && v.trim()) ? v.trim() : (fb || ''); }
 
   function setup(){
+    var header = document.querySelector('header');
+    if(header){
+      // Remove any node whose text contains the phrase "日付を編集"
+      Array.prototype.slice.call(header.querySelectorAll('*')).forEach(function(n){
+        var t = (n.textContent||'').replace(/\s+/g,'').trim();
+        if(t.indexOf('日付を編集') !== -1){ n.remove(); }
+      });
+    }
+
     var H1=document.querySelector('h1'); var CITY=(H1&&H1.textContent)?H1.textContent.replace(' 巡回','').trim():'';
     var cards=[].slice.call(document.querySelectorAll('.card')); var countEl=document.getElementById('count');
     function key(i){return 'chk:'+CITY+':'+i;} 
@@ -1416,7 +1423,7 @@ function attachHandlers(city){
     }
 
     cards.forEach(function(card,i){
-      if(card.__patchedV9) return; card.__patchedV9=true;
+      if(card.__patchedV10) return; card.__patchedV10=true;
       var chk=card.querySelector('.chk'); var badge=card.querySelector('.date-badge'); var data=load(i);
 
       // index badge (1-start)
