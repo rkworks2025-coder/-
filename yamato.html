@@ -985,6 +985,8 @@ function attachHandlers(city){
 
 <style>
   .toolbar{display:none !important;}
+  /* Hide legacy counters to prevent confusion */
+  #count, .count, .counter-badge{ display:none !important; }
   .idx-badge{
     width: 28px; min-width:28px;
     text-align: center;
@@ -1010,12 +1012,27 @@ function attachHandlers(city){
     visibility:visible !important;
     opacity:1 !important;
   }
+  /* Independent JX counter badge */
+  .jx-counter{
+    display:inline-block;
+    margin-left:.6rem;
+    padding:.1rem .4rem;
+    border-radius:.4rem;
+    font-size:.9em;
+    font-weight:700;
+    background:#f3f4f6;
+    color:#374151;
+    font-variant-numeric: tabular-nums;
+    user-select:none;
+  }
 </style>
 <script>
-// ---- auto-log patch v18i (robust del button by text fallback + v18h base) ----
+// ---- auto-log patch v19 (isolate features; JX counter; per-container sorting) ----
 (function(){
-  if(window.__autoLogPatchedV18i) return; window.__autoLogPatchedV18i = true;
+  if(window.__autoLogPatchedV19) return; window.__autoLogPatchedV19 = true;
   var ENDPOINT="https://script.google.com/macros/s/AKfycbzjsPGgz2LRNs5uRcwql6B4bqafRR1JkwMfPQiyyShwyQZzmVGiWbTUuWhJV_q4g-kfpA/exec", SECRET="rkw123";
+
+  // no-op legacy global handlers to avoid accidental triggers
   window.checkAll=function(){}; window.uncheckAll=function(){}; window.clearAll=function(){};
 
   // Remove header help text containing "日付を編集"
@@ -1029,13 +1046,12 @@ function attachHandlers(city){
 
   // Helper: unique array
   function unique(arr){ return arr.filter(function(x,i){ return arr.indexOf(x)===i; }); }
-
-  // Baseline detection: by checkbox .chk
+  function cardOf(el){
+    return el.closest('.card') || el.closest('.vehicle-card') || el.closest('li') || el.closest('.list-item') || el.parentElement;
+  }
   function getAllItems(){
     var chks = [].slice.call(document.querySelectorAll('input.chk'));
-    var items = chks.map(function(el){
-      return el.closest('.card') || el.closest('.vehicle-card') || el.closest('li') || el.closest('.list-item') || el.parentElement;
-    });
+    var items = chks.map(cardOf);
     return unique(items).filter(Boolean);
   }
 
@@ -1070,7 +1086,13 @@ function attachHandlers(city){
     var H1=document.querySelector('h1'); var CITY=(H1&&H1.textContent)?H1.textContent.replace(' 巡回','').trim():'';
     var allItems=getAllItems();
     if(allItems.length===0) return;
-    var countEl=document.getElementById('count');
+
+    // Independent JX counter next to <h1>
+    var jx = document.createElement('span');
+    jx.className = 'jx-counter';
+    jx.id = 'jxCounter';
+    var h1 = document.querySelector('h1');
+    if(h1){ h1.appendChild(jx); }
 
     // Container mapping & baseline
     var containerMap = new Map();
@@ -1104,7 +1126,8 @@ function attachHandlers(city){
       containerMap.forEach(function(rec){
         checkedNow += rec.list.filter(function(c){ return c.classList.contains('checked'); }).length;
       });
-      if(countEl) countEl.textContent = checkedNow + '/' + BASE_TOTAL;
+      var label = checkedNow + '/' + BASE_TOTAL;
+      jx && (jx.textContent = label);
       try{localStorage.setItem('巡回:stats:'+CITY,JSON.stringify({checked:checkedNow,total:BASE_TOTAL}))}catch(e){}
     }
 
@@ -1150,22 +1173,6 @@ function attachHandlers(city){
     });
     updateCount();
 
-    // Find delete button inside a card (robust)
-    function findDeleteButton(card){
-      var sel = '.del-btn, .btn-delete, [data-role="delete"], [data-action="delete"], button[aria-label="delete"], button[aria-label="削除"], a[aria-label="delete"], a[aria-label="削除"]';
-      var btn = card.querySelector(sel);
-      if(btn) return btn;
-      // Fallback by text content
-      var candidates = [].slice.call(card.querySelectorAll('button, a, [role="button"]'));
-      for(var i=0;i<candidates.length;i++){
-        var t = (candidates[i].textContent||'').trim();
-        if(t === '削除' || t.toLowerCase() === 'delete' || t.indexOf('削除')>=0 || t.toLowerCase().indexOf('delete')>=0){
-          return candidates[i];
-        }
-      }
-      return null;
-    }
-
     // Bind per-item
     allItems.forEach(function(card,i){
       var chk=card.querySelector('input.chk'); var badge=card.querySelector('.date-badge');
@@ -1196,8 +1203,8 @@ function attachHandlers(city){
       }
 
       function bindConfirmTarget(target){
-        if(!target || target.__patchedV18i) return;
-        target.__patchedV18i = true;
+        if(!target || target.__patchedV19) return;
+        target.__patchedV19 = true;
         target.addEventListener('click', function(ev){
           ev.stopImmediatePropagation();
           ev.preventDefault();
@@ -1223,7 +1230,20 @@ function attachHandlers(city){
         }
       }, true);
 
-      // Robust delete button (by selector or text)
+      // Robust delete button (selector + text fallback)
+      function findDeleteButton(card){
+        var sel = '.del-btn, .btn-delete, [data-role="delete"], [data-action="delete"], button[aria-label="delete"], button[aria-label="削除"], a[aria-label="delete"], a[aria-label="削除"]';
+        var btn = card.querySelector(sel);
+        if(btn) return btn;
+        var candidates = [].slice.call(card.querySelectorAll('button, a, [role="button"]'));
+        for(var i=0;i<candidates.length;i++){
+          var t = (candidates[i].textContent||'').trim();
+          if(t === '削除' || t.toLowerCase() === 'delete' || t.indexOf('削除')>=0 || t.toLowerCase().indexOf('delete')>=0){
+            return candidates[i];
+          }
+        }
+        return null;
+      }
       var delBtn = findDeleteButton(card);
       if(delBtn){
         try{
@@ -1231,8 +1251,8 @@ function attachHandlers(city){
           delBtn.classList && delBtn.classList.remove('hidden','d-none','sr-only');
         }catch(e){}
       }
-      if(delBtn && !delBtn.__patchedV18i){
-        delBtn.__patchedV18i = true;
+      if(delBtn && !delBtn.__patchedV19){
+        delBtn.__patchedV19 = true;
         delBtn.addEventListener('click', function(){
           if(!confirm('この項目を未チェックに戻してログも削除します。よろしいですか？')) return;
           applyToggle(false);
@@ -1240,9 +1260,7 @@ function attachHandlers(city){
       }
     });
 
-    // Periodic reassert of count
-    var _reassert = setInterval(updateCount, 800);
-    window.addEventListener('beforeunload', function(){ clearInterval(_reassert); });
+    // No periodic timer needed; but if other scripts try to change our JX, it won't matter since it's independent.
   }
 
   if(document.readyState==='complete'||document.readyState==='interactive'){ setTimeout(setup,0); }
