@@ -57,25 +57,20 @@ function render(sortOnLoad=false){
     else if(sevenRule(ts)) cls += "seven ";
     row.className = cls.trim();
 
-    // 左端：インデックス番号（1始まり・表示順基準）
     const idx = document.createElement("div"); idx.className="idx"; idx.textContent = (viewIdx+1);
-    // チェックボタン
     const chkCol = document.createElement("div"); chkCol.className="checkcol";
     const btnChk = document.createElement("button");
     btnChk.textContent = checked? "✔":"□";
     btnChk.onclick = ()=>toggle(i);
     chkCol.appendChild(btnChk);
 
-    // タイトル＆サブ
     const title = document.createElement("div"); title.className="title"; title.textContent = item.station || "";
     const sub = document.createElement("div"); sub.className="sub"; sub.textContent = (item.model||"") + "　" + (item.plate||"");
 
-    // 右：状態ボタン
     const right = document.createElement("div"); right.className="right";
     const btnFlag = document.createElement("button"); btnFlag.className="btn"; btnFlag.textContent="状態"; btnFlag.onclick=()=>setFlag(i);
     right.appendChild(btnFlag);
 
-    // 日付バッジ（MM/DD + HH:MM JST）
     const date = document.createElement("div"); date.className="date"; date.textContent = fmtDateJST(ts);
 
     row.appendChild(idx);
@@ -106,7 +101,7 @@ function toggle(i){
     state.dates[i] = null;
     saveState(state);
   }
-  render(false); // 並び替えはリロード時（= 初回 render(true)）
+  render(false);
 }
 
 function setFlag(i){
@@ -119,27 +114,28 @@ function setFlag(i){
   render(false);
 }
 
-// カウンター
 function updateCount(){
   const k = computeCounters(state);
   document.getElementById("count").textContent = `済${k.done}/停止${k.stopped}/不要${k.skip}/総${k.total}`;
 }
 
-// データ読み込み（Excel貼り付け）
 function onImport(){
   const text = prompt("Excelから「ステーション名,車種,フルナンバー」の行を\nそのまま貼り付けてください。\n（タブ区切り/カンマ区切りどちらでも可）", "");
   if(!text) return;
-  const items = parsePasted(text);
+  const items = (text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map(line=>{
+    const parts = line.split(/\t|,/);
+    return {station:(parts[0]||""), model:(parts[1]||""), plate:(parts[2]||"")};
+  }).filter(x=>x.station);
   if(items.length===0){ alert("読み込める行がありませんでした。"); return; }
   state.items = items;
   state.checked = items.map(()=>false);
   state.flags = items.map(()=>"" );
   state.dates = items.map(()=>null);
   saveState(state);
-  render(true); // 取込直後は初回ルールに倣って並び替え適用
+  render(true);
 }
 
-render(true); // 初回（=リロード時）は並び替え適用
+render(true);
 </script>
 </body>
 </html>

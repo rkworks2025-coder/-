@@ -36,3 +36,5 @@ a{color:var(--accent);text-decoration:none}
 .btn{appearance:none;border:1px solid var(--border);background:var(--panel2);color:var(--text);
   padding:8px 10px;border-radius:10px;font-size:12px}
 .toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:8px 12px 0}
+.importbox{background:var(--panel); border:1px dashed var(--border); padding:10px; border-radius:10px; margin:8px 12px;}
+.importbox textarea{width:100%; min-height:120px; border:1px solid var(--border); border-radius:8px; padding:8px; background:var(--panel2); color:var(--text);}

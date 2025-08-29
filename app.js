@@ -27,7 +27,6 @@ async function sendGAS(payload){
     });
   }catch(e){}
 }
-// ===== 都度集計 =====
 function computeCounters(state){
   const total = state.items.length;
   let done=0, stopped=0, skip=0;
@@ -38,18 +37,16 @@ function computeCounters(state){
   }
   return {done, stopped, skip, total};
 }
-// ===== 並び順 =====
 function getSortedIndices(state){
   const idx = [...Array(state.items.length).keys()];
   idx.sort((a,b)=> (state.checked[a]===state.checked[b]) ? 0 : (state.checked[a] ? 1 : -1));
   return idx;
 }
-// ===== Excel貼り付け取り込み =====
 function parsePasted(text){
   const lines = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const items = [];
   for(const line of lines){
-    const parts = line.split(/\t|,/);
+    const parts = line.split(/\t|,/); // タブ or カンマ
     const [station, model, plate] = [parts[0]||"", parts[1]||"", parts[2]||""];
     if(station){
       items.push({station, model, plate});
