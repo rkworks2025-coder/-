@@ -1,25 +1,39 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>巡回リスト Index</title>
-<link rel="stylesheet" href="style.css?v=202508291724">
-<script src="app.js?v=202508291724"></script>
+<link rel="stylesheet" href="style.css?v=202508291810">
+<script src="app.js?v=202508291810"></script>
+<script>
+const _origSync = window.syncFromGAS;
+window.syncFromGAS = async function() {
+  const lbl = document.getElementById('syncing_label');
+  if(lbl) lbl.textContent = '同期中…';
+  try {
+    const r = _origSync ? await _origSync() : null;
+    if (window.updateCounts) updateCounts();
+    return r;
+  } finally {
+    if(lbl) lbl.textContent = '';
+  }
+}
+</script>
 </head>
 <body onload="initIndex()">
 <header>
-  <button class="btn" onclick="syncFromGAS()">同期</button>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="btn" onclick="syncFromGAS()">同期</button>
+    <span id="syncing_label" style="font-size:12px;color:#666"></span>
+  </div>
   <h1>巡回リスト</h1>
   <button class="btn" onclick="updateCounts()">再計算</button>
 </header>
 <main>
-  <div id="summary" class="card">
-    <div id="all_count" class="badges"></div>
-  </div>
-  <div id="yamato_card" class="card"><a href="yamato.html">大和市</a><div id="yamato_count"></div></div>
-  <div id="ebina_card" class="card"><a href="ebina.html">海老名市</a><div id="ebina_count"></div></div>
-  <div id="chofu_card" class="card"><a href="chofu.html">調布市</a><div id="chofu_count"></div></div>
+  <div id="summary" class="card"><div id="all_count"></div></div>
+  <div class="card"><a href="yamato.html">大和市</a><div id="yamato_count" style="margin-top:6px"></div></div>
+  <div class="card"><a href="ebina.html">海老名市</a><div id="ebina_count" style="margin-top:6px"></div></div>
+  <div class="card"><a href="chofu.html">調布市</a><div id="chofu_count" style="margin-top:6px"></div></div>
   <div id="placeholder" class="placeholder" style="display:none">まだ同期されていません</div>
 </main>
 </body>
