@@ -1,123 +1,51 @@
-// ===== 設定 =====
-const GAS_URL = "YOUR_GAS_URL_HERE"; // Apps Script WebアプリURLを後で差し替え
+/* Drop-in replacement for sync logic. */
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyLPjIJOmYeC7kyZikkWcY-CmWlHYwL2NJDD0GL78x8XEN5UkBRfLY9EeCPyPZD34_aVw/exec";
 
-// ===== 共通ユーティリティ（既存挙動維持） =====
-function fmtDateJST(ts){
-  if(!ts) return "";
-  try{
-    const dt = new Date(ts);
-    const fmt = new Intl.DateTimeFormat("ja-JP", {
-      timeZone:"Asia/Tokyo", month:"2-digit", day:"2-digit",
-      hour:"2-digit", minute:"2-digit", hour12:false
-    }).formatToParts(dt);
-    const get = t => fmt.find(x=>x.type===t)?.value || "";
-    return get("month") + "/" + get("day") + "\\n" + get("hour") + ":" + get("minute");
-  }catch(e){ return ""; }
-}
-function sevenRule(ts){
-  if(!ts) return false; // 初回は薄グリーン
-  const SEVEN = 7*24*60*60*1000;
-  return (Date.now() - ts) >= SEVEN; // 7日以上経過で青
-}
-function computeCounters(state){
-  const total = state.items.length;
-  let done=0, stopped=0, skip=0;
-  for(let i=0;i<total;i++){
-    if(state.checked[i]) done++;
-    if(state.flags[i]==="stopped") stopped++;
-    if(state.flags[i]==="skip") skip++;
-  }
-  return {done, stopped, skip, total};
-}
-function getSortedIndices(state){
-  const idx = [...Array(state.items.length).keys()];
-  idx.sort((a,b)=> (state.checked[a]===state.checked[b]) ? 0 : (state.checked[a] ? 1 : -1));
-  return idx;
-}
-function loadCityState(cityKey){
-  try{
-    return JSON.parse(localStorage.getItem("junkai_"+cityKey)) || {
-      items: [], checked: [], flags: [], dates: [], meta: []
-    };
-  }catch(e){ return {items: [], checked: [], flags: [], dates: [], meta: []}; }
-}
-function saveCityState(cityKey, state){
-  localStorage.setItem("junkai_"+cityKey, JSON.stringify(state));
-}
-
-// ===== GAS 送信（ログ：市ページで使用） =====
-async function sendLog(payload){
-  if(!GAS_URL) return;
-  try{
-    await fetch(GAS_URL, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify(payload)
+async function syncFromGas() {
+  const url = GAS_URL + (GAS_URL.includes("?") ? "&" : "?") + "action=pull";
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      mode: "cors",
+      credentials: "omit",
+      redirect: "follow",
+      cache: "no-store",
+      headers: {"Accept":"application/json,text/plain;q=0.9,*/*;q=0.8"}
     });
-  }catch(e){
-    // silent
+
+    const contentType = (res.headers.get("content-type") || "").toLowerCase();
+    const raw = await res.text();
+
+    let json;
+    if (contentType.includes("application/json")) {
+      json = JSON.parse(raw);
+    } else {
+      try { json = JSON.parse(raw); }
+      catch (e) { throw new Error("非JSON応答: " + raw.slice(0, 280)); }
+    }
+
+    if (!json || (json.ok === false)) { throw new Error("GAS 側エラー: " + (json && (json.error || json.message) || "unknown")); }
+
+    const payload = json.payload || json.data || json;
+    if (!payload) throw new Error("payload が空です");
+
+    try {
+      localStorage.setItem("巡回マスタ", JSON.stringify(payload));
+      localStorage.setItem("巡回マスタ_timestamp", new Date().toISOString());
+    } catch (e) { console.warn("localStorage 保存失敗", e); }
+
+    if (typeof window.rebindAreasFromMaster === "function") { window.rebindAreasFromMaster(payload); }
+    alert("同期OK: データ取得に成功しました");
+    return payload;
+  } catch (err) {
+    alert("同期失敗: " + err.message + "\nURL: " + url);
+    throw err;
   }
 }
 
-// ====== 同期（index の「同期」ボタン用） ======
-async function syncFromGAS(){
-  try{
-    if(!GAS_URL) throw new Error("app.js の GAS_URL を設定してください。");
+window.syncFromGas = syncFromGas;
 
-    const url = GAS_URL + (GAS_URL.includes("?") ? "&" : "?") + "action=pull";
-    const res = await fetch(url, { method:"GET" });
-
-    if(!res.ok){
-      const text = await res.text().catch(()=> "");
-      throw new Error(`HTTP ${res.status} ${res.statusText} ${text?("- "+text):""}`.trim());
-    }
-
-    // Content-Type を確認しつつ JSON を安全にパース
-    const ct = res.headers.get("content-type") || "";
-    let data;
-    if(ct.includes("application/json")){
-      data = await res.json();
-    }else{
-      // JSONでない場合でも、JSON文字列の可能性があるのでtext->parse
-      const txt = await res.text();
-      try{
-        data = JSON.parse(txt);
-      }catch(parseErr){
-        throw new Error("JSON 以外のレスポンスを受信しました。GAS 側で JSON を返すようにしてください。");
-      }
-    }
-
-    // 期待キー
-    const CITY_KEYS = ["yamato","ebina","chofu"];
-    // 安全に配列化
-    const arrSafe = (v) => Array.isArray(v) ? v : [];
-
-    // 各エリアへ保存
-    for(const key of CITY_KEYS){
-      const items = arrSafe(data[key]).map(o => ({
-        station: (o && typeof o.station === "string") ? o.station : "",
-        model:   (o && typeof o.model   === "string") ? o.model   : "",
-        plate:   (o && typeof o.plate   === "string") ? o.plate   : "",
-        address: (o && typeof o.address === "string") ? o.address : "",
-        note:    (o && typeof o.note    === "string") ? o.note    : ""
-      }));
-
-      const state = {
-        items,
-        checked: items.map(()=>false),
-        flags: items.map(()=>""),
-        dates: items.map(()=>null),
-        meta: []
-      };
-      saveCityState(key, state);
-    }
-
-    // 成功
-    alert("同期完了！");
-    return true;
-  }catch(err){
-    const msg = (err && err.message) ? err.message : String(err);
-    alert("同期に失敗しました：\\n" + msg);
-    return false;
-  }
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.querySelector("#syncBtn");
+  if (btn) btn.addEventListener("click", syncFromGas);
+});
