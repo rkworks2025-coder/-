@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>海老名市 巡回リスト</title>
-<link rel="stylesheet" href="style.css?v=202508291810">
-<script src="app.js?v=202508291810"></script>
+<link rel="stylesheet" href="style.css?v=20250830b">
+<script src="app.js?v=20250830b"></script>
 </head>
 <body>
 <header>
@@ -12,66 +12,6 @@
   <h1>海老名市</h1>
   <div style="width:68px"></div>
 </header>
-<main id="list"></main>
-<div class="counter"><div id="count">済0/停止0/不要0/総0</div></div>
-<script>
-const CITY_ID="ebina";
-let state=loadCityState(CITY_ID);
-if(!state.items.length){state.items=[{station:"ステーション001",model:"",plate:""}];state.checked=[false];state.flags=[""];state.dates=[null];}
-state.checked=state.checked.length?state.checked:state.items.map(()=>false);
-state.flags=state.flags.length?state.flags:state.items.map(()=>'');
-state.dates=state.dates.length?state.dates:state.items.map(()=>null);
-
-function render(){
-  const listEl=document.getElementById("list"); listEl.innerHTML="";
-  for(let i=0;i<state.items.length;i++){
-    const it=state.items[i]||{station:"",model:"",plate:""};
-    const checked=!!state.checked[i]; const flag=state.flags[i]||"";
-    const row=document.createElement("div"); row.className="row";
-    if(flag==="stopped") row.classList.add("stopped");
-    else if(flag==="skip") row.classList.add("skip");
-    else if(checked) row.classList.add("checked");
-
-    const idx=document.createElement("div"); idx.className="idx"; idx.textContent=(i+1);
-    const chk=document.createElement("button"); chk.className="chkbtn"; chk.textContent=checked?"✔":"□";
-    chk.onclick=()=>toggle(i);
-
-    const wrap=document.createElement("div");
-    const t=document.createElement("div"); t.className="title"; t.textContent=it.station||"";
-    const s=document.createElement("div"); s.className="sub"; s.textContent=(it.model||"")+"　"+(it.plate||"");
-    wrap.appendChild(t); wrap.appendChild(s);
-
-    const menu=document.createElement("div"); menu.className="menu";
-    const btnM=document.createElement("button"); btnM.className="menubtn"; btnM.textContent="…"; btnM.onclick=()=>setFlag(i);
-    menu.appendChild(btnM);
-
-    row.appendChild(idx);
-    const chkCol=document.createElement("div"); chkCol.appendChild(chk); row.appendChild(chkCol);
-    row.appendChild(wrap);
-    row.appendChild(menu);
-    listEl.appendChild(row);
-  }
-  updateCount();
-}
-function updateCount(){const k=(function(s){const t=s.items.length;let d=0,st=0,sk=0;for(let i=0;i<t;i++){if(s.checked[i])d++;if(s.flags[i]==="stopped")st++;if(s.flags[i]==="skip")sk++;}return{done:d,stopped:st,skip:sk,total:t};})(state);
-  document.getElementById("count").textContent=`済${k.done}/停止${k.stopped}/不要${k.skip}/総${k.total}`;}
-function toggle(i){
-  const was=!!state.checked[i];
-  if(!confirm("よろしいですか？")) return;
-  state.checked[i]=!was;
-  localStorage.setItem("junkai_"+CITY_ID, JSON.stringify(state));
-  render();
-}
-function setFlag(i){
-  const v=prompt("状態：\\n0=通常（薄緑）\\n1=稼働停止（グレー）\\n2=巡回不要（黄色）","0");
-  if(v===null) return;
-  if(v==="1") state.flags[i]="stopped";
-  else if(v==="2") state.flags[i]="skip";
-  else state.flags[i]="";
-  localStorage.setItem("junkai_"+CITY_ID, JSON.stringify(state));
-  render();
-}
-render();
-</script>
+<main><div class="card">海老名市 ページ（変更なし）</div></main>
 </body>
 </html>
