@@ -5,139 +5,177 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>調布市 巡回リスト</title>
 <style>
-  :root { --bg:#f5f6f8; --panel:#ffffff; --panel2:#f9fafb; --border:#e5e7eb; --text:#111827; --muted:#6b7280; --accent:#2563eb; --pink:#ffc0cb; --stopped:#9ca3af; --skip:#fff3b0; }
+
+  :root { 
+    --bg:#f6f7fb; --panel:#ffffff; --panel2:#f3f4f6; --border:#e5e7eb; --text:#111827; --muted:#6b7280; --accent:#2563eb;
+    --green:#e6f4ea;   /* 通常（巡回可能） */
+    --pink:#ffd6e7;    /* チェック済み */
+    --gray:#e5e7eb;    /* 稼働停止 */
+    --yellow:#fff3b0;  /* 巡回不要 */
+    --blue:#dbeafe;    /* 7日ルール対象 */
+  }
+
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; }
-  header { position:sticky; top:0; background:#ffffffcc; backdrop-filter:saturate(180%) blur(8px); border-bottom:1px solid var(--border); padding:8px; display:flex; align-items:center; gap:8px; }
-  h1 { flex:1; text-align:center; margin:0; font-size:16px; color:var(--accent); letter-spacing:.02em; }
-  .toolbar { display:flex; gap:8px; }
+  header { position:sticky; top:0; background:#ffffffcc; border-bottom:1px solid var(--border); padding:10px 12px; backdrop-filter:saturate(180%) blur(8px); }
+  h1 { margin:0; font-size:16px; text-align:center; color:var(--accent); }
+  main { padding:12px; padding-bottom:88px; }
+  .item { border:1px solid var(--border); border-radius:14px; padding:10px 12px; margin-bottom:10px; background:var(--green); display:grid; grid-template-columns: 1fr auto; grid-template-rows:auto auto; gap:6px 10px; }
+  .name { font-weight:600; grid-column:1/2; grid-row:1/2; }
+  .date { font-size:12px; color:var(--muted); grid-column:1/2; grid-row:2/3; line-height:1.2; white-space:pre-line; }
+  .actions { grid-column:2/3; grid-row:1/3; display:flex; gap:8px; align-items:center; }
   .btn { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--text); padding:8px 10px; border-radius:10px; font-size:12px; }
   .btn:active { transform:scale(.98); }
-  main { padding:12px; padding-bottom:90px; }
-  .item { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .name { font-weight:600; flex:1; }
   .checked { background:var(--pink); }
-  .stopped { background:#eceff3; color:#374151; border-color:#cfd6df; }
-  .skip { background:var(--skip); color:#111; }
-  .badges { display:flex; align-items:center; gap:6px; }
-  .badge { font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid var(--border); color:#374151; background:var(--panel2); }
-  .counter { position:sticky; bottom:0; background:#ffffffcc; border-top:1px solid var(--border); padding:12px; display:flex; justify-content:space-between; align-items:center; backdrop-filter:saturate(180%) blur(8px); }
+  .stopped { background:var(--gray); }
+  .skip { background:var(--yellow); }
+  .seven { outline:2px dashed #93c5fd; background:var(--blue); }
+  .counter { position:sticky; bottom:0; background:#ffffffcc; border-top:1px solid var(--border); padding:12px; display:flex; justify-content:space-between; align-items:center; font-variant-numeric:tabular-nums; backdrop-filter:saturate(180%) blur(8px); }
   a { color:var(--accent); text-decoration:none; }
 </style>
 </head>
 <body>
 <header>
-  <div class="toolbar">
-    <button class="btn" onclick="checkAll(true)">全てをチェック</button>
-    <button class="btn" onclick="checkAll(false)">全て外す</button>
-    <button class="btn" onclick="resetState()">リセット</button>
-    <button class="btn" onclick="addItem()">＋追加</button>
-  </div>
   <h1>調布市 巡回リスト</h1>
 </header>
 <main id="list"></main>
 <div class="counter">
   <div><a href="index.html">← 戻る</a></div>
-  <div id="count">0/0 (0%)</div>
+  <div id="count">済0/停止0/不要0/総0</div>
 </div>
 <script>
-  const CITY_KEY = "junkai_chofu";
-  const CONFIRM_MSG = "よろしいですか？";
-  const listEl = document.getElementById("list");
-  function loadState(){
+  const CITY_ID = "chofu";
+  const CITY_KEY = "junkai_" + CITY_ID;
+  const GAS_ENDPOINT = ""; // Google Apps ScriptのURL（任意）
+  const CONFIRM_MSG = "よろしいですか？"; // チェックON時のみ
+
+  function loadState(){ 
     try{ 
       return JSON.parse(localStorage.getItem(CITY_KEY)) || {
         items:["ステーション001","ステーション002","ステーション003"],
         checked:[false,false,false],
-        flags:["","",""]
+        flags:["","",""],
+        dates:[null,null,null]
       };
-    }catch(e){
-      return { items:["ステーション001","ステーション002","ステーション003"], checked:[false,false,false], flags:["","",""] };
+    }catch(e){ 
+      return { items:["ステーション001","ステーション002","ステーション003"], checked:[false,false,false], flags:["","",""], dates:[null,null,null] }; 
     }
   }
   function saveState(s){ localStorage.setItem(CITY_KEY, JSON.stringify(s)); }
   let state = loadState();
+
+  function fmtDateJST(ts){
+    if(!ts) return "";
+    try {
+      const dt = new Date(ts);
+      const fmt = new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false
+      }).formatToParts(dt);
+      const get = (t)=>fmt.find(x=>x.type===t)?.value || "";
+      return get("month") + "/" + get("day") + "\n" + get("hour") + ":" + get("minute");
+    } catch(e) { return ""; }
+  }
+  function sevenRule(ts){
+    if(!ts) return true;
+    const SEVEN = 7*24*60*60*1000;
+    return (Date.now() - ts) >= SEVEN;
+  }
+
+  const listEl = document.getElementById("list");
   function render(){
     listEl.innerHTML = "";
-    state.items.forEach((name,i)=>{
+    for(let i=0;i<state.items.length;i++){ 
+      const name = state.items[i];
+      const checked = !!state.checked[i];
+      const flag = state.flags[i] || "";
+      const ts = state.dates[i];
+
       const row = document.createElement("div");
-      let cls = "item";
-      if(state.flags[i]==="stopped") cls += " stopped";
-      else if(state.flags[i]==="skip") cls += " skip";
-      if(state.checked[i]) cls += " checked";
-      row.className = cls;
+      let cls = "item ";
+      if(flag==="stopped") cls += "stopped ";
+      else if(flag==="skip") cls += "skip ";
+      else if(checked) cls += "checked ";
+      else cls += " "; // 通常（薄緑）
+      if(flag==="" && !checked && sevenRule(ts)) cls += "seven ";
+      row.className = cls.trim();
 
-      const left = document.createElement("div");
-      left.className="name";
-      left.textContent = name;
+      const title = document.createElement("div");
+      title.className = "name";
+      title.textContent = name;
 
-      const badges = document.createElement("div");
-      badges.className="badges";
-      if(state.flags[i]==="stopped"){ 
-        const b=document.createElement("span"); b.className="badge"; b.textContent="稼働停止"; badges.appendChild(b);
-      }
-      if(state.flags[i]==="skip"){ 
-        const b=document.createElement("span"); b.className="badge"; b.textContent="巡回不要"; badges.appendChild(b);
-      }
+      const dateEl = document.createElement("div");
+      dateEl.className = "date";
+      dateEl.textContent = fmtDateJST(ts);
 
-      const btnBox = document.createElement("div");
-      const btnCheck = document.createElement("button");
-      btnCheck.className="btn";
-      btnCheck.textContent = state.checked[i] ? "✔" : "□";
-      btnCheck.onclick = ()=>toggle(i);
-
+      const actions = document.createElement("div");
+      actions.className = "actions";
       const btnFlag = document.createElement("button");
-      btnFlag.className="btn";
+      btnFlag.className = "btn";
       btnFlag.textContent = "状態";
-      btnFlag.onclick = ()=>setFlag(i);
+      btnFlag.onclick = () => setFlag(i);
 
-      btnBox.appendChild(btnFlag);
-      btnBox.appendChild(btnCheck);
+      const btnCheck = document.createElement("button");
+      btnCheck.className = "btn";
+      btnCheck.textContent = checked ? "✔" : "□";
+      btnCheck.onclick = () => toggle(i);
 
-      row.appendChild(left);
-      row.appendChild(badges);
-      row.appendChild(btnBox);
+      actions.appendChild(btnFlag);
+      actions.appendChild(btnCheck);
+
+      row.appendChild(title);
+      row.appendChild(actions);
+      row.appendChild(dateEl);
+
       listEl.appendChild(row);
-    });
+    }
     updateCount();
   }
+
   function toggle(i){
-    if(!confirm(CONFIRM_MSG)) return;
-    state.checked[i] = !state.checked[i];
-    saveState(state); render();
+    const was = !!state.checked[i];
+    if(!was) {
+      if(!confirm(CONFIRM_MSG)) return;
+      state.checked[i] = true;
+      state.dates[i] = Date.now();
+      saveState(state);
+      sendGAS(i, "check_on");
+    } else {
+      state.checked[i] = false;
+      state.dates[i] = null;
+      saveState(state);
+    }
+    render();
   }
   function setFlag(i){
-    const v = prompt("状態を選択：\n0=通常\n1=稼働停止(グレー)\n2=巡回不要(黄色)", "0");
+    const v = prompt("状態を選択：\n0=通常（薄緑）\n1=稼働停止（グレー）\n2=巡回不要（黄色）", "0");
     if(v===null) return;
     if(v==="1") state.flags[i]="stopped";
     else if(v==="2") state.flags[i]="skip";
     else state.flags[i]="";
-    saveState(state); render();
+    saveState(state);
+    render();
   }
+
   function updateCount(){
     const total = state.items.length;
-    const done = state.checked.filter(Boolean).length;
-    const pct = total? Math.round(done/total*100):0;
-    document.getElementById("count").textContent = `${done}/${total} (${pct}%)`;
+    let done=0, stopped=0, skip=0;
+    for(let i=0;i<total;i++){ 
+      if(state.checked[i]) done++;
+      if(state.flags[i]==="stopped") stopped++;
+      if(state.flags[i]==="skip") skip++;
+    }
+    document.getElementById("count").textContent = `済${done}/停止${stopped}/不要${skip}/総${total}`;
   }
-  function checkAll(val){
-    if(!confirm(CONFIRM_MSG)) return;
-    state.checked = state.items.map(()=>val);
-    saveState(state); render();
+
+  async function sendGAS(i, event) {
+    if(!GAS_ENDPOINT) return;
+    try {
+      const payload = { event, city: "chofu", index: i, station: state.items[i], timestamp: new Date().toISOString() };
+      await fetch(GAS_ENDPOINT, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload), mode:"no-cors" });
+    } catch(e) { /* silent */ }
   }
-  function resetState(){
-    if(!confirm("すべて初期化します。よろしいですか？")) return;
-    state = { items:["ステーション001","ステーション002","ステーション003"], checked:[false,false,false], flags:["","",""] };
-    saveState(state); render();
-  }
-  function addItem(){
-    const name = prompt("ステーション名を追加：");
-    if(!name) return;
-    state.items.push(name);
-    state.checked.push(false);
-    state.flags.push("");
-    saveState(state); render();
-  }
+
   render();
 </script>
 </body>

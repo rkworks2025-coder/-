@@ -5,16 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>巡回リスト Index</title>
 <style>
-  :root { --bg:#f5f6f8; --panel:#ffffff; --border:#e5e7eb; --text:#111827; --muted:#6b7280; --accent:#2563eb; --pink:#ffc0cb; --stopped:#9ca3af; --skip:#fff3b0; }
+
+  :root { 
+    --bg:#f6f7fb; --panel:#ffffff; --panel2:#f3f4f6; --border:#e5e7eb; --text:#111827; --muted:#6b7280; --accent:#2563eb;
+    --green:#e6f4ea;   /* 通常（巡回可能） */
+    --pink:#ffd6e7;    /* チェック済み */
+    --gray:#e5e7eb;    /* 稼働停止 */
+    --yellow:#fff3b0;  /* 巡回不要 */
+    --blue:#dbeafe;    /* 7日ルール対象 */
+  }
+
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; }
-  header { position:sticky; top:0; background:#ffffffcc; backdrop-filter:saturate(180%) blur(8px); border-bottom:1px solid var(--border); padding:14px 16px; }
+  header { position:sticky; top:0; background:#ffffffcc; border-bottom:1px solid var(--border); padding:14px 16px; backdrop-filter:saturate(180%) blur(8px); }
   h1 { margin:0; font-size:18px; text-align:center; color:var(--accent); letter-spacing:.02em; }
-  main { padding:16px; }
-  .card { display:flex; align-items:center; justify-content:space-between; background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
+  main { padding:14px; }
+  .card { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
   .name a { color:var(--text); text-decoration:none; font-weight:600; }
   .meta { color:var(--muted); font-variant-numeric:tabular-nums; }
-  .all { background:linear-gradient(180deg,#fff,#f7f8fb); }
+  .all { background:linear-gradient(180deg,#fff,#f8fafc); }
   .note { color:var(--muted); font-size:12px; text-align:center; padding:6px 0 12px; }
   a { color:var(--accent); text-decoration:none; }
 </style>
@@ -24,44 +33,57 @@
   <main>
     <div class="card">
       <div class="name"><a href="yamato.html">大和市</a></div>
-      <div class="meta" id="yamato_count">0/0 (0%)</div>
+      <div class="meta" id="yamato_count">済0/停止0/不要0/総0</div>
     </div>
     <div class="card">
       <div class="name"><a href="ebina.html">海老名市</a></div>
-      <div class="meta" id="ebina_count">0/0 (0%)</div>
+      <div class="meta" id="ebina_count">済0/停止0/不要0/総0</div>
     </div>
     <div class="card">
       <div class="name"><a href="chofu.html">調布市</a></div>
-      <div class="meta" id="chofu_count">0/0 (0%)</div>
+      <div class="meta" id="chofu_count">済0/停止0/不要0/総0</div>
     </div>
     <div class="card all">
-      <div class="name">全エリア達成度</div>
-      <div class="meta" id="all_count">0/0 (0%)</div>
+      <div class="name">全エリア合計</div>
+      <div class="meta" id="all_count">済0/停止0/不要0/総0</div>
     </div>
-    <div class="note">チェック状態は端末内（localStorage）に保存されます。停止・不要の状態はページごとに管理されます。</div>
+    <div class="note">チェックは端末内（localStorage）に保存。Indexを開くと各市の最新状況を集計します。</div>
   </main>
 <script>
   const cities = ["yamato","ebina","chofu"];
   function getState(city){
-    try{
+    try{ 
       const s = JSON.parse(localStorage.getItem("junkai_"+city));
-      if (!s) return {items:[],checked:[],flags:[]};
-      return {items:Array.isArray(s.items)?s.items:[],checked:Array.isArray(s.checked)?s.checked:[],flags:Array.isArray(s.flags)?s.flags:[]};
-    }catch(e){ return {items:[],checked:[],flags:[]}; }
+      if(!s) return {items:[], checked:[], flags:[], dates:[]};
+      return {
+        items: Array.isArray(s.items)? s.items:[],
+        checked: Array.isArray(s.checked)? s.checked:[],
+        flags: Array.isArray(s.flags)? s.flags:[],
+        dates: Array.isArray(s.dates)? s.dates:[]
+      };
+    }catch(e){ return {items:[], checked:[], flags:[], dates:[]}; }
+  }
+  function countFor(s){
+    const total = s.items.length;
+    let done=0, stopped=0, skip=0;
+    for(let i=0;i<total;i++){ 
+      if(s.checked[i]) done++;
+      if(s.flags[i]==="stopped") stopped++;
+      if(s.flags[i]==="skip") skip++;
+    }
+    return { done, stopped, skip, total };
   }
   function updateCounts(){
-    let totalAll=0, doneAll=0;
+    let ad=0, as=0, ak=0, at=0;
     for(const c of cities){
-      const s=getState(c);
-      const total=s.items.length;
-      const done=s.checked.filter(Boolean).length;
-      totalAll+=total; doneAll+=done;
-      const pct= total? Math.round(done/total*100):0;
-      const el=document.getElementById(c+"_count");
-      if(el) el.textContent = `${done}/${total} (${pct}%)`;
+      const s = getState(c);
+      const k = countFor(s);
+      ad+=k.done; as+=k.stopped; ak+=k.skip; at+=k.total;
+      const el = document.getElementById(c+"_count");
+      if(el) el.textContent = `済${k.done}/停止${k.stopped}/不要${k.skip}/総${k.total}`;
     }
-    const pctAll = totalAll? Math.round(doneAll/totalAll*100):0;
-    document.getElementById("all_count").textContent = `${doneAll}/${totalAll} (${pctAll}%)`;
+    const elAll = document.getElementById("all_count");
+    elAll.textContent = `済${ad}/停止${as}/不要${ak}/総${at}`;
   }
   updateCounts();
 </script>
