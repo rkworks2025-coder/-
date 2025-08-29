@@ -1,1 +1,121 @@
-<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Ebina</title><script src='app.js'></script></head><body>Ebina</body></html>
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>海老名市 巡回リスト</title>
+<link rel="stylesheet" href="style.css">
+<script src="app.js"></script>
+</head>
+<body>
+<header>
+  <a class="btn back" href="index.html">← 戻る</a>
+  <h1>海老名市 巡回リスト</h1>
+  <div style="width:64px"></div>
+</header>
+<main id="list"></main>
+<div class="counter">
+  <div id="count">済0/停止0/不要0/総0</div>
+</div>
+<script>
+const CITY_ID = "ebina";
+let state = loadCityState(CITY_ID);
+if(!state.items.length){
+  state.items = [{station:"ステーション001",model:"-",plate:"-"}];
+  state.checked=[false]; state.flags=[""]; state.dates=[null]; state.meta=[];
+}
+state.checked = state.checked.length ? state.checked : state.items.map(()=>false);
+state.flags   = state.flags.length   ? state.flags   : state.items.map(()=>'');
+state.dates   = state.dates.length   ? state.dates   : state.items.map(()=>null);
+
+const listEl = document.getElementById("list");
+
+function render(sortOnLoad=false){
+  listEl.innerHTML = "";
+  const order = sortOnLoad ? getSortedIndices(state) : [...Array(state.items.length).keys()];
+  for(let viewIdx=0; viewIdx<order.length; viewIdx++){
+    const i = order[viewIdx];
+    const item = state.items[i] || {station:"",model:"",plate:""};
+    const checked = !!state.checked[i];
+    const flag = state.flags[i] || "";
+    const ts = state.dates[i];
+
+    const row = document.createElement("div");
+    let cls = "card ";
+    if(flag==="stopped") cls += "stopped ";
+    else if(flag==="skip") cls += "skip ";
+    else if(checked) cls += "checked ";
+    else if(sevenRule(ts)) cls += "seven ";
+    row.className = cls.trim();
+
+    const chkCol = document.createElement("div"); chkCol.className="checkcol";
+    const btnChk = document.createElement("button");
+    btnChk.textContent = checked? "✔":"□";
+    btnChk.onclick = ()=>toggle(i);
+    chkCol.appendChild(btnChk);
+
+    const idx = document.createElement("div"); idx.className="idx"; idx.textContent = (viewIdx+1);
+
+    const wrap = document.createElement("div");
+    const title = document.createElement("div"); title.className="title"; title.textContent = item.station || "";
+    const sub = document.createElement("div"); sub.className="sub"; sub.textContent = (item.model||"") + "　" + (item.plate||"");
+    wrap.appendChild(title); wrap.appendChild(sub);
+
+    const right = document.createElement("div"); right.className="right";
+    const btnFlag = document.createElement("button"); btnFlag.className="btn"; btnFlag.textContent="状態"; btnFlag.onclick=()=>setFlag(i);
+    right.appendChild(btnFlag);
+
+    const date = document.createElement("div"); date.className="date"; date.textContent = fmtDateJST(ts);
+
+    row.appendChild(chkCol);
+    row.appendChild(idx);
+    row.appendChild(wrap);
+    row.appendChild(right);
+    row.appendChild(date);
+
+    listEl.appendChild(row);
+  }
+  updateCount();
+}
+
+function toggle(i){
+  const was = !!state.checked[i];
+  if(!was){
+    if(!confirm("よろしいですか？")) return;
+    state.checked[i] = true;
+    state.dates[i] = Date.now();
+    saveCityState(CITY_ID, state);
+    sendLog({event:"check_on", city: CITY_ID, index: i+1,
+             station: state.items[i]?.station || "", model: state.items[i]?.model || "",
+             plate_full: state.items[i]?.plate || "", date_badge: fmtDateJST(state.dates[i])});
+  }else{
+    state.checked[i] = false;
+    state.dates[i] = null;
+    saveCityState(CITY_ID, state);
+    sendLog({event:"check_off", city: CITY_ID, index: i+1,
+             station: state.items[i]?.station || "", model: state.items[i]?.model || "",
+             plate_full: state.items[i]?.plate || "", date_badge: ""});
+  }
+  render(false);
+}
+
+function setFlag(i){
+  const v = prompt("状態を選択：\n0=通常（薄緑）\n1=稼働停止（グレー）\n2=巡回不要（黄色）", "0");
+  if(v===null) return;
+  if(v==="1") state.flags[i]="stopped";
+  else if(v==="2") state.flags[i]="skip";
+  else state.flags[i]="";
+  saveCityState(CITY_ID, state);
+  render(false);
+}
+
+function updateCount(){
+  const k = computeCounters(state);
+  document.getElementById("count").textContent = `済${k.done}/停止${k.stopped}/不要${k.skip}/総${k.total}`;
+}
+
+render(true);
+</script>
+</body>
+</html>
