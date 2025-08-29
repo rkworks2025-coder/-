@@ -8,34 +8,27 @@
 <script src="app.js"></script>
 </head>
 <body>
-<header><h1>海老名市 巡回リスト</h1></header>
+<header>
+  <a class="btn back" href="index.html">← 戻る</a>
+  <h1>海老名市 巡回リスト</h1>
+  <div style="width:64px"></div>
+</header>
 <main id="list"></main>
 <div class="counter">
-  <button class="btn" onclick="onImport()">データ読み込み</button>
   <div id="count">済0/停止0/不要0/総0</div>
-  <a class="btn" href="index.html">← 戻る</a>
 </div>
 <script>
 const CITY_ID = "ebina";
-const CITY_KEY = "junkai_" + CITY_ID;
-const CONFIRM_MSG = "よろしいですか？"; // ON/OFFとも確認
+const CONFIRM_MSG = "よろしいですか？"; // ON時のみ
+let state = loadCityState(CITY_ID);
 
-function loadState(){
-  try{
-    return JSON.parse(localStorage.getItem(CITY_KEY)) || {
-      items:[{station:"ステーション001",model:"-",plate:"-"},{station:"ステーション002",model:"-",plate:"-"}],
-      checked:[false,false],
-      flags:["",""],
-      dates:[null,null],
-      meta:[]
-    };
-  }catch(e){
-    return { items:[{station:"ステーション001",model:"-",plate:"-"},{station:"ステーション002",model:"-",plate:"-"}],
-             checked:[false,false], flags:["",""], dates:[null,null], meta:[] };
-  }
+if(!state.items.length){
+  state.items = [{station:"ステーション001",model:"-",plate:"-"}];
+  state.checked=[false]; state.flags=[""]; state.dates=[null]; state.meta=[];
 }
-function saveState(s){ localStorage.setItem(CITY_KEY, JSON.stringify(s)); }
-let state = loadState();
+state.checked = state.checked.length ? state.checked : state.items.map(()=>false);
+state.flags   = state.flags.length   ? state.flags   : state.items.map(()=>'');
+state.dates   = state.dates.length   ? state.dates   : state.items.map(()=>null);
 
 const listEl = document.getElementById("list");
 
@@ -57,15 +50,19 @@ function render(sortOnLoad=false){
     else if(sevenRule(ts)) cls += "seven ";
     row.className = cls.trim();
 
-    const idx = document.createElement("div"); idx.className="idx"; idx.textContent = (viewIdx+1);
+    // 左：チェック → 右にインデックス
     const chkCol = document.createElement("div"); chkCol.className="checkcol";
     const btnChk = document.createElement("button");
     btnChk.textContent = checked? "✔":"□";
     btnChk.onclick = ()=>toggle(i);
     chkCol.appendChild(btnChk);
 
+    const idx = document.createElement("div"); idx.className="idx"; idx.textContent = (viewIdx+1);
+
+    const wrap = document.createElement("div");
     const title = document.createElement("div"); title.className="title"; title.textContent = item.station || "";
     const sub = document.createElement("div"); sub.className="sub"; sub.textContent = (item.model||"") + "　" + (item.plate||"");
+    wrap.appendChild(title); wrap.appendChild(sub);
 
     const right = document.createElement("div"); right.className="right";
     const btnFlag = document.createElement("button"); btnFlag.className="btn"; btnFlag.textContent="状態"; btnFlag.onclick=()=>setFlag(i);
@@ -73,10 +70,8 @@ function render(sortOnLoad=false){
 
     const date = document.createElement("div"); date.className="date"; date.textContent = fmtDateJST(ts);
 
-    row.appendChild(idx);
     row.appendChild(chkCol);
-    const wrap = document.createElement("div");
-    wrap.appendChild(title); wrap.appendChild(sub);
+    row.appendChild(idx);
     row.appendChild(wrap);
     row.appendChild(right);
     row.appendChild(date);
@@ -88,18 +83,33 @@ function render(sortOnLoad=false){
 
 function toggle(i){
   const was = !!state.checked[i];
-  if(!confirm(CONFIRM_MSG)) return; // ON/OFF 共通で確認
   if(!was){
+    if(!confirm(CONFIRM_MSG)) return;
     state.checked[i] = true;
     state.dates[i] = Date.now();
-    saveState(state);
-    sendGAS({event:"check_on", city: CITY_ID, index: i+1,
-             station: state.items[i]?.station || "", model: state.items[i]?.model || "",
-             plate_full: state.items[i]?.plate || "", date_badge: fmtDateJST(state.dates[i])});
+    saveCityState(CITY_ID, state);
+    sendLog({
+      event:"check_on",
+      city: CITY_ID,
+      index: i+1,
+      station: state.items[i]?.station || "",
+      model: state.items[i]?.model || "",
+      plate_full: state.items[i]?.plate || "",
+      date_badge: fmtDateJST(state.dates[i])
+    });
   }else{
     state.checked[i] = false;
     state.dates[i] = null;
-    saveState(state);
+    saveCityState(CITY_ID, state);
+    sendLog({
+      event:"check_off",
+      city: CITY_ID,
+      index: i+1,
+      station: state.items[i]?.station || "",
+      model: state.items[i]?.model || ",
+      plate_full: state.items[i]?.plate || "",
+      date_badge: ""
+    });
   }
   render(false);
 }
@@ -110,29 +120,13 @@ function setFlag(i){
   if(v==="1") state.flags[i]="stopped";
   else if(v==="2") state.flags[i]="skip";
   else state.flags[i]="";
-  saveState(state);
+  saveCityState(CITY_ID, state);
   render(false);
 }
 
 function updateCount(){
   const k = computeCounters(state);
   document.getElementById("count").textContent = `済${k.done}/停止${k.stopped}/不要${k.skip}/総${k.total}`;
-}
-
-function onImport(){
-  const text = prompt("Excelから「ステーション名,車種,フルナンバー」の行を\nそのまま貼り付けてください。\n（タブ区切り/カンマ区切りどちらでも可）", "");
-  if(!text) return;
-  const items = (text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map(line=>{
-    const parts = line.split(/\t|,/);
-    return {station:(parts[0]||""), model:(parts[1]||""), plate:(parts[2]||"")};
-  }).filter(x=>x.station);
-  if(items.length===0){ alert("読み込める行がありませんでした。"); return; }
-  state.items = items;
-  state.checked = items.map(()=>false);
-  state.flags = items.map(()=>"" );
-  state.dates = items.map(()=>null);
-  saveState(state);
-  render(true);
 }
 
 render(true);

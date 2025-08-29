@@ -1,6 +1,8 @@
 
+// ===== 設定 =====
+const GAS_URL = "YOUR_GAS_URL_HERE"; // 後でApps ScriptのURLに差し替え
+
 // ===== 共通ユーティリティ =====
-const GAS_ENDPOINT = ""; // 必要ならWeb App URLを設定
 function fmtDateJST(ts){
   if(!ts) return "";
   try{
@@ -14,18 +16,9 @@ function fmtDateJST(ts){
   }catch(e){ return ""; }
 }
 function sevenRule(ts){
-  if(!ts) return false; // 初回は薄グリーンを維持
+  if(!ts) return false; // 初回は薄グリーン
   const SEVEN = 7*24*60*60*1000;
-  return (Date.now() - ts) >= SEVEN;
-}
-async function sendGAS(payload){
-  if(!GAS_ENDPOINT) return;
-  try{
-    await fetch(GAS_ENDPOINT, {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(payload), mode:"no-cors"
-    });
-  }catch(e){}
+  return (Date.now() - ts) >= SEVEN; // 7日以上経過で青
 }
 function computeCounters(state){
   const total = state.items.length;
@@ -42,15 +35,27 @@ function getSortedIndices(state){
   idx.sort((a,b)=> (state.checked[a]===state.checked[b]) ? 0 : (state.checked[a] ? 1 : -1));
   return idx;
 }
-function parsePasted(text){
-  const lines = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  const items = [];
-  for(const line of lines){
-    const parts = line.split(/\t|,/); // タブ or カンマ
-    const [station, model, plate] = [parts[0]||"", parts[1]||"", parts[2]||""];
-    if(station){
-      items.push({station, model, plate});
-    }
+function loadCityState(cityKey){
+  try{
+    return JSON.parse(localStorage.getItem("junkai_"+cityKey)) || {
+      items: [], checked: [], flags: [], dates: [], meta: []
+    };
+  }catch(e){ return {items: [], checked: [], flags: [], dates: [], meta: []}; }
+}
+function saveCityState(cityKey, state){
+  localStorage.setItem("junkai_"+cityKey, JSON.stringify(state));
+}
+
+// ===== GAS 送信（ログ） =====
+async function sendLog(payload){
+  if(!GAS_URL) return;
+  try{
+    await fetch(GAS_URL, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(payload)
+    });
+  }catch(e){
+    // silent
   }
-  return items;
 }

@@ -5,127 +5,78 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>巡回リスト Index</title>
 <link rel="stylesheet" href="style.css">
+<script src="app.js"></script>
 </head>
 <body>
-<header><h1>巡回リスト</h1></header>
+<header>
+  <button class="btn back" onclick="syncFromGAS()">同期</button>
+  <h1>巡回リスト</h1>
+  <div style="width:64px"></div>
+</header>
 <main>
   <div class="toolbar">
-    <div>
-      <button class="btn" onclick="openFile()">取込（ファイル）</button>
-      <input id="fileInput" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain" style="display:none">
-      <button class="btn" onclick="togglePaste()">取込（貼り付け）</button>
-    </div>
-    <button class="btn" onclick="location.reload()">更新</button>
-  </div>
-
-  <div id="pasteBox" class="importbox" style="display:none">
-    <div class="sub">Google Sheets から表をコピーして貼り付け（列：エリア / ステーション名 / 車種 / フルナンバー）</div>
-    <textarea id="pasteArea" placeholder="例）
-大和	ステーションA	軽トラ	相模500 あ 12-34
-海老名	ステーションB	2t	相模400 い 56-78"></textarea>
-    <div style="margin-top:8px; display:flex; gap:8px;">
-      <button class="btn" onclick="importFromPaste()">読み込む</button>
-      <button class="btn" onclick="togglePaste()">閉じる</button>
-    </div>
+    <div class="sub">GASと同期して各エリアに反映します</div>
+    <button class="btn" onclick="updateCounts()">再計算</button>
   </div>
 
   <div class="card">
-    <div class="idx"></div><div class="checkcol"></div>
+    <div class="checkcol"></div><div class="idx"></div>
     <div class="title"><a href="yamato.html">大和市</a></div>
     <div class="right"><div id="yamato_count" class="sub">済0/停止0/不要0/総0</div></div>
     <div class="date"></div>
   </div>
   <div class="card">
-    <div class="idx"></div><div class="checkcol"></div>
+    <div class="checkcol"></div><div class="idx"></div>
     <div class="title"><a href="ebina.html">海老名市</a></div>
     <div class="right"><div id="ebina_count" class="sub">済0/停止0/不要0/総0</div></div>
     <div class="date"></div>
   </div>
   <div class="card">
-    <div class="idx"></div><div class="checkcol"></div>
+    <div class="checkcol"></div><div class="idx"></div>
     <div class="title"><a href="chofu.html">調布市</a></div>
     <div class="right"><div id="chofu_count" class="sub">済0/停止0/不要0/総0</div></div>
     <div class="date"></div>
   </div>
   <div class="card">
-    <div class="idx"></div><div class="checkcol"></div>
+    <div class="checkcol"></div><div class="idx"></div>
     <div class="title">全エリア合計</div>
     <div class="right"><div id="all_count" class="sub">済0/停止0/不要0/総0</div></div>
     <div class="date"></div>
   </div>
 </main>
-
 <script>
-const AREA_MAP = {"大和":"yamato","海老名":"ebina","調布":"chofu"};
-
-function togglePaste(){
-  const el = document.getElementById('pasteBox');
-  el.style.display = (el.style.display==='none') ? 'block' : 'none';
-}
-function openFile(){
-  document.getElementById('fileInput').click();
-}
-document.getElementById('fileInput').addEventListener('change', async (e)=>{
-  const f = e.target.files[0];
-  if(!f) return;
-  const text = await f.text();
-  importCommon(text);
-  e.target.value = "";
-  alert('取り込みが完了しました。各エリアページを開いて確認してください。');
-});
-
-function importFromPaste(){
-  const text = document.getElementById('pasteArea').value || "";
-  if(!text.trim()){ alert('貼り付けテキストが空です。'); return; }
-  importCommon(text);
-  togglePaste();
-  alert('取り込みが完了しました。各エリアページを開いて確認してください。');
-}
-
-function parseRows(text){
-  const lines = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  const rows = [];
-  for(const line of lines){
-    const parts = line.split(/\t|,/);
-    if(parts.length < 4) continue;
-    const [area, station, model, plate] = parts.map(x=>x.trim());
-    // ヘッダ行スキップ：1列目が「エリア」や AREA_MAP に無いものはスキップ
-    if(area==="エリア") continue;
-    if(!(area in AREA_MAP)) continue;
-    rows.push({area, station, model, plate});
-  }
-  return rows;
-}
-
-function importCommon(text){
-  const rows = parseRows(text);
-  const buckets = {yamato:[], ebina:[], chofu:[]};
-  for(const r of rows){
-    const key = AREA_MAP[r.area];
-    buckets[key].push({station:r.station, model:r.model, plate:r.plate});
-  }
-  for(const key of Object.keys(buckets)){
-    const items = buckets[key];
-    if(items.length===0) continue;
-    const state = {
-      items,
-      checked: items.map(()=>false),
-      flags: items.map(()=>""),
-      dates: items.map(()=>null),
-      meta: []
-    };
-    localStorage.setItem("junkai_"+key, JSON.stringify(state));
-  }
-  updateCounts();
-}
-
-function getState(city){
+async function syncFromGAS(){
+  if(!GAS_URL){ alert("app.js の GAS_URL を設定してください。"); return; }
   try{
-    const s = JSON.parse(localStorage.getItem("junkai_"+city));
-    if(!s) return {items:[],checked:[],flags:[],dates:[],meta:[]};
-    return s;
-  }catch(e){ return {items:[],checked:[],flags:[],dates:[],meta:[]}; }
+    const res = await fetch(GAS_URL + '?action=pull', { method:'GET' });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    for(const key of ['yamato','ebina','chofu']){
+      const arr = Array.isArray(data[key]) ? data[key] : [];
+      const items = arr.map(o => ({
+        station: o.station || '',
+        model: o.model || '',
+        plate: o.plate || '',
+        address: o.address || '',
+        note: o.note || ''
+      }));
+      const state = {
+        items,
+        checked: items.map(()=>false),
+        flags: items.map(()=>''),
+        dates: items.map(()=>null),
+        meta: []
+      };
+      saveCityState(key, state);
+    }
+    updateCounts();
+    alert('同期が完了しました。各エリアページを開いて確認してください。');
+  }catch(e){
+    alert('同期に失敗しました。GASのCORS設定とaction=pullのレスポンス(JSON)を確認してください。\n'+e.message);
+  }
 }
+
+function getState(city){ return loadCityState(city); }
 function countFor(s){
   const total = s.items.length;
   let done=0, stopped=0, skip=0;
@@ -137,7 +88,7 @@ function countFor(s){
   return {done, stopped, skip, total};
 }
 function updateCounts(){
-  const cities=["yamato","ebina","chofu"];
+  const cities=['yamato','ebina','chofu'];
   let ad=0,as=0,ak=0,at=0;
   for(const c of cities){
     const s = getState(c);
@@ -146,7 +97,7 @@ function updateCounts(){
     const el = document.getElementById(c+"_count");
     if(el) el.textContent = `済${k.done}/停止${k.stopped}/不要${k.skip}/総${k.total}`;
   }
-  document.getElementById("all_count").textContent = `済${ad}/停止${as}/不要${ak}/総${at}`;
+  document.getElementById('all_count').textContent = `済${ad}/停止${as}/不要${ak}/総${at}`;
 }
 updateCounts();
 </script>
