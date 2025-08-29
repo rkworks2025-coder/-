@@ -29,7 +29,7 @@
   .checked { background:var(--pink); }
   .stopped { background:var(--gray); }
   .skip { background:var(--yellow); }
-  .seven { outline:2px dashed #93c5fd; background:var(--blue); }
+  .seven { background:var(--blue); } /* 点線の枠は廃止 */
   .counter { position:sticky; bottom:0; background:#ffffffcc; border-top:1px solid var(--border); padding:12px; display:flex; justify-content:space-between; align-items:center; font-variant-numeric:tabular-nums; backdrop-filter:saturate(180%) blur(8px); }
   a { color:var(--accent); text-decoration:none; }
 </style>
@@ -77,15 +77,24 @@
     } catch(e) { return ""; }
   }
   function sevenRule(ts){
-    if(!ts) return true;
+    if(!ts) return false; // 初期表示は薄グリーンを維持
     const SEVEN = 7*24*60*60*1000;
     return (Date.now() - ts) >= SEVEN;
   }
 
   const listEl = document.getElementById("list");
-  function render(){
+
+  function getSortedIndices(){ 
+    const idx = [...Array(state.items.length).keys()];
+    // チェック済み（true）を末尾へ。停止/不要は位置固定（要望があれば後で調整）
+    idx.sort((a,b)=> (state.checked[a]===state.checked[b]) ? 0 : (state.checked[a] ? 1 : -1));
+    return idx;
+  }
+
+  function render(sortOnLoad=false){
     listEl.innerHTML = "";
-    for(let i=0;i<state.items.length;i++){ 
+    const order = sortOnLoad ? getSortedIndices() : [...Array(state.items.length).keys()];
+    for(const i of order){ 
       const name = state.items[i];
       const checked = !!state.checked[i];
       const flag = state.flags[i] || "";
@@ -96,8 +105,7 @@
       if(flag==="stopped") cls += "stopped ";
       else if(flag==="skip") cls += "skip ";
       else if(checked) cls += "checked ";
-      else cls += " "; // 通常（薄緑）
-      if(flag==="" && !checked && sevenRule(ts)) cls += "seven ";
+      else if(sevenRule(ts)) cls += "seven ";
       row.className = cls.trim();
 
       const title = document.createElement("div");
@@ -145,7 +153,7 @@
       state.dates[i] = null;
       saveState(state);
     }
-    render();
+    render(false); // リロードまでは並び替えしない
   }
   function setFlag(i){
     const v = prompt("状態を選択：\n0=通常（薄緑）\n1=稼働停止（グレー）\n2=巡回不要（黄色）", "0");
@@ -154,7 +162,7 @@
     else if(v==="2") state.flags[i]="skip";
     else state.flags[i]="";
     saveState(state);
-    render();
+    render(false);
   }
 
   function updateCount(){
@@ -173,10 +181,11 @@
     try {
       const payload = { event, city: "chofu", index: i, station: state.items[i], timestamp: new Date().toISOString() };
       await fetch(GAS_ENDPOINT, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload), mode:"no-cors" });
-    } catch(e) { /* silent */ }
+    } catch(e) {}
   }
 
-  render();
+  // 初回のみ並び替えを反映（= リロード時）
+  render(true);
 </script>
 </body>
 </html>
