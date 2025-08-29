@@ -4,188 +4,142 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>海老名市 巡回リスト</title>
-<style>
-
-  :root { 
-    --bg:#f6f7fb; --panel:#ffffff; --panel2:#f3f4f6; --border:#e5e7eb; --text:#111827; --muted:#6b7280; --accent:#2563eb;
-    --green:#e6f4ea;   /* 通常（巡回可能） */
-    --pink:#ffd6e7;    /* チェック済み */
-    --gray:#e5e7eb;    /* 稼働停止 */
-    --yellow:#fff3b0;  /* 巡回不要 */
-    --blue:#dbeafe;    /* 7日ルール対象 */
-  }
-
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; }
-  header { position:sticky; top:0; background:#ffffffcc; border-bottom:1px solid var(--border); padding:10px 12px; backdrop-filter:saturate(180%) blur(8px); }
-  h1 { margin:0; font-size:16px; text-align:center; color:var(--accent); }
-  main { padding:12px; padding-bottom:88px; }
-  .item { border:1px solid var(--border); border-radius:14px; padding:10px 12px; margin-bottom:10px; background:var(--green); display:grid; grid-template-columns: 1fr auto; grid-template-rows:auto auto; gap:6px 10px; }
-  .name { font-weight:600; grid-column:1/2; grid-row:1/2; }
-  .date { font-size:12px; color:var(--muted); grid-column:1/2; grid-row:2/3; line-height:1.2; white-space:pre-line; }
-  .actions { grid-column:2/3; grid-row:1/3; display:flex; gap:8px; align-items:center; }
-  .btn { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--text); padding:8px 10px; border-radius:10px; font-size:12px; }
-  .btn:active { transform:scale(.98); }
-  .checked { background:var(--pink); }
-  .stopped { background:var(--gray); }
-  .skip { background:var(--yellow); }
-  .seven { background:var(--blue); } /* 点線の枠は廃止 */
-  .counter { position:sticky; bottom:0; background:#ffffffcc; border-top:1px solid var(--border); padding:12px; display:flex; justify-content:space-between; align-items:center; font-variant-numeric:tabular-nums; backdrop-filter:saturate(180%) blur(8px); }
-  a { color:var(--accent); text-decoration:none; }
-</style>
+<link rel="stylesheet" href="style.css">
+<script src="app.js"></script>
 </head>
 <body>
-<header>
-  <h1>海老名市 巡回リスト</h1>
-</header>
+<header><h1>海老名市 巡回リスト</h1></header>
 <main id="list"></main>
 <div class="counter">
-  <div><a href="index.html">← 戻る</a></div>
+  <button class="btn" onclick="onImport()">データ読み込み</button>
   <div id="count">済0/停止0/不要0/総0</div>
+  <a class="btn" href="index.html">← 戻る</a>
 </div>
 <script>
-  const CITY_ID = "ebina";
-  const CITY_KEY = "junkai_" + CITY_ID;
-  const GAS_ENDPOINT = ""; // Google Apps ScriptのURL（任意）
-  const CONFIRM_MSG = "よろしいですか？"; // チェックON時のみ
+const CITY_ID = "ebina";
+const CITY_KEY = "junkai_" + CITY_ID;
+const CONFIRM_MSG = "よろしいですか？"; // ON/OFFとも確認
 
-  function loadState(){ 
-    try{ 
-      return JSON.parse(localStorage.getItem(CITY_KEY)) || {
-        items:["ステーション001","ステーション002","ステーション003"],
-        checked:[false,false,false],
-        flags:["","",""],
-        dates:[null,null,null]
-      };
-    }catch(e){ 
-      return { items:["ステーション001","ステーション002","ステーション003"], checked:[false,false,false], flags:["","",""], dates:[null,null,null] }; 
-    }
+function loadState(){
+  try{
+    return JSON.parse(localStorage.getItem(CITY_KEY)) || {
+      items:[{station:"ステーション001",model:"-",plate:"-"},{station:"ステーション002",model:"-",plate:"-"}],
+      checked:[false,false],
+      flags:["",""],
+      dates:[null,null],
+      meta:[]
+    };
+  }catch(e){
+    return { items:[{station:"ステーション001",model:"-",plate:"-"},{station:"ステーション002",model:"-",plate:"-"}],
+             checked:[false,false], flags:["",""], dates:[null,null], meta:[] };
   }
-  function saveState(s){ localStorage.setItem(CITY_KEY, JSON.stringify(s)); }
-  let state = loadState();
+}
+function saveState(s){ localStorage.setItem(CITY_KEY, JSON.stringify(s)); }
+let state = loadState();
 
-  function fmtDateJST(ts){
-    if(!ts) return "";
-    try {
-      const dt = new Date(ts);
-      const fmt = new Intl.DateTimeFormat("ja-JP", {
-        timeZone: "Asia/Tokyo",
-        month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false
-      }).formatToParts(dt);
-      const get = (t)=>fmt.find(x=>x.type===t)?.value || "";
-      return get("month") + "/" + get("day") + "\n" + get("hour") + ":" + get("minute");
-    } catch(e) { return ""; }
+const listEl = document.getElementById("list");
+
+function render(sortOnLoad=false){
+  listEl.innerHTML = "";
+  const order = sortOnLoad ? getSortedIndices(state) : [...Array(state.items.length).keys()];
+  for(let viewIdx=0; viewIdx<order.length; viewIdx++){
+    const i = order[viewIdx];
+    const item = state.items[i] || {station:"",model:"",plate:""};
+    const checked = !!state.checked[i];
+    const flag = state.flags[i] || "";
+    const ts = state.dates[i];
+
+    const row = document.createElement("div");
+    let cls = "card ";
+    if(flag==="stopped") cls += "stopped ";
+    else if(flag==="skip") cls += "skip ";
+    else if(checked) cls += "checked ";
+    else if(sevenRule(ts)) cls += "seven ";
+    row.className = cls.trim();
+
+    // 左端：インデックス番号（1始まり・表示順基準）
+    const idx = document.createElement("div"); idx.className="idx"; idx.textContent = (viewIdx+1);
+    // チェックボタン
+    const chkCol = document.createElement("div"); chkCol.className="checkcol";
+    const btnChk = document.createElement("button");
+    btnChk.textContent = checked? "✔":"□";
+    btnChk.onclick = ()=>toggle(i);
+    chkCol.appendChild(btnChk);
+
+    // タイトル＆サブ
+    const title = document.createElement("div"); title.className="title"; title.textContent = item.station || "";
+    const sub = document.createElement("div"); sub.className="sub"; sub.textContent = (item.model||"") + "　" + (item.plate||"");
+
+    // 右：状態ボタン
+    const right = document.createElement("div"); right.className="right";
+    const btnFlag = document.createElement("button"); btnFlag.className="btn"; btnFlag.textContent="状態"; btnFlag.onclick=()=>setFlag(i);
+    right.appendChild(btnFlag);
+
+    // 日付バッジ（MM/DD + HH:MM JST）
+    const date = document.createElement("div"); date.className="date"; date.textContent = fmtDateJST(ts);
+
+    row.appendChild(idx);
+    row.appendChild(chkCol);
+    const wrap = document.createElement("div");
+    wrap.appendChild(title); wrap.appendChild(sub);
+    row.appendChild(wrap);
+    row.appendChild(right);
+    row.appendChild(date);
+
+    listEl.appendChild(row);
   }
-  function sevenRule(ts){
-    if(!ts) return false; // 初期表示は薄グリーンを維持
-    const SEVEN = 7*24*60*60*1000;
-    return (Date.now() - ts) >= SEVEN;
-  }
+  updateCount();
+}
 
-  const listEl = document.getElementById("list");
-
-  function getSortedIndices(){ 
-    const idx = [...Array(state.items.length).keys()];
-    // チェック済み（true）を末尾へ。停止/不要は位置固定（要望があれば後で調整）
-    idx.sort((a,b)=> (state.checked[a]===state.checked[b]) ? 0 : (state.checked[a] ? 1 : -1));
-    return idx;
-  }
-
-  function render(sortOnLoad=false){
-    listEl.innerHTML = "";
-    const order = sortOnLoad ? getSortedIndices() : [...Array(state.items.length).keys()];
-    for(const i of order){ 
-      const name = state.items[i];
-      const checked = !!state.checked[i];
-      const flag = state.flags[i] || "";
-      const ts = state.dates[i];
-
-      const row = document.createElement("div");
-      let cls = "item ";
-      if(flag==="stopped") cls += "stopped ";
-      else if(flag==="skip") cls += "skip ";
-      else if(checked) cls += "checked ";
-      else if(sevenRule(ts)) cls += "seven ";
-      row.className = cls.trim();
-
-      const title = document.createElement("div");
-      title.className = "name";
-      title.textContent = name;
-
-      const dateEl = document.createElement("div");
-      dateEl.className = "date";
-      dateEl.textContent = fmtDateJST(ts);
-
-      const actions = document.createElement("div");
-      actions.className = "actions";
-      const btnFlag = document.createElement("button");
-      btnFlag.className = "btn";
-      btnFlag.textContent = "状態";
-      btnFlag.onclick = () => setFlag(i);
-
-      const btnCheck = document.createElement("button");
-      btnCheck.className = "btn";
-      btnCheck.textContent = checked ? "✔" : "□";
-      btnCheck.onclick = () => toggle(i);
-
-      actions.appendChild(btnFlag);
-      actions.appendChild(btnCheck);
-
-      row.appendChild(title);
-      row.appendChild(actions);
-      row.appendChild(dateEl);
-
-      listEl.appendChild(row);
-    }
-    updateCount();
-  }
-
-  function toggle(i){
-    const was = !!state.checked[i];
-    if(!was) {
-      if(!confirm(CONFIRM_MSG)) return;
-      state.checked[i] = true;
-      state.dates[i] = Date.now();
-      saveState(state);
-      sendGAS(i, "check_on");
-    } else {
-      state.checked[i] = false;
-      state.dates[i] = null;
-      saveState(state);
-    }
-    render(false); // リロードまでは並び替えしない
-  }
-  function setFlag(i){
-    const v = prompt("状態を選択：\n0=通常（薄緑）\n1=稼働停止（グレー）\n2=巡回不要（黄色）", "0");
-    if(v===null) return;
-    if(v==="1") state.flags[i]="stopped";
-    else if(v==="2") state.flags[i]="skip";
-    else state.flags[i]="";
+function toggle(i){
+  const was = !!state.checked[i];
+  if(!confirm(CONFIRM_MSG)) return; // ON/OFF 共通で確認
+  if(!was){
+    state.checked[i] = true;
+    state.dates[i] = Date.now();
     saveState(state);
-    render(false);
+    sendGAS({event:"check_on", city: CITY_ID, index: i+1,
+             station: state.items[i]?.station || "", model: state.items[i]?.model || "",
+             plate_full: state.items[i]?.plate || "", date_badge: fmtDateJST(state.dates[i])});
+  }else{
+    state.checked[i] = false;
+    state.dates[i] = null;
+    saveState(state);
   }
+  render(false); // 並び替えはリロード時（= 初回 render(true)）
+}
 
-  function updateCount(){
-    const total = state.items.length;
-    let done=0, stopped=0, skip=0;
-    for(let i=0;i<total;i++){ 
-      if(state.checked[i]) done++;
-      if(state.flags[i]==="stopped") stopped++;
-      if(state.flags[i]==="skip") skip++;
-    }
-    document.getElementById("count").textContent = `済${done}/停止${stopped}/不要${skip}/総${total}`;
-  }
+function setFlag(i){
+  const v = prompt("状態を選択：\n0=通常（薄緑）\n1=稼働停止（グレー）\n2=巡回不要（黄色）", "0");
+  if(v===null) return;
+  if(v==="1") state.flags[i]="stopped";
+  else if(v==="2") state.flags[i]="skip";
+  else state.flags[i]="";
+  saveState(state);
+  render(false);
+}
 
-  async function sendGAS(i, event) {
-    if(!GAS_ENDPOINT) return;
-    try {
-      const payload = { event, city: "ebina", index: i, station: state.items[i], timestamp: new Date().toISOString() };
-      await fetch(GAS_ENDPOINT, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload), mode:"no-cors" });
-    } catch(e) {}
-  }
+// カウンター
+function updateCount(){
+  const k = computeCounters(state);
+  document.getElementById("count").textContent = `済${k.done}/停止${k.stopped}/不要${k.skip}/総${k.total}`;
+}
 
-  // 初回のみ並び替えを反映（= リロード時）
-  render(true);
+// データ読み込み（Excel貼り付け）
+function onImport(){
+  const text = prompt("Excelから「ステーション名,車種,フルナンバー」の行を\nそのまま貼り付けてください。\n（タブ区切り/カンマ区切りどちらでも可）", "");
+  if(!text) return;
+  const items = parsePasted(text);
+  if(items.length===0){ alert("読み込める行がありませんでした。"); return; }
+  state.items = items;
+  state.checked = items.map(()=>false);
+  state.flags = items.map(()=>"" );
+  state.dates = items.map(()=>null);
+  saveState(state);
+  render(true); // 取込直後は初回ルールに倣って並び替え適用
+}
+
+render(true); // 初回（=リロード時）は並び替え適用
 </script>
 </body>
 </html>
