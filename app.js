@@ -1,6 +1,6 @@
 
 // ===== 設定 =====
-const GAS_URL = "YOUR_GAS_URL_HERE"; // 後でApps ScriptのURLに差し替え
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyLPjIJOmYeC7kyZikkWcY-CmWlHYwL2NJDD0GL78x8XEN5UkBRfLY9EeCPyPZD34_aVw/exec"; // 後でApps ScriptのURLに差し替え
 
 // ===== 共通ユーティリティ =====
 function fmtDateJST(ts){
