@@ -1,8 +1,7 @@
-
 // ===== 設定 =====
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyLPjIJOmYeC7kyZikkWcY-CmWlHYwL2NJDD0GL78x8XEN5UkBRfLY9EeCPyPZD34_aVw/exec"; // 後でApps ScriptのURLに差し替え
+const GAS_URL = "YOUR_GAS_URL_HERE"; // Apps Script WebアプリURLを後で差し替え
 
-// ===== 共通ユーティリティ =====
+// ===== 共通ユーティリティ（既存挙動維持） =====
 function fmtDateJST(ts){
   if(!ts) return "";
   try{
@@ -12,7 +11,7 @@ function fmtDateJST(ts){
       hour:"2-digit", minute:"2-digit", hour12:false
     }).formatToParts(dt);
     const get = t => fmt.find(x=>x.type===t)?.value || "";
-    return get("month") + "/" + get("day") + "\n" + get("hour") + ":" + get("minute");
+    return get("month") + "/" + get("day") + "\\n" + get("hour") + ":" + get("minute");
   }catch(e){ return ""; }
 }
 function sevenRule(ts){
@@ -46,7 +45,7 @@ function saveCityState(cityKey, state){
   localStorage.setItem("junkai_"+cityKey, JSON.stringify(state));
 }
 
-// ===== GAS 送信（ログ） =====
+// ===== GAS 送信（ログ：市ページで使用） =====
 async function sendLog(payload){
   if(!GAS_URL) return;
   try{
@@ -57,5 +56,68 @@ async function sendLog(payload){
     });
   }catch(e){
     // silent
+  }
+}
+
+// ====== 同期（index の「同期」ボタン用） ======
+async function syncFromGAS(){
+  try{
+    if(!GAS_URL) throw new Error("app.js の GAS_URL を設定してください。");
+
+    const url = GAS_URL + (GAS_URL.includes("?") ? "&" : "?") + "action=pull";
+    const res = await fetch(url, { method:"GET" });
+
+    if(!res.ok){
+      const text = await res.text().catch(()=> "");
+      throw new Error(`HTTP ${res.status} ${res.statusText} ${text?("- "+text):""}`.trim());
+    }
+
+    // Content-Type を確認しつつ JSON を安全にパース
+    const ct = res.headers.get("content-type") || "";
+    let data;
+    if(ct.includes("application/json")){
+      data = await res.json();
+    }else{
+      // JSONでない場合でも、JSON文字列の可能性があるのでtext->parse
+      const txt = await res.text();
+      try{
+        data = JSON.parse(txt);
+      }catch(parseErr){
+        throw new Error("JSON 以外のレスポンスを受信しました。GAS 側で JSON を返すようにしてください。");
+      }
+    }
+
+    // 期待キー
+    const CITY_KEYS = ["yamato","ebina","chofu"];
+    // 安全に配列化
+    const arrSafe = (v) => Array.isArray(v) ? v : [];
+
+    // 各エリアへ保存
+    for(const key of CITY_KEYS){
+      const items = arrSafe(data[key]).map(o => ({
+        station: (o && typeof o.station === "string") ? o.station : "",
+        model:   (o && typeof o.model   === "string") ? o.model   : "",
+        plate:   (o && typeof o.plate   === "string") ? o.plate   : "",
+        address: (o && typeof o.address === "string") ? o.address : "",
+        note:    (o && typeof o.note    === "string") ? o.note    : ""
+      }));
+
+      const state = {
+        items,
+        checked: items.map(()=>false),
+        flags: items.map(()=>""),
+        dates: items.map(()=>null),
+        meta: []
+      };
+      saveCityState(key, state);
+    }
+
+    // 成功
+    alert("同期完了！");
+    return true;
+  }catch(err){
+    const msg = (err && err.message) ? err.message : String(err);
+    alert("同期に失敗しました：\\n" + msg);
+    return false;
   }
 }
