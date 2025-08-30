@@ -14,44 +14,43 @@
     .appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid #e6e8ef;}
     .title{font-size:20px;font-weight:800;letter-spacing:.04em;}
     .btns{display:flex;gap:10px;}
-    .btn{appearance:none;border:1px solid #d7dbe7;padding:8px 14px;border-radius:12px;background:#fff;font-weight:700;font-size:14px;}
-    .btn-primary{background:var(--chip);border-color:#c9d6ff;color:#1e40af;}
-    .wrap{max-width:820px;margin:18px auto;padding:0 14px 60px;}
-    .hint{margin:6px 2px 14px;color:var(--muted);font-size:13px}
-    .cards{display:grid;grid-template-columns:1fr;gap:14px}
-    .card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e6e8ef;border-radius:16px;padding:18px 16px;box-shadow:0 1px 0 rgba(8,15,35,.03);}
-    .card:hover{background:#fafcff}
-    .card h2{margin:0 0 8px 0;font-size:18px;letter-spacing:.03em}
-    .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#f2f5fb;border:1px solid #e6e8ef}
-    .muted{color:var(--muted)}
-    .empty{margin:28px 2px 0 2px;color:var(--muted);font-size:14px}
-    /* 進捗モーダル（JS から .show を付け外し） */
-    .modal{position:fixed;inset:0;background:rgba(8,15,35,.5);display:none;align-items:center;justify-content:center;z-index:50}
-    .modal.show{display:flex}
-    .dialog{width:min(520px,90vw);background:#111827;color:#fff;border-radius:14px;padding:18px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-    .barwrap{height:8px;background:#1f2937;border-radius:999px;overflow:hidden;margin-top:12px}
-    .bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399)}
-    .dialog h3{margin:0 0 8px 0;font-size:18px}
+    .btn{appearance:none;border:1px solid #d7dbe7;padding:8px 14px;border-radius:12px;cursor:pointer;background:#fff;font-size:14px;display:flex;align-items:center;gap:6px;transition:.2s;}
+    .btn:active{transform:scale(.95);}
+    .btn.sync{border-color:var(--accent);color:var(--accent);}
+    main{padding:20px 16px;}
+    h1{font-size:20px;margin:0 0 10px 0;font-weight:bold;}
+    .card{display:block;background:#fff;border-radius:24px;box-shadow:0 6px 16px -2px rgba(18,22,33,.08);margin:0 0 16px 0;padding:20px;border:1px solid #fff;transition:.3s;text-decoration:none;color:inherit;}
+    .card h2{font-size:18px;margin:0;font-weight:700;}
+    .meta{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
+    .chip{font-size:12px;font-weight:500;background:var(--chip);color:var(--accent);padding:4px 10px;border-radius:6px;}
+    .overall{margin-top:20px;display:flex;align-items:center;gap:8px;}
+    #overallHint{font-size:14px;color:var(--muted);margin:0;}
+    #overallHint.empty{font-size:14px;color:var(--accent);font-weight:600;}
+    .progress-modal{position:fixed;bottom:0;left:0;width:100%;z-index:9999;transition:.3s;background:rgba(255,255,255,.9);backdrop-filter:blur(4px);padding:10px 16px;box-shadow:0 -6px 16px -2px rgba(18,22,33,.08);border-top-left-radius:24px;border-top-right-radius:24px;transform:translateY(100%);}
+    .progress-modal.is-visible{transform:translateY(0%);}
+    .progress-modal[hidden]{display:none;}
+    .progress-bar-container{width:100%;height:6px;background:#eee;border-radius:3px;overflow:hidden;margin-top:10px;}
+    .progress-bar{height:100%;background:var(--accent);transition:width .3s linear;}
   </style>
 </head>
 <body>
-  <!-- ヘッダー -->
-  <header class="appbar">
+  <div class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
-      <!-- app.js 互換：ID を固定 -->
-      <button id="recalcBtn" class="btn">再計算</button>
-      <button id="syncBtn"   class="btn btn-primary">同期</button>
+      <button id="syncBtn" class="btn sync">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw"><path d="M21 12a9 9 0 1 1-9-9c2.72 0 5.18 1.15 6.96 3L21 3"/><path d="M21 3v9h-9"/></svg>
+        同期
+      </button>
+      <button id="recalcBtn" class="btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9v10"/><path d="M10 21h4v-4"/></svg>
+        再計算
+      </button>
     </div>
-  </header>
+  </div>
 
-  <main class="wrap">
-    <!-- 状態表示（app.js がここを書き換える） -->
-    <p id="statusText" class="hint">GASと同期して各エリアに反映します。</p>
-
-    <!-- 都市カード（静的に用意。app.js 側は data-city を見ても、個別 ID を見ても対応できるように） -->
-    <section id="cityCards" class="cards">
+  <main>
+    <section>
+      <h1>各エリアの集計</h1>
       <a id="card-yamato" class="card" href="yamato.html" data-city="大和市">
         <h2>大和市</h2>
         <div class="meta">
@@ -85,19 +84,20 @@
 
     <!-- 全体合計（必要なら app.js が使用） -->
     <p id="overallHint" class="empty">まだ同期されていません</p>
+    <p class="overall"><small>全体:</small> <span id="overallTotal">0</span></p>
+
+    <!-- GASのURLをデータ属性に保存 -->
+    <div id="app-config" data-gas-url="https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec"></div>
   </main>
 
   <!-- 同期中モーダル -->
-  <div id="progressModal" class="modal" aria-hidden="true">
-    <div class="dialog">
-      <h3 id="progressTitle">同期中…</h3>
-      <div class="barwrap"><div id="progressBar" class="bar"></div></div>
+  <div id="progressModal" class="progress-modal" hidden>
+    <p id="statusText">同期中...</p>
+    <div class="progress-bar-container">
+      <div id="progressBar" class="progress-bar" style="width:0%;"></div>
     </div>
   </div>
-
-  <!-- スクリプト（キャッシュ回避クエリ） -->
   
-  
-<script src="app.js?v=20250830"></script>
+  <script src="app.js?v=20250831"></script>
 </body>
 </html>
