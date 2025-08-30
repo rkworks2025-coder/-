@@ -22,104 +22,114 @@
       const CITY = document.title.replace(' 巡回','');
       const LS_KEY = 'junkai:items:v2';
       const STATE_LABEL = { normal:'通常', stopped:'稼働停止', skip:'巡回不要' };
-      const STATE_NEXT = { normal:'stopped', stopped:'skip', skip:'normal' };
+      const STATE_CODE = { '0':'normal', '1':'stopped', '2':'skip' };
 
       const $ = (sel, root=document)=>root.querySelector(sel);
 
-      function load(){
-        try { const s = localStorage.getItem(LS_KEY); return s? JSON.parse(s): []; } catch(e){ return []; }
-      }
-      function save(items){
-        localStorage.setItem(LS_KEY, JSON.stringify(items));
-        window.dispatchEvent(new StorageEvent('storage', {key: LS_KEY}));
-      }
-      // 既存statusから新フィールドへ移行
+      function load(){ try{ const s=localStorage.getItem(LS_KEY); return s? JSON.parse(s):[]; }catch(e){ return []; } }
+      function save(items){ localStorage.setItem(LS_KEY, JSON.stringify(items)); window.dispatchEvent(new StorageEvent('storage',{key:LS_KEY})); }
+
       function migrate(items){
         let changed=false;
         items.forEach(it=>{
-          if (it.city==null) return;
           if (it.done===undefined || it.state===undefined){
             const st = it.status||'';
-            it.done = (st==='済') ? 1 : 0;
-            it.state = (st==='停') ? 'stopped' : (st==='不要' ? 'skip' : 'normal');
+            it.done = (st==='済')?1:0;
+            it.state = (st==='停')?'stopped':(st==='不要'?'skip':'normal');
             changed=true;
           }
-          // 将来互換: statusはミラーリング
-          it.status = it.done ? '済' : (it.state==='stopped' ? '停' : (it.state==='skip' ? '不要' : ''));
+          it.status = it.done? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
         });
         if (changed) save(items);
         return items;
       }
 
-      function text(el, s){ el.textContent = s; }
+      function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getMonth()+1).padStart(2,'0'); const D=String(d.getDate()).padStart(2,'0'); const h=String(d.getHours()).padStart(2,'0'); const m=String(d.getMinutes()).padStart(2,'0'); return `${M}/${D} ${h}:${m}`; }
 
-      function applyClass(el, it){
-        el.classList.remove('is-stopped','is-skip','is-done');
-        if (it.state==='stopped') el.classList.add('is-stopped');
-        else if (it.state==='skip') el.classList.add('is-skip');
-        if (it.done) el.classList.add('is-done');
+      function updateCounter(done,total){
+        const el = document.getElementById('counter'); const pct = total? Math.floor(done*100/total):0; el.textContent = `${done}/${total} (${pct}%)`;
       }
 
       function render(){
-        const items = migrate(load()).filter(it=>it.city===CITY);
+        const itemsAll = migrate(load());
+        const items = itemsAll.filter(it=>it.city===CITY);
         const listEl = $('#list'); listEl.innerHTML='';
-        if (!items.length){ const d=document.createElement('div'); d.className='empty'; d.textContent='リストなし'; listEl.appendChild(d); updateCounter(0,0); return; }
+        if(!items.length){ const d=document.createElement('div'); d.className='empty'; d.textContent='リストなし'; listEl.appendChild(d); updateCounter(0,0); return; }
 
-        let done=0; const total=items.length;
-        items.forEach(it=>{ if (it.done) done++; });
+        let doneCnt=0, total=items.length;
+        items.forEach(it=>{ if(it.done) doneCnt++; });
+        updateCounter(doneCnt,total);
 
-        items.forEach(it=>{
+        items.forEach((it, idx)=>{
           const itemEl = document.createElement('div');
           itemEl.className = 'item';
+          if (it.state==='stopped') itemEl.classList.add('stop');
+          else if (it.state==='skip') itemEl.classList.add('skip');
+          if (it.done) itemEl.classList.add('done');
 
-          const left = document.createElement('div');
-          left.className = 'meta';
+          // row1
           const row1 = document.createElement('div'); row1.className='row1';
-          const station = document.createElement('span'); station.className='kv'; station.innerHTML = `<b>ステーション</b>${it.station||'-'}`;
-          const model = document.createElement('span'); model.className='kv'; model.innerHTML = `<b>車種</b>${it.model||'-'}`;
-          row1.appendChild(station); row1.appendChild(model);
-          const row2 = document.createElement('div'); row2.className='row2';
-          const plate = document.createElement('span'); plate.className='kv'; plate.innerHTML = `<b>登録番号</b>${it.plate||'-'}`;
-          row2.appendChild(plate);
-          left.appendChild(row1); left.appendChild(row2);
 
-          const ctrl = document.createElement('div'); ctrl.className='ctrl';
-          const doneChk = document.createElement('input'); doneChk.type='checkbox'; doneChk.className='donechk'; doneChk.checked=!!it.done;
-          const stateBtn = document.createElement('button'); stateBtn.className='statebtn'; text(stateBtn, STATE_LABEL[it.state||'normal']);
-
-          ctrl.appendChild(doneChk); ctrl.appendChild(stateBtn);
-
-          itemEl.appendChild(left); itemEl.appendChild(ctrl);
-          applyClass(itemEl, it);
-
-          doneChk.addEventListener('change', ()=>{
-            const all = load(); const t = all.find(a=>a.id===it.id);
-            if (t){ t.done = doneChk.checked ? 1 : 0; t.status = t.done ? '済' : (t.state==='stopped'?'停': (t.state==='skip'?'不要':'')); save(all); }
-            applyClass(itemEl, t||it);
-            // 再計算してヘッダ更新
-            const itemsNow = load().filter(x=>x.city===CITY); let d=0; itemsNow.forEach(x=>{ if (x.done) d++; }); updateCounter(d, itemsNow.length);
+          // left area: index, done checkbox, station
+          const left = document.createElement('div'); left.className='left';
+          const idxSpan = document.createElement('span'); idxSpan.className='idx'; idxSpan.textContent = String(idx+1);
+          const doneBox = document.createElement('input'); doneBox.type='checkbox'; doneBox.className='donebox'; doneBox.checked = !!it.done;
+          doneBox.addEventListener('change', (ev)=>{
+            const ok = confirm('よろしいですか？');
+            if(!ok){ ev.target.checked = !ev.target.checked; return; }
+            const all = load();
+            const t = all.find(a=>a.city===it.city && a.station===it.station && a.model===it.model && a.plate===it.plate);
+            if (t){ t.done = ev.target.checked?1:0; t.updatedAt = Date.now(); t.status = t.done ? '済' : (t.state==='stopped'?'停':(t.state==='skip'?'不要':'')); save(all); }
+            render();
           });
-          stateBtn.addEventListener('click', ()=>{
-            const all = load(); const t = all.find(a=>a.id===it.id);
+          const stationSpan = document.createElement('span'); stationSpan.textContent = it.station||'';
+
+          left.appendChild(idxSpan); left.appendChild(doneBox); left.appendChild(stationSpan);
+          row1.appendChild(left);
+
+          // right area: date & state select
+          const right = document.createElement('div');
+          const dateSpan = document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = fmt(it.updatedAt);
+          const stateBtn = document.createElement('button'); stateBtn.className='checkbox'; // reuse style
+          // visual label: match current state (not done)
+          if(it.state==='stopped'){ stateBtn.classList.add('stop'); stateBtn.textContent='停'; }
+          else if(it.state==='skip'){ stateBtn.classList.add('skip'); stateBtn.textContent='不要'; }
+          else{ stateBtn.textContent='状態'; }
+          stateBtn.addEventListener('click', (ev)=>{
+            ev.stopPropagation();
+            const input = prompt('状態を選択：
+0=通常
+1=稼働停止（グレー）
+2=巡回不要（黄色）', (it.state==='stopped'?'1':(it.state==='skip'?'2':'0')));
+            if (input===null) return;
+            const code = String(input).trim();
+            if (!(code in STATE_CODE)) return;
+            const newState = STATE_CODE[code];
+            const all = load();
+            const t = all.find(a=>a.city===it.city && a.station===it.station && a.model===it.model && a.plate===it.plate);
             if (t){
-              t.state = STATE_NEXT[t.state||'normal'];
-              t.status = t.done ? '済' : (t.state==='stopped'?'停': (t.state==='skip'?'不要':''));
+              t.state = newState;
+              t.status = t.done ? '済' : (newState==='stopped'?'停':(newState==='skip'?'不要':''));
+              t.updatedAt = Date.now();
               save(all);
-              text(stateBtn, STATE_LABEL[t.state]);
-              applyClass(itemEl, t);
             }
+            render();
           });
+
+          right.appendChild(dateSpan); right.appendChild(stateBtn);
+          row1.appendChild(right);
+
+          itemEl.appendChild(row1);
+
+          // row2
+          const row2 = document.createElement('div'); row2.className='row2';
+          const modelSpan = document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `<b>車種</b>${it.model||''}`;
+          const plateSpan = document.createElement('span'); plateSpan.className='kv'; plateSpan.innerHTML = `<b>登録番号</b>${it.plate||''}`;
+          row2.appendChild(modelSpan); row2.appendChild(plateSpan);
+          itemEl.appendChild(row2);
 
           listEl.appendChild(itemEl);
         });
-
-        updateCounter(done, total);
-      }
-
-      function updateCounter(done,total){
-        const el = document.getElementById('counter');
-        const pct = total? Math.floor(done*100/total): 0;
-        el.textContent = `${done}/${total} (${pct}%)`;
       }
 
       document.addEventListener('DOMContentLoaded', render);
