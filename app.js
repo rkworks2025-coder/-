@@ -1,190 +1,176 @@
-const CONFIG = { GAS_URL: "https://script.google.com/macros/s/AKfycby9NsfFHpjMI2GGQA2Jw8DcFuRs9aU74cuNWWvRWWe9SiWivhm6PtFmw5nCdsgxpTvLFw/exec" };
-/* 巡回アプリ front: 本番同期フル版
-   - デモ処理なし
-   - GAS ?action=pull の配列データを取り込み localStorage へ保存
-   - 進捗オーバーレイ内蔵
-   - 既存HTML互換: 'yamato' 'ebina' 'chofu' も保存
-*/
+/* =========================
+   巡回リスト app.js（フル版・同期修正版）
+   - 二重マウント防止
+   - 同期/再計算ボタン結線（既存DOMのみ使用）
+   - 進捗モーダル表示（擬似バー）
+   - GASへ ?action=pull で取得
+   - 都市別カウント反映（大和市/海老名市/調布市）
+   - フィールド名の表記ゆれを吸収
+   ========================= */
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycby9NsfFHpjMI2GGQA2Jw8DcFuRs9aU74cuNWWvRWWe9SiWivhm6PtFmw5nCdsgxpTvLFw/exec';
-const CITIES = ['大和市','海老名市','調布市'];
-
-/* ========== 進捗オーバーレイ ========== */
-const Overlay = (() => {
-  let root, bar, text, prog = 0, timer = null;
-  function ensure() {
-    if (root) return;
-    root = document.createElement('div');
-    Object.assign(root.style, {
-      position:'fixed', inset:0, display:'none', zIndex:9999,
-      alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,.35)'
-    });
-    const box = document.createElement('div');
-    Object.assign(box.style, {
-      minWidth:'260px', padding:'16px 18px', borderRadius:'12px',
-      background:'#111', color:'#fff', fontWeight:700, boxShadow:'0 8px 20px rgba(0,0,0,.3)'
-    });
-    text = document.createElement('div'); text.textContent='同期中…'; text.style.marginBottom='10px';
-    const wrap = document.createElement('div');
-    Object.assign(wrap.style,{height:'6px', background:'#333', borderRadius:'6px', overflow:'hidden'});
-    bar = document.createElement('div');
-    Object.assign(bar.style,{height:'100%', width:'0%', background:'#19a1ff', transition:'width .15s linear'});
-    wrap.appendChild(bar); box.appendChild(text); box.appendChild(wrap); root.appendChild(box); document.body.appendChild(root);
+(function () {
+  // ---- 二重マウント防止 ----
+  if (window.__JUNKAI_MOUNTED__) {
+    console.warn('JunkaiApp already mounted. Skip.');
+    return;
   }
-  function show(msg){ ensure(); text.textContent = msg||'同期中…'; root.style.display='flex';
-    prog=5; bar.style.width=prog+'%';
-    if (timer) clearInterval(timer);
-    timer=setInterval(()=>{ prog=Math.min(90, prog+Math.random()*8); bar.style.width=prog+'%'; },180);
+  window.__JUNKAI_MOUNTED__ = true;
+
+  // ---- 設定（あなたの本番URLを直書き）----
+  // ※依頼どおり固定で組み込み
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycby9NsfFHpjMI2GGQA2Jw8DcFuRs9aU74cuNWWvRWWe9SiWivhm6PtFmw5nCdsgxpTvLFw/exec';
+
+  // ---- DOM ヘルパ ----
+  const $ = (sel, root = document) => root.querySelector(sel);
+
+  // 進捗モーダル
+  const modal = $('#progressModal');
+  const bar   = $('#progressBar');
+  const statusText = $('#statusText');
+
+  // 都市カード（合計表示用）
+  const cityEls = {
+    yamato: { done: $('#yamato-done'), stop: $('#yamato-stop'), skip: $('#yamato-skip'), total: $('#yamato-total') },
+    ebina : { done: $('#ebina-done'),  stop: $('#ebina-stop'),  skip: $('#ebina-skip'),  total: $('#ebina-total')  },
+    chofu : { done: $('#chofu-done'),  stop: $('#chofu-stop'),  skip: $('#chofu-skip'),  total: $('#chofu-total')  },
+  };
+
+  // ---- 状態 ----
+  let latestRows = []; // 直近同期データを保持（再計算で使用）
+
+  // ---- 表記ゆれ吸収（1行→正規化）----
+  function normalizeRow(r) {
+    const city    = r.city ?? r.cityName ?? r['市区町村'] ?? r['City'] ?? '';
+    const station = r.station ?? r.stationName ?? r['ステーション'] ?? r['Station'] ?? '';
+    const model   = r.model ?? r['車種名'] ?? r['Model'] ?? '';
+    const plate   = r.plate_full ?? r.plate ?? r['登録番号'] ?? r['Plate'] ?? '';
+    return { city: String(city).trim(), station: String(station).trim(), model: String(model).trim(), plate: String(plate).trim() };
   }
-  function to100AndHide(msg){ if(!root) return; text.textContent=msg||'同期完了'; bar.style.width='100%'; setTimeout(hide,350); }
-  function hide(){ if(timer) clearInterval(timer), timer=null; if(root) root.style.display='none'; }
-  return {show, to100AndHide, hide};
-})();
 
-/* ========== 同期（本番） ========== */
-async function runSyncFromGAS() {
-  try {
-    Overlay.show('同期中…');
-    const ctrl = new AbortController();
-    const t = setTimeout(()=>ctrl.abort(), 20000);
-    const res = await fetch(`${GAS_URL}?action=pull`, {
-      method:'GET', headers:{'Accept':'application/json'}, signal:ctrl.signal
-    });
-    clearTimeout(t);
-    const json = await res.json();
-    if (!json || json.ok !== true || !Array.isArray(json.data)) throw new Error('JSON形式不正');
-
-    const rows = normalizeRows(json.data);
-    applyPulledData(rows);
-    Overlay.to100AndHide('同期完了');
-
-    const counts = cityCounts(rows);
-    alert(`同期完了：大和 ${counts['大和市']||0} / 海老名 ${counts['海老名市']||0} / 調布 ${counts['調布市']||0}`);
-  } catch(e) {
-    Overlay.hide();
-    alert(`同期に失敗しました：${e && e.message ? e.message : e}`);
-  }
-}
-
-/* ========== 整形・保存・反映 ========== */
-function normalizeRows(arr){
-  return arr.map(r=>({
-    city: (r.city ?? '').toString().trim(),
-    station: (r.station ?? '').toString().trim(),
-    model: (r.model ?? '').toString().trim(),
-    plate_full: (r.plate_full ?? '').toString().trim(),
-    rowNumber: Number(r.rowNumber ?? 0) || 0
-  })).filter(r=>r.city);
-}
-function cityCounts(rows){
-  const m={}; for(const r of rows) m[r.city]=(m[r.city]||0)+1; return m;
-}
-function applyPulledData(rows){
-  // 全体保存
-  localStorage.setItem('jun:data:all', JSON.stringify(rows));
-  localStorage.setItem('jun:data:ts', String(Date.now()));
-  // 都市別
-  const byCity={}; for(const c of CITIES) byCity[c]=[];
-  rows.forEach(r=>{ (byCity[r.city] || (byCity[r.city]=[])).push(r); });
-  localStorage.setItem('jun:data:city:大和市', JSON.stringify(byCity['大和市']||[]));
-  localStorage.setItem('jun:data:city:海老名市', JSON.stringify(byCity['海老名市']||[]));
-  localStorage.setItem('jun:data:city:調布市', JSON.stringify(byCity['調布市']||[]));
-  // 旧キー互換
-  localStorage.setItem('yamato', JSON.stringify(byCity['大和市']||[]));
-  localStorage.setItem('ebina',  JSON.stringify(byCity['海老名市']||[]));
-  localStorage.setItem('chofu',  JSON.stringify(byCity['調布市']||[]));
-  // インデックスの分母表示を更新（存在する場合のみ）
-  tryUpdateIndexCounters(byCity);
-}
-function tryUpdateIndexCounters(byCity){
-  const set = (id,n)=>{ const el=document.getElementById(id); if(el) el.textContent=String(n); };
-  set('count-yamato', (byCity['大和市']||[]).length);
-  set('count-ebina',  (byCity['海老名市']||[]).length);
-  set('count-chofu',  (byCity['調布市']||[]).length);
-}
-
-/* ========== 初期化 ========== */
-function bindButtons(){
-  const b1 = document.getElementById('btnSync');
-  if (b1) b1.addEventListener('click', runSyncFromGAS);
-  document.querySelectorAll('.js-sync').forEach(b=> b.addEventListener('click', runSyncFromGAS));
-  const recalc = document.getElementById('btnRecalc') || document.querySelector('.js-recalc');
-  if (recalc) recalc.addEventListener('click', ()=>{
-    const rows = JSON.parse(localStorage.getItem('jun:data:all')||'[]');
-    const bc={'大和市':[],'海老名市':[],'調布市':[]};
-    rows.forEach(r=>{ (bc[r.city]||(bc[r.city]=[])).push(r); });
-    tryUpdateIndexCounters(bc);
-    alert('再計算しました');
-  });
-}
-document.addEventListener('DOMContentLoaded', bindButtons);
-window.runSyncFromGAS = runSyncFromGAS;  // 直接呼び出し用
-
-
-;(function(){
-  if (window.JunkaiApp && window.JunkaiApp._mounted) return;
-  window.JunkaiApp = Object.assign({}, window.JunkaiApp||{}, {_mounted:true});
-
-  function qs(s){return document.querySelector(s)}
-  function setText(sel,val){ const el=typeof sel==='string'?qs(sel):sel; if(el) el.textContent=String(val) }
-  function status(text){
-    // Prefer #statusText if present; otherwise fall back to #sync-title
-    const el = document.getElementById('statusText') || document.getElementById('sync-title');
-    if (el) el.textContent = text;
-  }
-  function updateIndexCounters(c){
-    const map = { yamato:'#card-yamato', ebina:'#card-ebina', chofu:'#card-chofu' };
-    for (const k in map){
-      const base = qs(map[k]); if(!base||!c[k]) continue;
-      setText(base.querySelector('.c-total .num'), c[k].total ?? 0);
-      setText(base.querySelector('.c-done .num'),  c[k].done  ?? 0);
-      setText(base.querySelector('.c-stop .num'),  c[k].stop  ?? 0);
-      setText(base.querySelector('.c-skip .num'),  c[k].skip  ?? 0);
-    }
-  }
-  async function syncFromGAS(){
-    const overlay = qs('#sync-overlay'); const bar = qs('#sync-progress-bar');
-    if (overlay) overlay.classList.add('show');
-    status('同期中…'); if (bar) bar.style.width='0%';
-    let pct=0; const tm=setInterval(()=>{ pct=Math.min(95,pct+3+Math.random()*6); if(bar) bar.style.width=pct.toFixed(0)+'%'; },120);
-    try{
-      const resp = await fetch(CONFIG.GAS_URL + "?action=pull", {cache:'no-store'});
-      if(!resp.ok) throw new Error('同期エラー: HTTP '+resp.status);
-      const payload = await resp.json();
-      const rows = Array.isArray(payload) ? payload :
-                   (Array.isArray(payload.data) ? payload.data :
-                    (Array.isArray(payload.rows) ? payload.rows : []));
-      const counters={ yamato:{done:0,stop:0,skip:0,total:0},
-                       ebina:{done:0,stop:0,skip:0,total:0},
-                       chofu:{done:0,stop:0,skip:0,total:0} };
-      for(const r of rows){
-        const city = (r.city ?? r.cityName ?? r['市区町村'] ?? r['City'] ?? '').toString();
-        if (city.includes('大和市')) counters.yamato.total++;
-        else if (city.includes('海老名市')) counters.ebina.total++;
-        else if (city.includes('調布市')) counters.chofu.total++;
-      }
-      updateIndexCounters(counters);
-      if (bar) bar.style.width='100%';
-      status('同期完了！');
-    }catch(e){
-      status(e.message || '同期に失敗しました');
-    }finally{
-      clearInterval(tm);
-      setTimeout(()=>{ if(overlay) overlay.classList.remove('show'); }, 800);
-    }
-  }
-  function recalc(){
-    // Placeholder for local data re-aggregation; keep in app.js per spec
-    const get = sel => parseInt((qs(sel)?.textContent||'0').replace(/\D+/g,''))||0;
-    const counters={
-      yamato:{done:get('#card-yamato .c-done .num'), stop:get('#card-yamato .c-stop .num'), skip:get('#card-yamato .c-skip .num'), total:get('#card-yamato .c-total .num')},
-      ebina:{done:get('#card-ebina .c-done .num'), stop:get('#card-ebina .c-stop .num'), skip:get('#card-ebina .c-skip .num'), total:get('#card-ebina .c-total .num')},
-      chofu:{done:get('#card-chofu .c-done .num'), stop:get('#card-chofu .c-stop .num'), skip:get('#card-chofu .c-skip .num'), total:get('#card-chofu .c-total .num')},
+  // ---- 集計（現状は総数のみ反映。done/stop/skip は将来拡張）----
+  function computeCounts(rows) {
+    const counts = {
+      '大和市': { total: 0, done: 0, stop: 0, skip: 0 },
+      '海老名市': { total: 0, done: 0, stop: 0, skip: 0 },
+      '調布市': { total: 0, done: 0, stop: 0, skip: 0 },
     };
-    updateIndexCounters(counters);
+    for (const raw of rows) {
+      const { city } = normalizeRow(raw);
+      if (city in counts) {
+        counts[city].total += 1;
+        // 将来：raw の状態フィールドを見て done/stop/skip を振る
+      }
+    }
+    return counts;
   }
-  document.addEventListener('DOMContentLoaded', function init(){
-    const btnSync = qs('#btn-sync'); if (btnSync) btnSync.addEventListener('click', syncFromGAS, {once:false});
-    const btnRecalc = qs('#btn-recalc'); if (btnRecalc) btnRecalc.addEventListener('click', recalc, {once:false});
-  }, {once:true});
+
+  function renderCounts(counts) {
+    // Yamato
+    cityEls.yamato.total.textContent = counts['大和市']?.total ?? 0;
+    cityEls.yamato.done.textContent  = counts['大和市']?.done  ?? 0;
+    cityEls.yamato.stop.textContent  = counts['大和市']?.stop  ?? 0;
+    cityEls.yamato.skip.textContent  = counts['大和市']?.skip  ?? 0;
+
+    // Ebina
+    cityEls.ebina.total.textContent = counts['海老名市']?.total ?? 0;
+    cityEls.ebina.done.textContent  = counts['海老名市']?.done  ?? 0;
+    cityEls.ebina.stop.textContent  = counts['海老名市']?.stop  ?? 0;
+    cityEls.ebina.skip.textContent  = counts['海老名市']?.skip  ?? 0;
+
+    // Chofu
+    cityEls.chofu.total.textContent = counts['調布市']?.total ?? 0;
+    cityEls.chofu.done.textContent  = counts['調布市']?.done  ?? 0;
+    cityEls.chofu.stop.textContent  = counts['調布市']?.stop  ?? 0;
+    cityEls.chofu.skip.textContent  = counts['調布市']?.skip  ?? 0;
+  }
+
+  // ---- モーダル制御（擬似プログレス）----
+  let progTimer = null;
+  function openProgress() {
+    if (!modal || !bar) return;
+    modal.classList.add('show');
+    bar.style.width = '0%';
+    let t = 0;
+    progTimer = setInterval(() => {
+      t = (t + 5) % 100;
+      bar.style.width = `${t}%`;
+    }, 80);
+  }
+  function closeProgress() {
+    if (progTimer) { clearInterval(progTimer); progTimer = null; }
+    if (modal) modal.classList.remove('show');
+  }
+
+  // ---- 同期処理 ----
+  async function doSync() {
+    try {
+      statusText && (statusText.textContent = '同期中…');
+      openProgress();
+
+      const res = await fetch(`${GAS_URL}?action=pull`, {
+        method: 'GET',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error('データ形式が不正です（配列ではありません）');
+      }
+
+      latestRows = data;
+      const counts = computeCounts(latestRows);
+      renderCounts(counts);
+
+      statusText && (statusText.textContent = '同期完了！');
+    } catch (err) {
+      console.error(err);
+      statusText && (statusText.textContent = `同期エラー：${err.message ?? err}`);
+      // エラー時もUIは閉じる
+    } finally {
+      closeProgress();
+    }
+  }
+
+  // ---- 再計算（サーバ通信なし）----
+  function doRecalc() {
+    const counts = computeCounts(latestRows || []);
+    renderCounts(counts);
+    statusText && (statusText.textContent = '再計算完了');
+  }
+
+  // ---- ボタンへ結線（既存DOMのみ）----
+  function bindButtons() {
+    const syncBtn   = $('#syncBtn');
+    const recalcBtn = $('#recalcBtn');
+
+    // 重複バインド防止
+    if (syncBtn && !syncBtn.dataset.bound) {
+      syncBtn.addEventListener('click', doSync, { passive: true });
+      syncBtn.dataset.bound = '1';
+    }
+    if (recalcBtn && !recalcBtn.dataset.bound) {
+      recalcBtn.addEventListener('click', doRecalc, { passive: true });
+      recalcBtn.dataset.bound = '1';
+    }
+  }
+
+  // ---- 初期化 ----
+  function mountIndex() {
+    bindButtons();
+    // 初回は表示だけ整える（数値は0のままでOK）
+    statusText && (statusText.textContent = 'GASと同期して各エリアに反映します。');
+  }
+
+  // グローバル公開（index 側で mountIndex を呼ぶ構成にも両対応）
+  window.JunkaiApp = window.JunkaiApp || {};
+  window.JunkaiApp.mountIndex = mountIndex;
+
+  // 自動マウント（index 側が呼ばない場合の保険）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountIndex, { once: true });
+  } else {
+    mountIndex();
+  }
 })();
