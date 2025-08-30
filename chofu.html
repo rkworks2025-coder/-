@@ -1,54 +1,146 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>調布市</title>
-<link rel="stylesheet" href="style.css?v=20250831"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>調布市 巡回</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<header class="appbar"><a class="backlink" href="index.html">←戻る</a><div class="title">調布市</div></header>
-<main class="wrap"><section id="list" class="list"></section><p id="empty" class="empty">まだ同期されていません</p></main>
-
-<script>
-// area inline patch 83.1
-var LS_KEY_ITEMS='junkai:items:v1';
-var CITY='調布市';
-
-function load(){ try{var s=localStorage.getItem(LS_KEY_ITEMS);return s?JSON.parse(s):[]}catch(e){return[]}}
-function el(tag, cls, txt){var x=document.createElement(tag); if(cls) x.className=cls; if(txt!=null) x.textContent=txt; return x;}
-
-function statusClass(s){
-  if (!s) return '';
-  if (s.indexOf('完')>=0 || s.toLowerCase().indexOf('done')>=0) return 'done';
-  if (s.indexOf('停')>=0 || s.toLowerCase().indexOf('stop')>=0) return 'stop';
-  if (s.indexOf('要')>=0 || s.toLowerCase().indexOf('skip')>=0) return 'skip';
-  return '';
-}
-
-function render(items){
-  var list=document.getElementById('list');
-  var empty=document.getElementById('empty');
-  list.innerHTML='';
-  var data=[];
-  for (var i=0;i<(items?items.length:0);i++){ var it=items[i]; if (it.city===CITY) data.push(it); }
-  if (!data.length){ if (empty) empty.style.display='block'; return; }
-  if (empty) empty.style.display='none';
-  for (var j=0;j<data.length;j++){
-    var it=data[j];
-    var card = el('div','item '+statusClass(it.status||''));
-    var row1 = el('div','row1');
-    row1.appendChild(el('div','kv', it.station||'-'));
-    var tags = el('div'); if (it.status){ var b = el('span','badge', it.status); tags.appendChild(b); }
-    row1.appendChild(tags); card.appendChild(row1);
-    var row2 = el('div','row2');
-    row2.appendChild(el('span','kv','車種: '+(it.model||'-')));
-    row2.appendChild(el('span','kv','登録番号: '+(it.plate||'-')));
-    card.appendChild(row2);
-    list.appendChild(card);
-  }
-}
-
-document.addEventListener('DOMContentLoaded',function(){ render(load()); });
-</script>
-</body></html>
+  <header class="appbar">
+    <a href="index.html" class="backlink">← 戻る</a>
+    <div class="title">調布市 巡回</div>
+    <span id="counter" class="counter"></span>
+  </header>
+  <div class="wrap">
+    <section id="list" class="list"></section>
+    <p id="empty" class="empty">まだ同期されていません</p>
+  </div>
+  <script>
+    (function() {
+      const CITY = '調布市';
+      const LS_KEY = 'junkai:items:v2';
+      const statuses = ['', '済', '停', '不要'];
+      const $ = (sel) => document.querySelector(sel);
+      function load() {
+        try {
+          const str = localStorage.getItem(LS_KEY);
+          return str ? JSON.parse(str) : [];
+        } catch (e) {
+          return [];
+        }
+      }
+      function save(items) {
+        localStorage.setItem(LS_KEY, JSON.stringify(items));
+      }
+      function format(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${m}/${day} ${hh}:${mm}`;
+      }
+      function nextStatus(current) {
+        const idx = statuses.indexOf(current || '');
+        return statuses[(idx + 1) % statuses.length];
+      }
+      function render() {
+        const listEl = $('#list');
+        const emptyEl = $('#empty');
+        const counterEl = $('#counter');
+        const allItems = load();
+        const items = allItems.filter(it => it.city === CITY);
+        if (!items || items.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          counterEl.textContent = '';
+          return;
+        }
+        emptyEl.style.display = 'none';
+        listEl.innerHTML = '';
+        let doneCount = 0;
+        items.forEach((it) => {
+          if (it.status === '済') doneCount++;
+        });
+        counterEl.textContent = `${doneCount}/${items.length}`;
+        items.forEach((it, idx) => {
+          const itemEl = document.createElement('div');
+          itemEl.className = 'item';
+          if (it.status === '済') itemEl.classList.add('done');
+          else if (it.status === '停') itemEl.classList.add('stop');
+          else if (it.status === '不要') itemEl.classList.add('skip');
+          const row1 = document.createElement('div');
+          row1.className = 'row1';
+          const left = document.createElement('div');
+          left.className = 'left';
+          const idxSpan = document.createElement('span');
+          idxSpan.className = 'idx';
+          idxSpan.textContent = String(idx + 1);
+          const chk = document.createElement('button');
+          chk.className = 'checkbox';
+          if (it.status === '済') {
+            chk.classList.add('checked');
+            chk.textContent = '✓';
+          } else if (it.status === '停') {
+            chk.classList.add('stop');
+            chk.textContent = '停';
+          } else if (it.status === '不要') {
+            chk.classList.add('skip');
+            chk.textContent = '不要';
+          }
+          chk.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const newStatus = nextStatus(it.status);
+            it.status = newStatus;
+            it.updatedAt = new Date().getTime();
+            const list = load();
+            for (let j = 0; j < list.length; j++) {
+              const obj = list[j];
+              if (obj.city === it.city && obj.station === it.station && obj.model === it.model && obj.plate === it.plate) {
+                list[j].status = newStatus;
+                list[j].updatedAt = it.updatedAt;
+                break;
+              }
+            }
+            save(list);
+            render();
+          });
+          left.appendChild(idxSpan);
+          left.appendChild(chk);
+          const stationSpan = document.createElement('span');
+          stationSpan.textContent = it.station || '';
+          left.appendChild(stationSpan);
+          row1.appendChild(left);
+          const dateSpan = document.createElement('span');
+          dateSpan.className = 'date';
+          dateSpan.textContent = format(it.updatedAt);
+          row1.appendChild(dateSpan);
+          itemEl.appendChild(row1);
+          const row2 = document.createElement('div');
+          row2.className = 'row2';
+          const modelSpan = document.createElement('span');
+          modelSpan.className = 'kv';
+          const mdl = document.createElement('b');
+          mdl.textContent = '';
+          modelSpan.appendChild(mdl);
+          modelSpan.appendChild(document.createTextNode(it.model || '-'));
+          row2.appendChild(modelSpan);
+          const plateSpan = document.createElement('span');
+          plateSpan.className = 'kv';
+          const pl = document.createElement('b');
+          pl.textContent = '';
+          plateSpan.appendChild(pl);
+          plateSpan.appendChild(document.createTextNode(it.plate || '-'));
+          row2.appendChild(plateSpan);
+          itemEl.appendChild(row2);
+          listEl.appendChild(itemEl);
+        });
+      }
+      document.addEventListener('DOMContentLoaded', render);
+      window.addEventListener('storage', render);
+    })();
+  </script>
+</body>
+</html>

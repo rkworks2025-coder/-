@@ -1,97 +1,233 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>巡回リスト</title>
-<link rel="stylesheet" href="style.css?v=20250831"/></head>
-<body><header class="appbar"><div class="title">巡回リスト</div>
-<div class="btns"><button id="recalcBtn" class="btn">再計算</button>
-<button id="syncBtn" class="btn btn-primary">同期</button></div></header>
-<main class="wrap"><p id="statusText" class="hint">同期してください</p>
-<section class="cards"><a class="card" href="yamato.html">大和市</a>
-<a class="card" href="ebina.html">海老名市</a>
-<a class="card" href="chofu.html">調布市</a></section></main>
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>巡回リスト</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="appbar">
+    <div class="title">巡回リスト</div>
+    <div class="btns">
+      <button id="syncBtn" class="btn primary">同期</button>
+      <button id="recalcBtn" class="btn">再計算</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <p id="statusText" class="hint">同期してください</p>
+    <section class="cards">
+      <a id="card-yamato" class="card" href="yamato.html">
+        <h2>大和市 巡回</h2>
+        <div class="meta"><span id="yamato-count">0/0 (0%)</span></div>
+      </a>
+      <a id="card-ebina" class="card" href="ebina.html">
+        <h2>海老名市 巡回</h2>
+        <div class="meta"><span id="ebina-count">0/0 (0%)</span></div>
+      </a>
+      <a id="card-chofu" class="card" href="chofu.html">
+        <h2>調布市 巡回</h2>
+        <div class="meta"><span id="chofu-count">0/0 (0%)</span></div>
+      </a>
+    </section>
+    <h2 class="hint" style="margin-top:20px;">全エリア達成度</h2>
+    <div class="meta"><span id="overall-count">0/0 (0%)</span></div>
+    <div class="actions">
+      <button id="exportJson">保存(JSON)</button>
+      <button id="importJson">読み込み(JSON)</button>
+      <input type="file" id="jsonFile" accept=".json" style="display:none" />
+    </div>
+  </div>
+  <div id="progressModal" class="progress-modal">
+    <p id="progressMessage">同期中…</p>
+    <div class="progress-bar-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+      const LS_KEY = 'junkai:items:v2';
 
-<script>
-// index inline patch 83.1
-var GAS_URL = (typeof GAS_URL!=='undefined' && GAS_URL) ? GAS_URL :
-  'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
-var LS_KEY_ITEMS = 'junkai:items:v1';
+      const $ = (sel) => document.querySelector(sel);
 
-var els = {
-  syncBtn: document.getElementById('syncBtn'),
-  recalcBtn: document.getElementById('recalcBtn'),
-  status: document.getElementById('statusText')
-};
+      function loadItems() {
+        try {
+          const str = localStorage.getItem(LS_KEY);
+          return str ? JSON.parse(str) : [];
+        } catch (e) {
+          console.warn('Failed to parse localStorage', e);
+          return [];
+        }
+      }
 
-function parseRows(arr) { // from 2D array to normalized items
-  var out = [];
-  for (var i=0; i<(arr?arr.length:0); i++) {
-    var r = arr[i] || [];
-    var city = r[0] || '';
-    var station = r[1] || '';
-    var model = r[2] || '';
-    var plate = r[3] || '';
-    var status = (r[4] || '').toString();
-    if (!city || !station) continue;
-    out.push({ city: city, station: station, model: model, plate: plate, status: status });
-  }
-  return out;
-}
+      function saveItems(items) {
+        localStorage.setItem(LS_KEY, JSON.stringify(items));
+      }
 
-function save(items) {
-  try { localStorage.setItem(LS_KEY_ITEMS, JSON.stringify(items)); }
-  catch(e){ console.warn('localStorage save failed', e); }
-}
+      function computeCounts(items) {
+        const counts = {
+          yamato: { done: 0, total: 0 },
+          ebina: { done: 0, total: 0 },
+          chofu: { done: 0, total: 0 },
+          overall: { done: 0, total: 0 }
+        };
+        for (const it of items) {
+          let key;
+          if (it.city === '大和市') key = 'yamato';
+          else if (it.city === '海老名市') key = 'ebina';
+          else if (it.city === '調布市') key = 'chofu';
+          if (key) {
+            counts[key].total++;
+            if (it.status === '済') counts[key].done++;
+          }
+        }
+        counts.overall.done = counts.yamato.done + counts.ebina.done + counts.chofu.done;
+        counts.overall.total = counts.yamato.total + counts.ebina.total + counts.chofu.total;
+        return counts;
+      }
 
-function load() {
-  try {
-    var s = localStorage.getItem(LS_KEY_ITEMS);
-    return s ? JSON.parse(s) : [];
-  } catch(e){ return []; }
-}
+      function renderIndex() {
+        const items = loadItems();
+        const counts = computeCounts(items);
+        function update(key, id) {
+          const done = counts[key].done;
+          const total = counts[key].total;
+          const percent = total ? Math.floor(done * 100 / total) : 0;
+          $(id).textContent = `${done}/${total} (${percent}%)`;
+        }
+        update('yamato', '#yamato-count');
+        update('ebina', '#ebina-count');
+        update('chofu', '#chofu-count');
+        const ovDone = counts.overall.done;
+        const ovTotal = counts.overall.total;
+        const ovPercent = ovTotal ? Math.floor(ovDone * 100 / ovTotal) : 0;
+        $('#overall-count').textContent = `${ovDone}/${ovTotal} (${ovPercent}%)`;
+      }
 
-function countByCity(items) {
-  var keys = {'大和市':0,'海老名市':0,'調布市':0};
-  var total = 0;
-  for (var i=0;i<items.length;i++){ var it=items[i]; if (keys.hasOwnProperty(it.city)) keys[it.city]++; total++; }
-  keys.total = total;
-  return keys;
-}
+      function showProgress(message) {
+        const modal = $('#progressModal');
+        const bar = $('#progressBar');
+        const msg = $('#progressMessage');
+        if (msg) msg.textContent = message;
+        if (bar) bar.style.width = '25%';
+        if (modal) modal.classList.add('visible');
+      }
 
-function renderCounts() {
-  var items = load();
-  var cnt = countByCity(items);
-  var cards = document.querySelectorAll('.cards .card');
-  for (var i=0;i<cards.length;i++){
-    var a = cards[i];
-    var name = a.textContent.trim();
-    var n = (cnt.hasOwnProperty(name) ? cnt[name] : 0);
-    var badge = a.querySelector('.badge');
-    if (!badge) { badge = document.createElement('span'); badge.className = 'badge'; a.appendChild(badge); }
-    badge.textContent = n + '件';
-  }
-  if (els.status) els.status.textContent = items.length ? '同期完了' : '同期してください';
-}
+      function updateProgress(percent) {
+        const bar = $('#progressBar');
+        if (bar) bar.style.width = `${percent}%`;
+      }
 
-async function sync() {
-  try {
-    if (els.status) els.status.textContent = '同期中…';
-    var res = await fetch(GAS_URL + '?action=pull', { cache: 'no-store' });
-    var data = await res.json();
-    var items = parseRows((data && (data.values || data.rows)) || data || []);
-    save(items);
-    renderCounts();
-  } catch (e) {
-    console.error(e);
-    if (els.status) els.status.textContent = '同期失敗';
-  }
-}
+      function hideProgress() {
+        const modal = $('#progressModal');
+        if (modal) {
+          setTimeout(() => modal.classList.remove('visible'), 500);
+        }
+      }
 
-function recalc() { renderCounts(); }
+      async function sync() {
+        showProgress('同期中…');
+        updateProgress(10);
+        try {
+          const res = await fetch(GAS_URL + '?action=pull');
+          updateProgress(50);
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`HTTP ${res.status}: ${text}`);
+          }
+          const json = await res.json();
+          updateProgress(80);
+          if (!json || !Array.isArray(json.data)) {
+            throw new Error('データ形式が正しくありません');
+          }
+          const raw = json.data;
+          const oldItems = loadItems();
+          const statusMap = {};
+          for (const it of oldItems) {
+            const key = `${it.city}|${it.station}|${it.model}|${it.plate}`;
+            statusMap[key] = { status: it.status, updatedAt: it.updatedAt };
+          }
+          const items = raw.map(row => {
+            const obj = { city: row[0], station: row[1], model: row[2], plate: row[3] };
+            const key = `${obj.city}|${obj.station}|${obj.model}|${obj.plate}`;
+            if (statusMap[key]) {
+              obj.status = statusMap[key].status;
+              obj.updatedAt = statusMap[key].updatedAt;
+            } else {
+              obj.status = '';
+              obj.updatedAt = null;
+            }
+            return obj;
+          });
+          saveItems(items);
+          renderIndex();
+          $('#statusText').textContent = '同期完了！';
+        } catch (err) {
+          console.error('Sync error', err);
+          $('#statusText').textContent = '同期エラー: ' + (err.message || err);
+        } finally {
+          updateProgress(100);
+          hideProgress();
+        }
+      }
 
-document.addEventListener('DOMContentLoaded', function(){
-  renderCounts();
-  if (els.syncBtn) els.syncBtn.onclick = sync;
-  if (els.recalcBtn) els.recalcBtn.onclick = recalc;
-});
-</script>
-</body></html>
+      function recalc() {
+        renderIndex();
+        $('#statusText').textContent = '再計算完了';
+      }
+
+      function exportJson() {
+        const items = loadItems();
+        const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'junkai_items.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      function importJson(file) {
+        const reader = new FileReader();
+        reader.onload = function() {
+          try {
+            const items = JSON.parse(reader.result);
+            if (!Array.isArray(items)) {
+              throw new Error('配列ではありません');
+            }
+            saveItems(items);
+            renderIndex();
+            $('#statusText').textContent = '読み込み完了';
+          } catch (err) {
+            console.error('Import error', err);
+            $('#statusText').textContent = 'JSON読み込みエラー: ' + (err.message || err);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('syncBtn').addEventListener('click', sync);
+        document.getElementById('recalcBtn').addEventListener('click', recalc);
+        document.getElementById('exportJson').addEventListener('click', exportJson);
+        document.getElementById('importJson').addEventListener('click', () => {
+          document.getElementById('jsonFile').click();
+        });
+        document.getElementById('jsonFile').addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            importJson(file);
+          }
+          e.target.value = '';
+        });
+        // 更新は storage イベントでも反映させる
+        window.addEventListener('storage', () => renderIndex());
+        renderIndex();
+      });
+    })();
+  </script>
+</body>
+</html>
