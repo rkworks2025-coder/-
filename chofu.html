@@ -1,3 +1,20 @@
-<!DOCTYPE html><html><body>
-<div class="back"><a id="back-to-index" href="index.html">← 戻る</a></div>
-<h1>Chofu</h1></body></html>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>調布市</title>
+<link rel="stylesheet" href="style.css?v=20250830"/>
+</head>
+<body>
+<header class="appbar"><a class="backlink" href="index.html">←戻る</a><div class="title">調布市</div></header>
+<main class="wrap"><section id="list" class="list"></section><p id="empty" class="empty">まだ同期されていません</p></main>
+<script>
+const LS_KEY_ITEMS='junkai:items:v1';const CITY='調布市';
+function $(s){return document.querySelector(s)}
+function el(t,a={},c=[]){const n=document.createElement(t);for(const k in a)n.setAttribute(k,a[k]);c.forEach(x=>n.appendChild(typeof x==='string'?document.createTextNode(x):x));return n;}
+function load(){try{const r=localStorage.getItem(LS_KEY_ITEMS);return r?JSON.parse(r):[]}catch(_ ){return []}}
+function render(rows){const list=$('#list'),empty=$('#empty');list.innerHTML='';const rs=rows.filter(it=>it.city===CITY);if(rs.length===0){empty.style.display='block';return}empty.style.display='none';for(const it of rs){const card=el('div',{class:'item'},[el('div',{class:'row1'},[document.createTextNode(it.station||'(不明)'),el('span',{class:'badge'},[CITY])]),el('div',{class:'row2'},[el('span',{class:'kv'},[el('b',{},['車種']),' '+(it.model||'-')]),el('span',{class:'kv'},[el('b',{},['登録番号']),' '+(it.plate||'-')])])]);list.appendChild(card);}}
+document.addEventListener('DOMContentLoaded',()=>render(load()));
+</script>
+</body></html>
