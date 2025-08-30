@@ -4,7 +4,7 @@
  * 各行の状態に応じた色分けやプログレスバーの表示を含みます。
  */
 
-:root {
+:root{--leadw:96px;
   --accent: #2b6bf6;
   --pink: #ffe6ec;
   --gray-bg: #b3b3b3;
@@ -308,6 +308,16 @@ body {
 .row1{ display:flex; align-items:center; justify-content:space-between; }
 .left{ display:flex; align-items:center; gap:8px; }
 .right{ display:flex; align-items:center; gap:10px; }
-.lead{ display:inline-flex; align-items:center; gap:8px; width:70px; } /* idx+checkboxぶんの幅 */
+.lead{ display:inline-flex; align-items:center; gap:8px; width:var(--leadw); } /* idx+checkboxぶんの幅 */
 .row2{ display:flex; align-items:center; gap:12px; margin-top:6px; }
 .row2 .lead{ visibility:hidden; } /* インデント用ダミー */
+
+/* state select vertical center & size */
+.state-select{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:36px; line-height:36px; min-width:170px;
+}
+/* 灰カード時は文字を黒系に */
+.item.stop, .item.stop *{ color:#000 !important; }
+/* 黄色も少しコントラスト確保 */
+.item.skip{ color:#222 !important; }

@@ -80,6 +80,7 @@
           left.appendChild(lead); left.appendChild(stationSpan);
           row1.appendChild(left);
           const right=document.createElement('div'); right.className='right';
+ right.className='right';
           const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
           const sel = document.createElement('select'); sel.className='state-select';
           const opts = [
@@ -102,9 +103,9 @@
           row1.appendChild(right);
           itemEl.appendChild(row1);
           const row2=document.createElement('div'); row2.className='row2';
-          const spacer=document.createElement('span'); spacer.className='lead'; /* indent */
-          const modelSpan=document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `${it.model||''}`;
+          const spacer=document.createElement('span'); spacer.className='lead';
           const plateSpan=document.createElement('span'); plateSpan.className='kv'; plateSpan.innerHTML = `${it.plate||''}`;
+          const modelSpan=document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `${it.model||''}`;
           row2.appendChild(spacer); row2.appendChild(plateSpan); row2.appendChild(modelSpan);
           itemEl.appendChild(row2);
           listEl.appendChild(itemEl);
