@@ -3,36 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>巡回リスト</title>
+  <title>巡回リスト v3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="appbar">
-    <div class="title">巡回リスト <span style="font-size:12px;color:#0af;">v2</span></div>
+    <div class="title">巡回リスト v3</div>
     <div class="btns">
-      <button id="syncBtn" class="btn primary" onclick="try{SYNC_CLICK();return false;}catch(e){}">同期</button>
+      <button id="syncBtn" class="btn primary">同期</button>
       <button id="recalcBtn" class="btn">再計算</button>
     </div>
   </div>
-
-    <script>
-      window.SYNC_CLICK = function(){
-        try{
-          var st = document.getElementById('statusText');
-          if (st) st.textContent = '同期開始(v2)';
-          if (window._sync) { window._sync(); }
-          else if (window.sync) { window.sync(); }
-          else { if (st) st.textContent = '同期関数未定義(v2)'; }
-        }catch(e){
-          try{ document.getElementById('statusText').textContent = '同期例外(v2)'; }catch(_){}
-        }
-      };
-    </script>
-
   <div class="wrap">
-    <div id="buildBanner" style="margin:8px 0;padding:6px 10px;border:1px solid #2a2a2a;border-radius:8px;color:#0af;">BUILD v2 LOADED</div>
     <p id="statusText" class="hint">同期してください</p>
-    <script>try{var st=document.getElementById("statusText"); if(st) st.textContent="準備OK v2";}catch(e){}</script>
     <section class="cards">
       <a id="card-yamato" class="card" href="yamato.html">
         <h2>大和市 巡回</h2>
@@ -55,42 +38,12 @@
       <input type="file" id="jsonFile" accept=".json" style="display:none" />
     </div>
   </div>
-
-    <script>
-      window.SYNC_CLICK = function(){
-        try{
-          var st = document.getElementById('statusText');
-          if (st) st.textContent = '同期開始(v2)';
-          if (window._sync) { window._sync(); }
-          else if (window.sync) { window.sync(); }
-          else { if (st) st.textContent = '同期関数未定義(v2)'; }
-        }catch(e){
-          try{ document.getElementById('statusText').textContent = '同期例外(v2)'; }catch(_){}
-        }
-      };
-    </script>
-
   <div id="progressModal" class="progress-modal">
     <p id="progressMessage">同期中…</p>
     <div class="progress-bar-container">
       <div id="progressBar" class="progress-bar"></div>
     </div>
   </div>
-
-    <script>
-      window.SYNC_CLICK = function(){
-        try{
-          var st = document.getElementById('statusText');
-          if (st) st.textContent = '同期開始(v2)';
-          if (window._sync) { window._sync(); }
-          else if (window.sync) { window.sync(); }
-          else { if (st) st.textContent = '同期関数未定義(v2)'; }
-        }catch(e){
-          try{ document.getElementById('statusText').textContent = '同期例外(v2)'; }catch(_){}
-        }
-      };
-    </script>
-
   <script>
     (function() {
       const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
@@ -124,20 +77,6 @@
           if (it.city === '大和市') key = 'yamato';
           else if (it.city === '海老名市') key = 'ebina';
           else if (it.city === '調布市') key = 'chofu';
-          if (!key) continue;
-          counts[key].total++;
-          const doneFlag = (typeof it.done !== 'undefined') ? (it.done ? 1 : 0) : (it.status === '済' ? 1 : 0);
-          if (doneFlag) counts[key].done++;
-        }
-        counts.overall.done = counts.yamato.done + counts.ebina.done + counts.chofu.done;
-        counts.overall.total = counts.yamato.total + counts.ebina.total + counts.chofu.total;
-        return counts;
-      };
-        for (const it of items) {
-          let key;
-          if (it.city === '大和市') key = 'yamato';
-          else if (it.city === '海老名市') key = 'ebina';
-          else if (it.city === '調布市') key = 'chofu';
           if (key) {
             counts[key].total++;
             if (it.status === '済') counts[key].done++;
@@ -164,8 +103,6 @@
         const ovTotal = counts.overall.total;
         const ovPercent = ovTotal ? Math.floor(ovDone * 100 / ovTotal) : 0;
         $('#overall-count').textContent = `${ovDone}/${ovTotal} (${ovPercent}%)`;
-        const st = document.getElementById('statusText');
-        if (st) st.textContent = ovTotal>0 ? '同期完了' : '同期されてません';
       }
 
       function showProgress(message) {
@@ -193,58 +130,12 @@
         showProgress('同期中…');
         updateProgress(10);
         try {
-          const url = GAS_URL + '?action=pull&_ts=' + Date.now();
-          const res = await fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit', redirect: 'follow' });
+          const res = await fetch(GAS_URL + '?action=pull');
           updateProgress(50);
           if (!res.ok) {
             const text = await res.text();
-            throw new Error('HTTP ' + res.status + ' ' + text);
+            throw new Error(`HTTP ${res.status}: ${text}`);
           }
-          let json;
-          try { json = await res.json(); } catch(e){ throw new Error('JSON parse error'); }
-          updateProgress(80);
-          if (!json || !Array.isArray(json.data)) {
-            throw new Error('データ形式が正しくありません');
-          }
-          const raw = json.data;
-          const oldItems = loadItems();
-          const statusMap = {};
-          for (const it of oldItems) {
-            const key = `${it.city}|${it.station}|${it.model}|${it.plate}`;
-            statusMap[key] = { status: it.status, done: it.done, state: it.state, updatedAt: it.updatedAt };
-          }
-          const items = raw.map(row => {
-            const obj = { city: row[0], station: row[1], model: row[2], plate: row[3] };
-            const key = `${obj.city}|${obj.station}|${obj.model}|${obj.plate}`;
-            if (statusMap[key]) {
-              const prev = statusMap[key];
-              obj.status = prev.status;
-              if (typeof prev.done !== 'undefined') obj.done = prev.done;
-              if (typeof prev.state !== 'undefined') obj.state = prev.state;
-              obj.updatedAt = prev.updatedAt;
-            } else {
-              obj.status = '';
-              obj.state = 'normal';
-              obj.done = 0;
-              obj.updatedAt = Date.now();
-            }
-            return obj;
-          });
-          saveItems(items);
-          renderIndex();
-          const st = document.getElementById('statusText');
-          if (st) st.textContent = '同期完了！';
-        } catch (err) {
-          console.error('Sync error', err);
-          const st = document.getElementById('statusText');
-          if (st) st.textContent = '同期エラー: ' + (err.message || err);
-        } finally {
-          updateProgress(100);
-          hideProgress();
-        }
-      }
-      window._sync = sync;
-      window.sync = sync;
           const json = await res.json();
           updateProgress(80);
           if (!json || !Array.isArray(json.data)) {
@@ -280,9 +171,6 @@
           hideProgress();
         }
       }
-      window._sync = sync;
-      window.sync = sync;
-      window._sync = sync;
 
       function recalc() {
         renderIndex();
@@ -322,9 +210,8 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        var st=document.getElementById('statusText'); if(st) st.textContent='準備完了';
-        var _sb=document.getElementById('syncBtn'); if(_sb){ _sb.addEventListener('click', sync); }
-        var _rb=document.getElementById('recalcBtn'); if(_rb){ _rb.addEventListener('click', recalc); }
+        document.getElementById('syncBtn').addEventListener('click', sync);
+        document.getElementById('recalcBtn').addEventListener('click', recalc);
         document.getElementById('exportJson').addEventListener('click', exportJson);
         document.getElementById('importJson').addEventListener('click', () => {
           document.getElementById('jsonFile').click();
