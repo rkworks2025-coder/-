@@ -82,11 +82,21 @@
           row1.appendChild(left);
           const right=document.createElement('div');
           const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
-          const stateBtn=document.createElement('button'); stateBtn.className='checkbox'; stateBtn.textContent = it.state==='stopped'?'停':(it.state==='skip'?'不要':'状態');
-          stateBtn.addEventListener('click',()=>{ const input = prompt('状態を選択：\n0=通常\n1=稼働停止（グレー）\n2=巡回不要（黄色）', it.state==='stopped'?'1':(it.state==='skip'?'2':'0')); if(input===null) return; const code=String(input).trim(); const map={'0':'normal','1':'stopped','2':'skip'}; if(!(code in map)) return; it.state=map[code]; it.updatedAt=Date.now();
-            try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.updatedAt=it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); } }catch(__){} render();
+          const stateBtn=document.createElement('button'); stateBtn.className='checkbox';
+          const setStateLabel = ()=>{ stateBtn.textContent = (it.state==='stopped')?'停止':(it.state==='skip'?'不要':'通常'); };
+          setStateLabel();
+          stateBtn.addEventListener('click',()=>{
+            const next = it.state==='normal' ? 'stopped' : (it.state==='stopped' ? 'skip' : 'normal');
+            it.state = next; it.updatedAt = Date.now();
+            try{
+              const a = load(); // migrate(load())でも良いが軽量化
+              const t = a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate);
+              if(t){ t.state = it.state; t.status = t.done ? '済' : (t.state==='stopped'?'停':(t.state==='skip'?'不要':'')); t.updatedAt = it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); }
+            }catch(__){}
+            setStateLabel();
+            render();
           });
-          right.appendChild(dateSpan); right.appendChild(stateBtn);
+          right.appendChild(stateBtn);
           row1.appendChild(right);
           itemEl.appendChild(row1);
           const row2=document.createElement('div'); row2.className='row2';
