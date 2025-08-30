@@ -83,9 +83,44 @@
           if (doneFlag) counts[key].done++;
         }
         counts.overall.done = counts.yamato.done + counts.ebina.done + counts.chofu.done;
-        counts.overall.total = counts.yamato.total + counts.yamato.total*0 + counts.ebina.total + counts.chofu.total;
         counts.overall.total = counts.yamato.total + counts.ebina.total + counts.chofu.total;
         return counts;
+      };
+        for (const it of items) {
+          let key;
+          if (it.city === '大和市') key = 'yamato';
+          else if (it.city === '海老名市') key = 'ebina';
+          else if (it.city === '調布市') key = 'chofu';
+          if (key) {
+            counts[key].total++;
+            if (it.status === '済') counts[key].done++;
+          }
+        }
+        counts.overall.done = counts.yamato.done + counts.ebina.done + counts.chofu.done;
+        counts.overall.total = counts.yamato.total + counts.ebina.total + counts.chofu.total;
+        return counts;
+      }
+
+      function renderIndex() {
+        const items = loadItems();
+        const counts = computeCounts(items);
+        function update(key, id) {
+          const done = counts[key].done;
+          const total = counts[key].total;
+          const percent = total ? Math.floor(done * 100 / total) : 0;
+          $(id).textContent = `${done}/${total} (${percent}%)`;
+        }
+        update('yamato', '#yamato-count');
+        update('ebina', '#ebina-count');
+        update('chofu', '#chofu-count');
+        const ovDone = counts.overall.done;
+        const ovTotal = counts.overall.total;
+        const ovPercent = ovTotal ? Math.floor(ovDone * 100 / ovTotal) : 0;
+        $('#overall-count').textContent = `${ovDone}/${ovTotal} (${ovPercent}%)`;
+        const st = document.getElementById('statusText');
+        if (st) st.textContent = ovTotal>0 ? '同期完了' : '同期されてません';
+      }
+
       function showProgress(message) {
         const modal = $('#progressModal');
         const bar = $('#progressBar');
@@ -111,12 +146,56 @@
         showProgress('同期中…');
         updateProgress(10);
         try {
-          const res = await fetch(GAS_URL + '?action=pull');
+          const url = GAS_URL + '?action=pull&_ts=' + Date.now();
+          const res = await fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit', redirect: 'follow' });
           updateProgress(50);
           if (!res.ok) {
             const text = await res.text();
-            throw new Error(`HTTP ${res.status}: ${text}`);
+            throw new Error('HTTP ' + res.status + ' ' + text);
           }
+          let json;
+          try { json = await res.json(); } catch(e){ throw new Error('JSON parse error'); }
+          updateProgress(80);
+          if (!json || !Array.isArray(json.data)) {
+            throw new Error('データ形式が正しくありません');
+          }
+          const raw = json.data;
+          const oldItems = loadItems();
+          const statusMap = {};
+          for (const it of oldItems) {
+            const key = `${it.city}|${it.station}|${it.model}|${it.plate}`;
+            statusMap[key] = { status: it.status, done: it.done, state: it.state, updatedAt: it.updatedAt };
+          }
+          const items = raw.map(row => {
+            const obj = { city: row[0], station: row[1], model: row[2], plate: row[3] };
+            const key = `${obj.city}|${obj.station}|${obj.model}|${obj.plate}`;
+            if (statusMap[key]) {
+              const prev = statusMap[key];
+              obj.status = prev.status;
+              if (typeof prev.done !== 'undefined') obj.done = prev.done;
+              if (typeof prev.state !== 'undefined') obj.state = prev.state;
+              obj.updatedAt = prev.updatedAt;
+            } else {
+              obj.status = '';
+              obj.state = 'normal';
+              obj.done = 0;
+              obj.updatedAt = Date.now();
+            }
+            return obj;
+          });
+          saveItems(items);
+          renderIndex();
+          const st = document.getElementById('statusText');
+          if (st) st.textContent = '同期完了！';
+        } catch (err) {
+          console.error('Sync error', err);
+          const st = document.getElementById('statusText');
+          if (st) st.textContent = '同期エラー: ' + (err.message || err);
+        } finally {
+          updateProgress(100);
+          hideProgress();
+        }
+      }
           const json = await res.json();
           updateProgress(80);
           if (!json || !Array.isArray(json.data)) {
@@ -191,8 +270,8 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('syncBtn').addEventListener('click', sync);
-        document.getElementById('recalcBtn').addEventListener('click', recalc);
+        var _sb=document.getElementById('syncBtn'); if(_sb){ _sb.addEventListener('click', sync); }
+        var _rb=document.getElementById('recalcBtn'); if(_rb){ _rb.addEventListener('click', recalc); }
         document.getElementById('exportJson').addEventListener('click', exportJson);
         document.getElementById('importJson').addEventListener('click', () => {
           document.getElementById('jsonFile').click();
