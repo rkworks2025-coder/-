@@ -5,49 +5,51 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
 
+  <!-- キャッシュ強め対策：バージョンクエリ -->
+  <link rel="stylesheet" href="style.css?v=20250830" />
   <style>
-    :root { --accent:#2b6bf6; --fg:#0e1a2b; --muted:#64748b; --chip:#eff4ff; }
-    body{font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; margin:0; background:#f6f7fb; color:var(--fg);}
-    .appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid #e6e8ef;}
-    .title{font-size:20px;font-weight:800;letter-spacing:.04em;}
-    .btns{display:flex;gap:10px;}
-    .btn{appearance:none;border:1px solid #d7dbe7;padding:8px 14px;border-radius:12px;cursor:pointer;background:#fff;font-size:14px;display:flex;align-items:center;gap:6px;transition:.2s;}
-    .btn:active{transform:scale(.95);}
-    .btn.sync{border-color:var(--accent);color:var(--accent);}
-    main{padding:20px 16px;}
-    h1{font-size:20px;margin:0 0 10px 0;font-weight:bold;}
-    .card{display:block;background:#fff;border-radius:24px;box-shadow:0 6px 16px -2px rgba(18,22,33,.08);margin:0 0 16px 0;padding:20px;border:1px solid #fff;transition:.3s;text-decoration:none;color:inherit;}
-    .card h2{font-size:18px;margin:0;font-weight:700;}
-    .meta{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
-    .chip{font-size:12px;font-weight:500;background:var(--chip);color:var(--accent);padding:4px 10px;border-radius:6px;}
-    .overall{margin-top:20px;display:flex;align-items:center;gap:8px;}
-    #overallHint{font-size:14px;color:var(--muted);margin:0;}
-    #overallHint.empty{font-size:14px;color:var(--accent);font-weight:600;}
-    .progress-modal{position:fixed;bottom:0;left:0;width:100%;z-index:9999;transition:.3s;background:rgba(255,255,255,.9);backdrop-filter:blur(4px);padding:10px 16px;box-shadow:0 -6px 16px -2px rgba(18,22,33,.08);border-top-left-radius:24px;border-top-right-radius:24px;transform:translateY(100%);}
-    .progress-modal.is-visible{transform:translateY(0%);}
-    .progress-modal[hidden]{display:none;}
-    .progress-bar-container{width:100%;height:6px;background:#eee;border-radius:3px;overflow:hidden;margin-top:10px;}
-    .progress-bar{height:100%;background:var(--accent);transition:width .3s linear;}
+    /* 万一 style.css が読めない時の最低限フォールバック */
+    :root{--accent:#2b6bf6;--fg:#0e1a2b;--muted:#64748b;--chip:#eff4ff;}
+    html,body{margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;background:#f6f7fb;color:var(--fg)}
+    .appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid #e6e8ef}
+    .title{font-size:20px;font-weight:800;letter-spacing:.04em}
+    .btns{display:flex;gap:10px}
+    .btn{appearance:none;border:1px solid #d7dbe7;padding:8px 14px;border-radius:12px;background:#fff;font-weight:700;font-size:14px}
+    .btn-primary{background:var(--chip);border-color:#c9d6ff;color:#1e40af}
+    .wrap{max-width:820px;margin:18px auto;padding:0 14px 60px}
+    .hint{margin:6px 2px 14px;color:var(--muted);font-size:13px}
+    .cards{display:grid;grid-template-columns:1fr;gap:14px}
+    .card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e6e8ef;border-radius:16px;padding:18px 16px;box-shadow:0 1px 0 rgba(8,15,35,.03)}
+    .card:hover{background:#fafcff}
+    .card h2{margin:0 0 8px 0;font-size:18px;letter-spacing:.03em}
+    .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#f2f5fb;border:1px solid #e6e8ef}
+    .empty{margin:28px 2px 0 2px;color:var(--muted);font-size:14px}
+
+    /* 進捗モーダル */
+    .modal{position:fixed;inset:0;background:rgba(8,15,35,.5);display:none;align-items:center;justify-content:center;z-index:50}
+    .modal.show{display:flex}
+    .dialog{width:min(520px,90vw);background:#111827;color:#fff;border-radius:14px;padding:18px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .barwrap{height:8px;background:#1f2937;border-radius:999px;overflow:hidden;margin-top:12px}
+    .bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399)}
+    .dialog h3{margin:0 0 8px 0;font-size:18px}
   </style>
 </head>
 <body>
-  <div class="appbar">
+  <!-- ヘッダー（重複生成を避けるため固定） -->
+  <header class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
-      <button id="syncBtn" class="btn sync">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw"><path d="M21 12a9 9 0 1 1-9-9c2.72 0 5.18 1.15 6.96 3L21 3"/><path d="M21 3v9h-9"/></svg>
-        同期
-      </button>
-      <button id="recalcBtn" class="btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9v10"/><path d="M10 21h4v-4"/></svg>
-        再計算
-      </button>
+      <button id="recalcBtn" class="btn">再計算</button>
+      <button id="syncBtn" class="btn btn-primary">同期</button>
     </div>
-  </div>
+  </header>
 
-  <main>
-    <section>
-      <h1>各エリアの集計</h1>
+  <main class="wrap">
+    <p id="statusText" class="hint">GASと同期して各エリアに反映します。</p>
+
+    <section id="cityCards" class="cards">
       <a id="card-yamato" class="card" href="yamato.html" data-city="大和市">
         <h2>大和市</h2>
         <div class="meta">
@@ -80,192 +82,105 @@
     </section>
 
     <p id="overallHint" class="empty">まだ同期されていません</p>
-    <p class="overall"><small>全体:</small> <span id="overallTotal">0</span></p>
   </main>
 
-  <div id="progressModal" class="progress-modal" hidden>
-    <p id="statusText">同期中...</p>
-    <div class="progress-bar-container">
-      <div id="progressBar" class="progress-bar" style="width:0%;"></div>
+  <!-- 同期中モーダル -->
+  <div id="progressModal" class="modal" aria-hidden="true">
+    <div class="dialog">
+      <h3 id="progressTitle">同期中…</h3>
+      <div class="barwrap"><div id="progressBar" class="bar"></div></div>
     </div>
   </div>
-  
+
+  <!-- 内蔵 app.js 相当（配列の配列に対応 & ボタン二重バインド防止） -->
   <script>
-    /* =========================
-       巡回リスト app.js（最終版・エラーハンドリング強化）
-       - 二重マウント防止
-       - 同期/再計算ボタン結線
-       - 進捗モーダル表示（擬似バー）
-       - GASへ ?action=pull で取得
-       - 都市別カウント反映
-       - フィールド名の表記ゆれを吸収
-       - エラー詳細を画面に表示
-       ========================= */
+    const GAS_URL =
+      'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
 
-    (function () {
-      if (window.__JUNKAI_MOUNTED__) {
-        console.warn('JunkaiApp already mounted. Skip.');
-        return;
-      }
-      window.__JUNKAI_MOUNTED__ = true;
+    const els = {
+      syncBtn:     document.getElementById('syncBtn'),
+      recalcBtn:   document.getElementById('recalcBtn'),
+      statusText:  document.getElementById('statusText'),
+      progress:    document.getElementById('progressModal'),
+      bar:         document.getElementById('progressBar'),
+      overallHint: document.getElementById('overallHint'),
+      yamato: { done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total' },
+      ebina : { done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total'  },
+      chofu : { done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total'  },
+    };
+    function $(s){return document.querySelector(s)}
+    function setText(sel,v){const n=$(sel); if(n) n.textContent=String(v)}
 
-      const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
-      console.log('GAS URL loaded:', GAS_URL);
+    function showModal(title){
+      document.getElementById('progressTitle').textContent = title||'同期中…';
+      els.progress.classList.add('show');
+      let t=0; els._timer=setInterval(()=>{t=(t+7)%100; els.bar.style.width=t+'%'},80);
+    }
+    function hideModal(title){
+      if(title) document.getElementById('progressTitle').textContent=title;
+      if(els._timer){clearInterval(els._timer); els._timer=null;}
+      setTimeout(()=>{els.progress.classList.remove('show'); els.bar.style.width='0%'},300);
+    }
 
-      const $ = (sel, root = document) => root.querySelector(sel);
+    function resetTotals(){
+      ['yamato','ebina','chofu'].forEach(k=>{
+        setText(els[k].done,0); setText(els[k].stop,0); setText(els[k].skip,0); setText(els[k].total,0);
+      });
+      els.overallHint.textContent='まだ同期されていません';
+    }
 
-      const modal = $('#progressModal');
-      const bar = $('#progressBar');
-      const statusText = $('#statusText');
+    async function handleSync(){
+      try{
+        showModal('同期中…');
+        els.statusText.textContent='GAS から巡回データを取得しています…';
 
-      const cityEls = {
-        yamato: { done: $('#yamato-done'), stop: $('#yamato-stop'), skip: $('#yamato-skip'), total: $('#yamato-total') },
-        ebina: { done: $('#ebina-done'), stop: $('#ebina-stop'), skip: $('#ebina-skip'), total: $('#ebina-total') },
-        chofu: { done: $('#chofu-done'), stop: $('#chofu-stop'), skip: $('#chofu-skip'), total: $('#chofu-total') },
-      };
+        const url = `${GAS_URL}?action=pull&ts=${Date.now()}`;
+        const res = await fetch(url,{cache:'no-store'});
+        const json = await res.json();
 
-      const overallHint = $('#overallHint');
-      const totalCount = $('#overallTotal');
-
-      let latestRows = [];
-
-      function showProgress(message) {
-        if (modal) {
-          modal.hidden = false;
-          bar.style.width = '0%';
-          if (statusText) statusText.textContent = message;
+        if(!json || !json.ok || !Array.isArray(json.data)){
+          throw new Error('GAS の戻り値が想定外です');
         }
-      }
 
-      function closeProgress() {
-        if (modal) {
-          setTimeout(() => {
-            modal.hidden = true;
-          }, 500);
-        }
-      }
-
-      function computeCounts(rows) {
-        const counts = {
-          yamato: { done: 0, stop: 0, skip: 0, total: 0 },
-          ebina: { done: 0, stop: 0, skip: 0, total: 0 },
-          chofu: { done: 0, stop: 0, skip: 0, total: 0 },
-          overall: 0,
+        const cnt = {
+          '大和市':{done:0,stop:0,skip:0,total:0},
+          '海老名市':{done:0,stop:0,skip:0,total:0},
+          '調布市':{done:0,stop:0,skip:0,total:0},
         };
 
-        if (!Array.isArray(rows)) {
-          console.warn('Expected array data for counting, but got:', rows);
-          return counts;
-        }
+        // ここが肝：配列の配列 → city は row[0]
+        json.data.forEach(row=>{
+          const city = row && row[0] ? String(row[0]).trim() : '';
+          if (city in cnt) cnt[city].total += 1;
+        });
 
-        for (const row of rows) {
-          const city = row.city || row.City;
-          const status = row.status || row.Status;
+        setText(els.yamato.total, cnt['大和市'].total);
+        setText(els.ebina.total,  cnt['海老名市'].total);
+        setText(els.chofu.total,  cnt['調布市'].total);
 
-          if (city === '大和市' && counts.yamato) {
-            counts.yamato.total++;
-            if (status === '済') counts.yamato.done++;
-            else if (status === '停') counts.yamato.stop++;
-            else if (status === '不要') counts.yamato.skip++;
-          } else if (city === '海老名市' && counts.ebina) {
-            counts.ebina.total++;
-            if (status === '済') counts.ebina.done++;
-            else if (status === '停') counts.ebina.stop++;
-            else if (status === '不要') counts.ebina.skip++;
-          } else if (city === '調布市' && counts.chofu) {
-            counts.chofu.total++;
-            if (status === '済') counts.chofu.done++;
-            else if (status === '停') counts.chofu.stop++;
-            else if (status === '不要') counts.chofu.skip++;
-          }
-        }
-        counts.overall = rows.length;
-        return counts;
+        const overall = cnt['大和市'].total + cnt['海老名市'].total + cnt['調布市'].total;
+        els.overallHint.textContent = overall>0 ? '' : 'まだ同期されていません';
+
+        els.statusText.textContent = `同期完了：大和 ${cnt['大和市'].total} / 海老名 ${cnt['海老名市'].total} / 調布 ${cnt['調布市'].total}`;
+        hideModal('同期完了！');
+      }catch(err){
+        console.error(err);
+        els.statusText.textContent='同期に失敗しました。コンソールを確認してください。';
+        hideModal('同期失敗');
+        alert('同期に失敗しました：' + (err?.message||'不明なエラー'));
       }
+    }
 
-      function renderCounts(counts) {
-        for (const city in counts) {
-          if (cityEls[city]) {
-            cityEls[city].done.textContent = counts[city].done;
-            cityEls[city].stop.textContent = counts[city].stop;
-            cityEls[city].skip.textContent = counts[city].skip;
-            cityEls[city].total.textContent = counts[city].total;
-          }
-        }
-        if (totalCount) {
-          totalCount.textContent = counts.overall;
-          overallHint.classList.remove('empty');
-        }
-      }
+    function handleRecalc(){
+      els.statusText.textContent='再計算しました。';
+    }
 
-      async function doSync() {
-        showProgress('同期を開始しています...');
-        bar.style.width = '30%';
+    // 重複バインド防止（UI が二重に見える原因のひとつ対策）
+    if (els.syncBtn && !els.syncBtn._wired){ els.syncBtn.addEventListener('click', handleSync); els.syncBtn._wired=true; }
+    if (els.recalcBtn && !els.recalcBtn._wired){ els.recalcBtn.addEventListener('click', handleRecalc); els.recalcBtn._wired=true; }
 
-        try {
-          const resp = await fetch(GAS_URL + '?action=pull');
-          bar.style.width = '70%';
-
-          if (!resp.ok) {
-            const errorText = await resp.text();
-            throw new Error(`HTTP Error! status: ${resp.status}, message: ${errorText}`);
-          }
-
-          const responseJson = await resp.json();
-          if (responseJson.ok === false) {
-            throw new Error(`GASエラー: ${responseJson.error}`);
-          }
-          
-          const data = responseJson.data;
-          if (!Array.isArray(data)) {
-            throw new Error('返されたデータが配列ではありません。');
-          }
-
-          latestRows = data;
-          const counts = computeCounts(latestRows);
-          renderCounts(counts);
-          if (statusText) statusText.textContent = '同期完了！';
-
-        } catch (err) {
-          console.error('同期処理エラー:', err);
-          if (statusText) statusText.textContent = `同期エラー：${err.message ?? err}`;
-          bar.style.width = '0%';
-        } finally {
-          closeProgress();
-        }
-      }
-
-      function doRecalc() {
-        showProgress('再計算中...');
-        const counts = computeCounts(latestRows || []);
-        renderCounts(counts);
-        if (statusText) statusText.textContent = '再計算完了';
-        closeProgress();
-      }
-
-      function bindButtons() {
-        const syncBtn = $('#syncBtn');
-        const recalcBtn = $('#recalcBtn');
-
-        if (syncBtn && !syncBtn.dataset.bound) {
-          syncBtn.addEventListener('click', doSync, { passive: true });
-          syncBtn.dataset.bound = '1';
-        }
-        if (recalcBtn && !recalcBtn.dataset.bound) {
-          recalcBtn.addEventListener('click', doRecalc, { passive: true });
-          recalcBtn.dataset.bound = '1';
-        }
-      }
-
-      function mountIndex() {
-        bindButtons();
-        if (statusText) statusText.textContent = 'GASと同期して各エリアに反映します。';
-      }
-
-      if (document.title === '巡回リスト') {
-        mountIndex();
-      }
-    })();
+    // 初期化
+    resetTotals();
   </script>
 </body>
 </html>
