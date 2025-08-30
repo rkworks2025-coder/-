@@ -8,16 +8,31 @@
 </head>
 <body>
   <div class="appbar">
-    <div class="title">巡回リスト <span style="font-size:12px;color:#0af;">v1</span></div>
+    <div class="title">巡回リスト <span style="font-size:12px;color:#0af;">v2</span></div>
     <div class="btns">
-      <button id="syncBtn" class="btn primary" onclick="try{if(window._sync){window._sync();return false}}catch(e){}">同期</button>
+      <button id="syncBtn" class="btn primary" onclick="try{SYNC_CLICK();return false;}catch(e){}">同期</button>
       <button id="recalcBtn" class="btn">再計算</button>
     </div>
   </div>
+
+    <script>
+      window.SYNC_CLICK = function(){
+        try{
+          var st = document.getElementById('statusText');
+          if (st) st.textContent = '同期開始(v2)';
+          if (window._sync) { window._sync(); }
+          else if (window.sync) { window.sync(); }
+          else { if (st) st.textContent = '同期関数未定義(v2)'; }
+        }catch(e){
+          try{ document.getElementById('statusText').textContent = '同期例外(v2)'; }catch(_){}
+        }
+      };
+    </script>
+
   <div class="wrap">
-    <div id="buildBanner" style="margin:8px 0;padding:6px 10px;border:1px solid #2a2a2a;border-radius:8px;color:#0af;">BUILD v1 LOADED</div>
+    <div id="buildBanner" style="margin:8px 0;padding:6px 10px;border:1px solid #2a2a2a;border-radius:8px;color:#0af;">BUILD v2 LOADED</div>
     <p id="statusText" class="hint">同期してください</p>
-    <script>try{var st=document.getElementById("statusText"); if(st) st.textContent="準備OK v1";}catch(e){}</script>
+    <script>try{var st=document.getElementById("statusText"); if(st) st.textContent="準備OK v2";}catch(e){}</script>
     <section class="cards">
       <a id="card-yamato" class="card" href="yamato.html">
         <h2>大和市 巡回</h2>
@@ -40,12 +55,42 @@
       <input type="file" id="jsonFile" accept=".json" style="display:none" />
     </div>
   </div>
+
+    <script>
+      window.SYNC_CLICK = function(){
+        try{
+          var st = document.getElementById('statusText');
+          if (st) st.textContent = '同期開始(v2)';
+          if (window._sync) { window._sync(); }
+          else if (window.sync) { window.sync(); }
+          else { if (st) st.textContent = '同期関数未定義(v2)'; }
+        }catch(e){
+          try{ document.getElementById('statusText').textContent = '同期例外(v2)'; }catch(_){}
+        }
+      };
+    </script>
+
   <div id="progressModal" class="progress-modal">
     <p id="progressMessage">同期中…</p>
     <div class="progress-bar-container">
       <div id="progressBar" class="progress-bar"></div>
     </div>
   </div>
+
+    <script>
+      window.SYNC_CLICK = function(){
+        try{
+          var st = document.getElementById('statusText');
+          if (st) st.textContent = '同期開始(v2)';
+          if (window._sync) { window._sync(); }
+          else if (window.sync) { window.sync(); }
+          else { if (st) st.textContent = '同期関数未定義(v2)'; }
+        }catch(e){
+          try{ document.getElementById('statusText').textContent = '同期例外(v2)'; }catch(_){}
+        }
+      };
+    </script>
+
   <script>
     (function() {
       const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
@@ -199,6 +244,7 @@
         }
       }
       window._sync = sync;
+      window.sync = sync;
           const json = await res.json();
           updateProgress(80);
           if (!json || !Array.isArray(json.data)) {
@@ -235,6 +281,7 @@
         }
       }
       window._sync = sync;
+      window.sync = sync;
       window._sync = sync;
 
       function recalc() {
