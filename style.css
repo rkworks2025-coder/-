@@ -300,7 +300,7 @@ body {
 .state-dropdown button:hover{ background:#f2f2f2; }
 
 /* state select dropdown */
-.state-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;border:1px solid #ccc;border-radius:8px;padding:10px 32px 10px 12px;font-size:14px;background:#fff;color:#222;position:relative;display:inline-block;min-width:160px;text-align:center;font-weight:600;}
+.state-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;border:1px solid #ccc;border-radius:8px;padding:6px 22px 6px 10px;font-size:13px;background:#fff;color:#222;display:inline-flex;align-items:center;justify-content:center;height:28px;line-height:28px;min-width:120px;}
 /* simple caret */
 .state-select:after{ content:''; position:absolute; right:10px; top:50%; transform:translateY(-50%); }
 
@@ -313,10 +313,7 @@ body {
 .row2 .lead{ visibility:hidden; } /* インデント用ダミー */
 
 /* state select vertical center & size */
-.state-select{
-  display:inline-flex; align-items:center; justify-content:center;
-  height:36px; line-height:36px; min-width:170px;
-}
+.state-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;border:1px solid #ccc;border-radius:8px;padding:6px 22px 6px 10px;font-size:13px;background:#fff;color:#222;display:inline-flex;align-items:center;justify-content:center;height:28px;line-height:28px;min-width:120px;}
 /* 灰カード時は文字を黒系に */
 .item.stop, .item.stop *{ color:#000 !important; }
 /* 黄色も少しコントラスト確保 */
