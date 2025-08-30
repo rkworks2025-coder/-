@@ -1,11 +1,12 @@
 /* =========================
-   巡回リスト app.js（フル版・同期修正版）
+   巡回リスト app.js（最終版・エラーハンドリング強化）
    - 二重マウント防止
-   - 同期/再計算ボタン結線（既存DOMのみ使用）
+   - 同期/再計算ボタン結線
    - 進捗モーダル表示（擬似バー）
    - GASへ ?action=pull で取得
-   - 都市別カウント反映（大和市/海老名市/調布市）
+   - 都市別カウント反映
    - フィールド名の表記ゆれを吸収
+   - エラー詳細を画面に表示
    ========================= */
 
 (function () {
@@ -16,9 +17,14 @@
   }
   window.__JUNKAI_MOUNTED__ = true;
 
-  // ---- 設定（あなたの本番URLを直書き）----
-  // ※依頼どおり固定で組み込み
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxrIC6V1olx_Jo5eLGRWRwLoJtNZLxs1I9ZHjyNWv-ZqQiXPWeph5JWhnJkqgRZT1HszQ/exec';
+  // ---- 設定（URLをHTMLから取得）----
+  const appConfigEl = document.getElementById('app-config');
+  if (!appConfigEl || !appConfigEl.dataset.gasUrl) {
+    console.error('GAS URL not found. Please set it in a data attribute on the #app-config element in index.html.');
+    return;
+  }
+  const GAS_URL = appConfigEl.dataset.gasUrl;
+  console.log('GAS URL loaded:', GAS_URL);
 
   // ---- DOM ヘルパ ----
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -43,17 +49,19 @@
   let latestRows = [];
 
   // ---- 進捗UI表示/非表示 ----
-  function showProgress() {
+  function showProgress(message) {
     if (modal) {
       modal.hidden = false;
       bar.style.width = '0%';
+      if (statusText) statusText.textContent = message;
     }
   }
 
   function closeProgress() {
     if (modal) {
-      modal.hidden = true;
-      bar.style.width = '100%';
+      setTimeout(() => {
+        modal.hidden = true;
+      }, 500); // 完了メッセージを少し表示させる
     }
   }
 
@@ -72,11 +80,9 @@
     }
 
     for (const row of rows) {
-      // フィールド名の表記ゆれを吸収
       const city = row.city || row.City;
       const status = row.status || row.Status;
 
-      // 都市ごとにカウント
       if (city === '大和市' && counts.yamato) {
         counts.yamato.total++;
         if (status === '済') counts.yamato.done++;
@@ -116,8 +122,7 @@
 
   // ---- GASと同期 ----
   async function doSync() {
-    showProgress();
-    if (statusText) statusText.textContent = '同期中...';
+    showProgress('同期を開始しています...');
     bar.style.width = '30%';
 
     try {
@@ -129,22 +134,25 @@
         throw new Error(`HTTP Error! status: ${resp.status}, message: ${errorText}`);
       }
 
-      const data = await resp.json();
-      bar.style.width = '100%';
-
-      if (!Array.isArray(data)) {
-        throw new Error('GASから返されたデータが配列ではありません。');
+      const rawData = await resp.text();
+      try {
+        const data = JSON.parse(rawData);
+        if (!Array.isArray(data)) {
+          throw new Error('返されたデータがJSON配列ではありません。');
+        }
+        latestRows = data;
+        const counts = computeCounts(latestRows);
+        renderCounts(counts);
+        if (statusText) statusText.textContent = '同期完了！';
+      } catch (jsonErr) {
+        console.error('JSONパースエラー:', jsonErr, '生データ:', rawData);
+        if (statusText) statusText.textContent = `エラー：返されたデータがJSON形式ではありません。GASのログを確認してください。 (生データ: ${rawData.substring(0, 100)}...)`;
       }
 
-      latestRows = data;
-      const counts = computeCounts(latestRows);
-      renderCounts(counts);
-
-      statusText && (statusText.textContent = '同期完了！');
     } catch (err) {
-      console.error(err);
-      statusText && (statusText.textContent = `同期エラー：${err.message ?? err}`);
-      // エラー時もUIは閉じる
+      console.error('同期処理エラー:', err);
+      if (statusText) statusText.textContent = `同期エラー：${err.message ?? err}`;
+      bar.style.width = '0%';
     } finally {
       closeProgress();
     }
@@ -152,9 +160,11 @@
 
   // ---- 再計算（サーバ通信なし）----
   function doRecalc() {
+    showProgress('再計算中...');
     const counts = computeCounts(latestRows || []);
     renderCounts(counts);
-    statusText && (statusText.textContent = '再計算完了');
+    if (statusText) statusText.textContent = '再計算完了';
+    closeProgress();
   }
 
   // ---- ボタンへ結線（既存DOMのみ）----
@@ -162,7 +172,6 @@
     const syncBtn = $('#syncBtn');
     const recalcBtn = $('#recalcBtn');
 
-    // 重複バインド防止
     if (syncBtn && !syncBtn.dataset.bound) {
       syncBtn.addEventListener('click', doSync, { passive: true });
       syncBtn.dataset.bound = '1';
@@ -176,16 +185,11 @@
   // ---- 初期化 ----
   function mountIndex() {
     bindButtons();
-    // 初回は表示だけ整える（数値は0のままでOK）
-    statusText && (statusText.textContent = 'GASと同期して各エリアに反映します。');
+    if (statusText) statusText.textContent = 'GASと同期して各エリアに反映します。';
   }
 
-  // `index.html` の場合にのみ初期化
   if (document.title === '巡回リスト') {
     mountIndex();
-  } else {
-    // 個別ページ（yamato.html, ebina.html, chofu.html）の初期化
-    // 各ページに特化した処理があればここに記述
   }
 })();
 
