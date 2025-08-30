@@ -74,14 +74,14 @@
           const left=document.createElement('div'); left.className='left';
           const idxSpan=document.createElement('span'); idxSpan.className='idx'; idxSpan.textContent=String(idx+1);
           const doneBox=document.createElement('input'); doneBox.type='checkbox'; doneBox.className='checkbox'; doneBox.checked=!!it.done;
-          doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } it.done=ev.target.checked?1:0; it.updatedAt=Date.now();
-            try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); } }catch(__){} render();
+          doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } it.done=ev.target.checked?1:0; it.updatedAt = ev.target.checked ? Date.now() : null;
+            try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt = it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); } }catch(__){} dateSpan.textContent = ev.target.checked ? fmt(it.updatedAt) : ''; render();
           });
           const stationSpan=document.createElement('span'); stationSpan.textContent = it.station||'';
           left.appendChild(idxSpan); left.appendChild(doneBox); left.appendChild(stationSpan);
           row1.appendChild(left);
           const right=document.createElement('div');
-          const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent=fmt(it.updatedAt);
+          const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
           const stateBtn=document.createElement('button'); stateBtn.className='checkbox'; stateBtn.textContent = it.state==='stopped'?'停':(it.state==='skip'?'不要':'状態');
           stateBtn.addEventListener('click',()=>{ const input = prompt('状態を選択：\n0=通常\n1=稼働停止（グレー）\n2=巡回不要（黄色）', it.state==='stopped'?'1':(it.state==='skip'?'2':'0')); if(input===null) return; const code=String(input).trim(); const map={'0':'normal','1':'stopped','2':'skip'}; if(!(code in map)) return; it.state=map[code]; it.updatedAt=Date.now();
             try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.updatedAt=it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); } }catch(__){} render();
