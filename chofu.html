@@ -29,7 +29,7 @@
       for(const k of KEYS){ try{ const s=localStorage.getItem(k); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(_ ){} }
       return [];
     }
-    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); localStorage.setItem('junkai:items:v2', JSON.stringify(a)); }catch(_ ){} }catch(_ ){} }
+    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); }catch(_ ){} }
     function migrate(items){
       let changed=false;
       items.forEach(it=>{ 
@@ -40,9 +40,19 @@
       if(changed) saveItems(items);
       return items;
     }
-    function nstr(s){ return String(s||'').replace(/\s+/g,'').replace(/巡回/g,'').toLowerCase(); }
-function sameItem(a,b){ return nstr(a.city)===nstr(b.city) && nstr(a.station)===nstr(b.station) && nstr(a.model)===nstr(b.model) && nstr(a.plate)===nstr(b.plate); }
-function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getMonth()+1).padStart(2,'0'); const D=String(d.getDate()).padStart(2,'0'); const h=String(d.getHours()).padStart(2,'0'); const m=String(d.getMinutes()).padStart(2,'0'); return `${M}/${D} ${h}:${m}`; }
+    function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getMonth()+1).padStart(2,'0'); const D=String(d.getDate()).padStart(2,'0'); const h=String(d.getHours()).padStart(2,'0'); const m=String(d.getMinutes()).padStart(2,'0'); return `${M}/${D} ${h}:${m}`; }
+
+function normStr(s){ return String(s||'').replace(/\s+/g,'').replace(/巡回/g,'').toLowerCase(); }
+function ovKey(it){ return [normStr(it.city), normStr(it.station), normStr(it.model), normStr(it.plate)].join('|'); }
+function loadOv(){
+  try{ const s=localStorage.getItem('junkai:overrides'); return s? JSON.parse(s): {}; }catch(_){ return {}; }
+}
+function saveOv(ov){
+  try{
+    localStorage.setItem('junkai:overrides', JSON.stringify(ov));
+  }catch(_){}
+}
+
 
     function applyClass(el,it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
     function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc107', green='#d8f0df'; let bg=green; if(it.state==='stopped') bg=gray; else if(it.state==='skip') bg=yellow; else if(it.done) bg=pink; el.style.backgroundColor=bg; }
@@ -63,6 +73,7 @@ function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getM
       const listEl = document.querySelector('#list'); const emptyEl = document.querySelector('#empty');
       const norm = s=> (s||'').replace(/\s+/g,'').replace('巡回','');
       const items = all.filter(it=> norm(it.city) === norm(CITY) );
+      const ov = loadOv(); items.forEach(it=>{ const k=ovKey(it); const o=ov[k]; if(o){ if(typeof o.done!=='undefined') it.done=o.done; if(typeof o.updatedAt!=='undefined') it.updatedAt=o.updatedAt; if(o.status) it.status=o.status; if(o.state) it.state=o.state; }});
       // sort on render: unchecked first, then station, then plate
       items.sort((a,b)=> (a.done - b.done) || String(a.station||'').localeCompare(String(b.station||'')) || String(a.plate||'').localeCompare(String(b.plate||'')) );
       listEl.innerHTML='';
@@ -100,18 +111,27 @@ function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getM
         row2.appendChild(spacer); row2.appendChild(plateSpan); row2.appendChild(modelSpan);
         itemEl.appendChild(row2);
 
-        doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } 
+        doneBox.addEventListener('change',(ev)=>{
+          if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; }
           it.done = ev.target.checked ? 1 : 0;
           it.updatedAt = ev.target.checked ? Date.now() : null;
           it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
-          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=> sameItem(x,it) ); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status; saveItems(a); } }catch(_ ){}
-          if(it.done) enqueueLog({ timestamp: it.updatedAt, city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', state: it.state||'normal', done:1 });
+          // save to array (original logic)
+          try{
+            const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[];
+            const t=a.find(x=> normStr(x.city)===normStr(it.city) && normStr(x.station)===normStr(it.station) && normStr(x.model)===normStr(it.model) && normStr(x.plate)===normStr(it.plate) );
+            if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status;
+              try{ localStorage.setItem('junkai:items', JSON.stringify(a)); localStorage.setItem('junkai:items:v2', JSON.stringify(a)); }catch(_){}
+            }
+          }catch(_){}
+          // overrides
+          const ov = loadOv(); const k=ovKey(it); ov[k]={ done: it.done, updatedAt: it.updatedAt, status: it.status, state: it.state }; saveOv(ov);
           dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
           applyClass(itemEl,it); applyVisual(itemEl,it);
         });
 
         sel.addEventListener('change',()=>{ it.state=sel.value; it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':'')); it.updatedAt=Date.now();
-          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=> sameItem(x,it) ); if(t){ t.state=it.state; t.status=it.status; t.updatedAt=it.updatedAt; saveItems(a); } }catch(_ ){}
+          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.status=it.status; t.updatedAt=it.updatedAt; saveItems(a); } }catch(_ ){}
           applyClass(itemEl,it); applyVisual(itemEl,it);
         });
 
