@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
 
-  <!-- キャッシュ強め対策：バージョンクエリ -->
-  <link rel="stylesheet" href="style.css?v=20250830" />
   <style>
-    /* 万一 style.css が読み込まれない時の最低限フォールバック */
     :root { --accent:#2b6bf6; --fg:#0e1a2b; --muted:#64748b; --chip:#eff4ff; }
     body{font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; margin:0; background:#f6f7fb; color:var(--fg);}
     .appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid #e6e8ef;}
@@ -82,12 +79,10 @@
       </a>
     </section>
 
-    <!-- 全体合計（必要なら app.js が使用） -->
     <p id="overallHint" class="empty">まだ同期されていません</p>
     <p class="overall"><small>全体:</small> <span id="overallTotal">0</span></p>
   </main>
 
-  <!-- 同期中モーダル -->
   <div id="progressModal" class="progress-modal" hidden>
     <p id="statusText">同期中...</p>
     <div class="progress-bar-container">
@@ -95,6 +90,182 @@
     </div>
   </div>
   
-  <script src="app.js?v=20250831"></script>
+  <script>
+    /* =========================
+       巡回リスト app.js（最終版・エラーハンドリング強化）
+       - 二重マウント防止
+       - 同期/再計算ボタン結線
+       - 進捗モーダル表示（擬似バー）
+       - GASへ ?action=pull で取得
+       - 都市別カウント反映
+       - フィールド名の表記ゆれを吸収
+       - エラー詳細を画面に表示
+       ========================= */
+
+    (function () {
+      if (window.__JUNKAI_MOUNTED__) {
+        console.warn('JunkaiApp already mounted. Skip.');
+        return;
+      }
+      window.__JUNKAI_MOUNTED__ = true;
+
+      const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+      console.log('GAS URL loaded:', GAS_URL);
+
+      const $ = (sel, root = document) => root.querySelector(sel);
+
+      const modal = $('#progressModal');
+      const bar = $('#progressBar');
+      const statusText = $('#statusText');
+
+      const cityEls = {
+        yamato: { done: $('#yamato-done'), stop: $('#yamato-stop'), skip: $('#yamato-skip'), total: $('#yamato-total') },
+        ebina: { done: $('#ebina-done'), stop: $('#ebina-stop'), skip: $('#ebina-skip'), total: $('#ebina-total') },
+        chofu: { done: $('#chofu-done'), stop: $('#chofu-stop'), skip: $('#chofu-skip'), total: $('#chofu-total') },
+      };
+
+      const overallHint = $('#overallHint');
+      const totalCount = $('#overallTotal');
+
+      let latestRows = [];
+
+      function showProgress(message) {
+        if (modal) {
+          modal.hidden = false;
+          bar.style.width = '0%';
+          if (statusText) statusText.textContent = message;
+        }
+      }
+
+      function closeProgress() {
+        if (modal) {
+          setTimeout(() => {
+            modal.hidden = true;
+          }, 500);
+        }
+      }
+
+      function computeCounts(rows) {
+        const counts = {
+          yamato: { done: 0, stop: 0, skip: 0, total: 0 },
+          ebina: { done: 0, stop: 0, skip: 0, total: 0 },
+          chofu: { done: 0, stop: 0, skip: 0, total: 0 },
+          overall: 0,
+        };
+
+        if (!Array.isArray(rows)) {
+          console.warn('Expected array data for counting, but got:', rows);
+          return counts;
+        }
+
+        for (const row of rows) {
+          const city = row.city || row.City;
+          const status = row.status || row.Status;
+
+          if (city === '大和市' && counts.yamato) {
+            counts.yamato.total++;
+            if (status === '済') counts.yamato.done++;
+            else if (status === '停') counts.yamato.stop++;
+            else if (status === '不要') counts.yamato.skip++;
+          } else if (city === '海老名市' && counts.ebina) {
+            counts.ebina.total++;
+            if (status === '済') counts.ebina.done++;
+            else if (status === '停') counts.ebina.stop++;
+            else if (status === '不要') counts.ebina.skip++;
+          } else if (city === '調布市' && counts.chofu) {
+            counts.chofu.total++;
+            if (status === '済') counts.chofu.done++;
+            else if (status === '停') counts.chofu.stop++;
+            else if (status === '不要') counts.chofu.skip++;
+          }
+        }
+        counts.overall = rows.length;
+        return counts;
+      }
+
+      function renderCounts(counts) {
+        for (const city in counts) {
+          if (cityEls[city]) {
+            cityEls[city].done.textContent = counts[city].done;
+            cityEls[city].stop.textContent = counts[city].stop;
+            cityEls[city].skip.textContent = counts[city].skip;
+            cityEls[city].total.textContent = counts[city].total;
+          }
+        }
+        if (totalCount) {
+          totalCount.textContent = counts.overall;
+          overallHint.classList.remove('empty');
+        }
+      }
+
+      async function doSync() {
+        showProgress('同期を開始しています...');
+        bar.style.width = '30%';
+
+        try {
+          const resp = await fetch(GAS_URL + '?action=pull');
+          bar.style.width = '70%';
+
+          if (!resp.ok) {
+            const errorText = await resp.text();
+            throw new Error(`HTTP Error! status: ${resp.status}, message: ${errorText}`);
+          }
+
+          const responseJson = await resp.json();
+          if (responseJson.ok === false) {
+            throw new Error(`GASエラー: ${responseJson.error}`);
+          }
+          
+          const data = responseJson.data;
+          if (!Array.isArray(data)) {
+            throw new Error('返されたデータが配列ではありません。');
+          }
+
+          latestRows = data;
+          const counts = computeCounts(latestRows);
+          renderCounts(counts);
+          if (statusText) statusText.textContent = '同期完了！';
+
+        } catch (err) {
+          console.error('同期処理エラー:', err);
+          if (statusText) statusText.textContent = `同期エラー：${err.message ?? err}`;
+          bar.style.width = '0%';
+        } finally {
+          closeProgress();
+        }
+      }
+
+      function doRecalc() {
+        showProgress('再計算中...');
+        const counts = computeCounts(latestRows || []);
+        renderCounts(counts);
+        if (statusText) statusText.textContent = '再計算完了';
+        closeProgress();
+      }
+
+      function bindButtons() {
+        const syncBtn = $('#syncBtn');
+        const recalcBtn = $('#recalcBtn');
+
+        if (syncBtn && !syncBtn.dataset.bound) {
+          syncBtn.addEventListener('click', doSync, { passive: true });
+          syncBtn.dataset.bound = '1';
+        }
+        if (recalcBtn && !recalcBtn.dataset.bound) {
+          recalcBtn.addEventListener('click', doRecalc, { passive: true });
+          recalcBtn.dataset.bound = '1';
+        }
+      }
+
+      function mountIndex() {
+        bindButtons();
+        if (statusText) statusText.textContent = 'GASと同期して各エリアに反映します。';
+      }
+
+      if (document.title === '巡回リスト') {
+        mountIndex();
+      }
+    })();
+  </script>
 </body>
 </html>
