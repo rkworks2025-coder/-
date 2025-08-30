@@ -29,7 +29,7 @@
       for(const k of KEYS){ try{ const s=localStorage.getItem(k); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(_ ){} }
       return [];
     }
-    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); }catch(_ ){} }
+    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); localStorage.setItem('junkai:items:v2', JSON.stringify(a)); }catch(_ ){} }catch(_ ){} }
     function migrate(items){
       let changed=false;
       items.forEach(it=>{ 
@@ -44,6 +44,8 @@
 
     function applyClass(el,it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
     function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc107', green='#d8f0df'; let bg=green; if(it.state==='stopped') bg=gray; else if(it.state==='skip') bg=yellow; else if(it.done) bg=pink; el.style.backgroundColor=bg; }
+function updateCounterFromDom(){ const list=document.querySelector('#list'); if(!list) return; const total=list.querySelectorAll('.item').length; const done=list.querySelectorAll('.item input[type="checkbox"]:checked').length; const c=document.querySelector('#counter'); if(c) c.textContent = (total?`${done}/${total} (${Math.floor(done*100/total)}%)`:'0/0 (0%)'); }
+function moveCard(itemEl, it){ const list=document.querySelector('#list'); if(!list) return; if(it.done){ list.appendChild(itemEl); }else{ list.insertBefore(itemEl, list.firstChild); } }
 
     const LOG_LS_KEY='junkai:pendingLogs';
     function getLogUrl(){ try{ return localStorage.getItem('junkai:LOG_URL')||''; }catch(_ ){ return ''; } }
@@ -118,6 +120,8 @@
         listEl.appendChild(itemEl);
       });
     }
+    updateCounterFromDom();
+  }
 
     document.addEventListener('DOMContentLoaded', render);
     window.addEventListener('storage', render);
