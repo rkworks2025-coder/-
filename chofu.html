@@ -61,6 +61,8 @@
       const listEl = document.querySelector('#list'); const emptyEl = document.querySelector('#empty');
       const norm = s=> (s||'').replace(/\s+/g,'').replace('巡回','');
       const items = all.filter(it=> norm(it.city) === norm(CITY) );
+      // sort: unchecked first, checked last
+      items.sort((a,b)=> (a.done===b.done)?0:(a.done?1:-1));
       listEl.innerHTML='';
       if(!items.length){ if(emptyEl) emptyEl.textContent='まだ同期されていません'; const c=document.querySelector('#counter'); if(c) c.textContent='0/0 (0%)'; return; }
       if(emptyEl) emptyEl.textContent='';
