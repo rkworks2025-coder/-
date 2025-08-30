@@ -7,7 +7,7 @@
 :root {
   --accent: #2b6bf6;
   --pink: #ffe6ec;
-  --gray-bg: #999999;
+  --gray-bg: #b3b3b3;
   --yellow: #ffc107;
   --border: #e5e7eb;
   --fg: #0f172a;
@@ -300,11 +300,14 @@ body {
 .state-dropdown button:hover{ background:#f2f2f2; }
 
 /* state select dropdown */
-.state-select{
-  appearance:none; -webkit-appearance:none; -moz-appearance:none;
-  border:1px solid #ccc; border-radius:8px; padding:8px 28px 8px 10px;
-  font-size:14px; background:#fff; color:#222;
-  position:relative;
-}
+.state-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;border:1px solid #ccc;border-radius:8px;padding:10px 32px 10px 12px;font-size:14px;background:#fff;color:#222;position:relative;display:inline-block;min-width:160px;text-align:center;font-weight:600;}
 /* simple caret */
 .state-select:after{ content:''; position:absolute; right:10px; top:50%; transform:translateY(-50%); }
+
+/* align + indent */
+.row1{ display:flex; align-items:center; justify-content:space-between; }
+.left{ display:flex; align-items:center; gap:8px; }
+.right{ display:flex; align-items:center; gap:10px; }
+.lead{ display:inline-flex; align-items:center; gap:8px; width:70px; } /* idx+checkboxぶんの幅 */
+.row2{ display:flex; align-items:center; gap:12px; margin-top:6px; }
+.row2 .lead{ visibility:hidden; } /* インデント用ダミー */

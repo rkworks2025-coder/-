@@ -72,15 +72,14 @@
           applyClass(itemEl, it);
           const row1=document.createElement('div'); row1.className='row1';
           const left=document.createElement('div'); left.className='left';
+          const lead=document.createElement('span'); lead.className='lead';
           const idxSpan=document.createElement('span'); idxSpan.className='idx'; idxSpan.textContent=String(idx+1);
           const doneBox=document.createElement('input'); doneBox.type='checkbox'; doneBox.className='checkbox'; doneBox.checked=!!it.done;
-          doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } it.done=ev.target.checked?1:0; it.updatedAt = ev.target.checked ? Date.now() : null;
-            try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt = it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); } }catch(__){} dateSpan.textContent = ev.target.checked ? fmt(it.updatedAt) : ''; render();
-          });
+          lead.appendChild(idxSpan); lead.appendChild(doneBox);
           const stationSpan=document.createElement('span'); stationSpan.textContent = it.station||'';
-          left.appendChild(idxSpan); left.appendChild(doneBox); left.appendChild(stationSpan);
+          left.appendChild(lead); left.appendChild(stationSpan);
           row1.appendChild(left);
-          const right=document.createElement('div');
+          const right=document.createElement('div'); right.className='right';
           const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
           const sel = document.createElement('select'); sel.className='state-select';
           const opts = [
@@ -103,9 +102,10 @@
           row1.appendChild(right);
           itemEl.appendChild(row1);
           const row2=document.createElement('div'); row2.className='row2';
+          const spacer=document.createElement('span'); spacer.className='lead'; /* indent */
           const modelSpan=document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `${it.model||''}`;
           const plateSpan=document.createElement('span'); plateSpan.className='kv'; plateSpan.innerHTML = `${it.plate||''}`;
-          row2.appendChild(modelSpan); row2.appendChild(plateSpan);
+          row2.appendChild(spacer); row2.appendChild(plateSpan); row2.appendChild(modelSpan);
           itemEl.appendChild(row2);
           listEl.appendChild(itemEl);
         });
