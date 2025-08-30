@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=20250830" />
+  <link rel="stylesheet" href="style.css?v=20250830-2" />
 </head>
 <body>
   <header class="appbar">
@@ -56,6 +56,24 @@
     </div>
   </div>
 
-  <script src="app.js?v=20250830"></script>
+  <script src="app.js?v=20250830-2"></script>
+  <script>
+    // app.js のマウントを確実に呼ぶ
+    if (window.JunkaiApp && typeof window.JunkaiApp.mountIndex === "function") {
+      window.JunkaiApp.mountIndex({
+        els: {
+          syncBtn: document.getElementById("syncBtn"),
+          recalcBtn: document.getElementById("recalcBtn"),
+          statusText: document.getElementById("statusText"),
+          progressModal: document.getElementById("progressModal"),
+          progressBar: document.getElementById("progressBar"),
+          cityCards: document.getElementById("cityCards"),
+          yamato: { done:"#yamato-done", stop:"#yamato-stop", skip:"#yamato-skip", total:"#yamato-total" },
+          ebina : { done:"#ebina-done",  stop:"#ebina-stop",  skip:"#ebina-skip",  total:"#ebina-total"  },
+          chofu : { done:"#chofu-done",  stop:"#chofu-stop",  skip:"#chofu-skip",  total:"#chofu-total"  },
+        }
+      });
+    }
+  </script>
 </body>
 </html>
