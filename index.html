@@ -36,12 +36,15 @@
   </style>
 </head>
 \1
-
-<div class="toolbar">
-  <button id="btn-recalc" class="btn primary">再計算</button>
-  <button id="btn-sync" class="btn secondary">同期</button>
-</div>
-
+<header class="site-header white">
+  <div class="header-inner">
+    <h1 class="title">巡回アプリ</h1>
+    <div class="actions">
+      <button id="btn-recalc" class="btn primary">再計算</button>
+      <button id="btn-sync" class="btn secondary">同期</button>
+    </div>
+  </div>
+</header>
   <!-- ヘッダー -->
   <header class="appbar">
     <div class="title">巡回リスト</div>
@@ -102,49 +105,8 @@
   </div>
 
   <!-- スクリプト（キャッシュ回避クエリ） -->
-  <script src="app.js?v=20250830"></script>
-  <script>
-    // 互換レイヤ（app.js が存在しない/読み込めない時でも最低限の保険）
-    (function () {
-      const hasApp = typeof window.JunkaiApp !== "undefined";
-      // もし app.js でグローバルを出しているならそれに任せる
-      if (hasApp && typeof window.JunkaiApp.mountIndex === "function") {
-        window.JunkaiApp.mountIndex({
-          els: {
-            syncBtn: document.getElementById("syncBtn"),
-            recalcBtn: document.getElementById("recalcBtn"),
-            statusText: document.getElementById("statusText"),
-            progressModal: document.getElementById("progressModal"),
-            progressBar: document.getElementById("progressBar"),
-            // per-city IDs（両対応）
-            cityCards: document.getElementById("cityCards"),
-            yamato: { done:"#yamato-done", stop:"#yamato-stop", skip:"#yamato-skip", total:"#yamato-total" },
-            ebina : { done:"#ebina-done",  stop:"#ebina-stop",  skip:"#ebina-skip",  total:"#ebina-total"  },
-            chofu : { done:"#chofu-done",  stop:"#chofu-stop",  skip:"#chofu-skip",  total:"#chofu-total"  },
-          }
-        });
-      } else {
-        // app.js が無い時の簡易ワイヤリング（ボタンは生きているように見せるだけ）
-        const modal = document.getElementById("progressModal");
-        const bar   = document.getElementById("progressBar");
-        const sync  = document.getElementById("syncBtn");
-        const rec   = document.getElementById("recalcBtn");
-        const stxt  = document.getElementById("statusText");
-
-        function fakeProgress() {
-          modal.classList.add("show");
-          let t = 0, id = setInterval(()=>{
-            t = (t+7)%100;
-            bar.style.width = t + "%";
-          }, 80);
-          setTimeout(()=>{ clearInterval(id); modal.classList.remove("show"); alert("同期完了（デモ）"); }, 1200);
-        }
-        if (sync)  sync.addEventListener("click", fakeProgress);
-        if (rec)   rec.addEventListener("click", ()=>{ stxt.textContent = "再計算しました（デモ）"; });
-      }
-    })();
-  </script>
-
+  
+  
 <div id="sync-overlay" class="overlay">
   <div class="overlay-content">
     <div id="sync-title" class="overlay-title">同期中…</div>
@@ -152,6 +114,6 @@
     <div id="sync-done" class="overlay-done" style="display:none;">同期完了！</div>
   </div>
 </div>
-
+<script src="app.js?v=20250830"></script>
 </body>
 </html>

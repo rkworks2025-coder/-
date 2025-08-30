@@ -121,89 +121,73 @@ document.addEventListener('DOMContentLoaded', bindButtons);
 window.runSyncFromGAS = runSyncFromGAS;  // 直接呼び出し用
 
 
-// ---- Added helpers (保持: 黒基調+オレンジアクセント) ----
-function qs(sel){return document.querySelector(sel);}
-function qsa(sel){return Array.from(document.querySelectorAll(sel));}
-
-// Update index counters from data structure: { yamato:{done, stop, skip, total}, ebina:{...}, chofu:{...} }
+// === Helpers (UI & counters) ===
+function qs(s){return document.querySelector(s)}
+function qsa(s){return Array.from(document.querySelectorAll(s))}
 function updateIndexCounters(counters){
-  const mapping = {
-    yamato: 'card-yamato',
-    ebina: 'card-ebina',
-    chofu: 'card-chofu',
-  };
-  Object.keys(mapping).forEach(key=>{
-    const el = document.getElementById(mapping[key]);
-    if(!el || !counters[key]) return;
-    el.querySelector('.c-done .num').textContent = counters[key].done ?? 0;
-    el.querySelector('.c-stop .num').textContent = counters[key].stop ?? 0;
-    el.querySelector('.c-skip .num').textContent = counters[key].skip ?? 0;
-    el.querySelector('.c-total .num').textContent = counters[key].total ?? 0;
+  const mapping = { yamato:'card-yamato', ebina:'card-ebina', chofu:'card-chofu' };
+  Object.keys(mapping).forEach(k=>{
+    const el = document.getElementById(mapping[k]); if(!el||!counters[k]) return;
+    el.querySelector('.c-total .num').textContent = counters[k].total ?? 0;
+    el.querySelector('.c-done .num').textContent  = counters[k].done  ?? 0;
+    el.querySelector('.c-stop .num').textContent  = counters[k].stop  ?? 0;
+    el.querySelector('.c-skip .num').textContent  = counters[k].skip  ?? 0;
   });
+  // total
+  const t = (counters.yamato.total||0)+(counters.ebina.total||0)+(counters.chofu.total||0);
+  const elT = document.getElementById('total-counts-total');
+  if(elT) elT.textContent = t;
 }
 
-// Dummy recalculation: recompute done/stop/skip/total from DOM checkboxes if available
-function recalcFromDOM(){
-  const mk = (key)=>{
-    const boxes = qsa(`[data-area="${key}"] input[type="checkbox"]`);
-    let done=0, stop=0, skip=0;
-    boxes.forEach(b=>{
-      if(b.dataset.state === 'stop') stop++;
-      else if(b.dataset.state === 'skip') skip++;
-      else if(b.checked) done++;
-    });
-    return {done, stop, skip, total: boxes.length || 0};
-  };
-  const res = { yamato: mk('yamato'), ebina: mk('ebina'), chofu: mk('chofu') };
-  updateIndexCounters(res);
-  return res;
-}
 
 async function syncFromGAS(){
-  // Show overlay
-  const overlay = qs('#sync-overlay');
-  const bar = qs('#sync-progress-bar');
-  const title = qs('#sync-title');
-  const doneMsg = qs('#sync-done');
-  if(overlay){ overlay.classList.add('show'); }
-  if(doneMsg){ doneMsg.style.display='none'; }
-  if(title){ title.textContent = '同期中…'; }
-  if(bar){ bar.style.width = '0%'; }
-
-  // Animate progress while fetching
-  let pct = 0;
-  const timer = setInterval(()=>{
-    pct = Math.min(95, pct + 3 + Math.random()*5);
-    if(bar){ bar.style.width = pct.toFixed(0) + '%'; }
-  }, 120);
+  const overlay = qs('#sync-overlay'); const bar = qs('#sync-progress-bar');
+  const title = qs('#sync-title'); const doneMsg = qs('#sync-done');
+  if(overlay) overlay.classList.add('show');
+  if(doneMsg) doneMsg.style.display='none';
+  if(title) title.textContent='同期中…';
+  if(bar) bar.style.width='0%';
+  let pct=0; const tm=setInterval(()=>{ pct=Math.min(95,pct+3+Math.random()*6); if(bar) bar.style.width=pct.toFixed(0)+'%'; }, 120);
   try{
     const url = CONFIG.GAS_URL + "?action=pull";
-    const resp = await fetch(url, { method: "GET", cache: "no-store" });
-    if(!resp.ok) throw new Error("同期エラー: HTTP " + resp.status);
-    const data = await resp.json().catch(()=> ({}));
-    // Expecting data = { yamato:{done,stop,skip,total}, ebina:{...}, chofu:{...} }
-    if(data && (data.yamato || data.ebina || data.chofu)){
-      updateIndexCounters(data);
+    const resp = await fetch(url, {cache:'no-store'});
+    if(!resp.ok) throw new Error('同期エラー: HTTP '+resp.status);
+    const payload = await resp.json();
+    // Accept array or object-wrapped arrays
+    const rows = Array.isArray(payload) ? payload :
+                 (Array.isArray(payload.data) ? payload.data :
+                  (Array.isArray(payload.rows) ? payload.rows : []));
+    const counters = { yamato:{done:0,stop:0,skip:0,total:0},
+                       ebina:{done:0,stop:0,skip:0,total:0},
+                       chofu:{done:0,stop:0,skip:0,total:0} };
+    for(const r of rows){
+      const city    = (r.city ?? r.cityName ?? r['市区町村'] ?? r['City']   ?? '').toString();
+      const station = (r.station ?? r.stationName ?? r['ステーション'] ?? r['Station'] ?? '').toString();
+      const model   = (r.model ?? r['車種名'] ?? r['Model'] ?? '').toString();
+      const plate   = (r.plate_full ?? r.plate ?? r['登録番号'] ?? r['Plate'] ?? '').toString();
+      const c = city;
+      if(c.includes('大和市')) counters.yamato.total++;
+      else if(c.includes('海老名市')) counters.ebina.total++;
+      else if(c.includes('調布市')) counters.chofu.total++;
     }
-    pct = 100;
-    if(bar){ bar.style.width = '100%'; }
-    if(title){ title.textContent = '同期完了！'; }
-    if(doneMsg){ doneMsg.style.display='block'; }
-  }catch(err){
-    alert(err.message || '同期に失敗しました');
+    updateIndexCounters(counters);
+    if(bar) bar.style.width='100%';
+    if(title) title.textContent='同期完了！';
+    if(doneMsg) doneMsg.style.display='block';
+  }catch(e){
+    alert(e.message || '同期に失敗しました');
   }finally{
-    clearInterval(timer);
-    // Keep the overlay visible for a moment to show "同期完了！"
-    setTimeout(()=>{
-      if(overlay){ overlay.classList.remove('show'); }
-    }, 800);
+    clearInterval(tm);
+    setTimeout(()=>{ if(overlay) overlay.classList.remove('show'); }, 800);
   }
 }
-
-// Wire buttons if present
 document.addEventListener('DOMContentLoaded', ()=>{
-  const btnRecalc = document.getElementById('btn-recalc');
-  const btnSync = document.getElementById('btn-sync');
-  if(btnRecalc){ btnRecalc.addEventListener('click', recalcFromDOM); }
-  if(btnSync){ btnSync.addEventListener('click', syncFromGAS); }
+  const btnSync = qs('#btn-sync'); if(btnSync) btnSync.addEventListener('click', syncFromGAS);
+  const btnRecalc = qs('#btn-recalc'); if(btnRecalc) btnRecalc.addEventListener('click', ()=>{
+    // 現状はDOMからの再計算はダミー。将来拡張時に置換。
+    const counters={ yamato:{done:0,stop:0,skip:0,total:parseInt(qs('#card-yamato .c-total .num').textContent||'0')||0},
+                     ebina:{done:0,stop:0,skip:0,total:parseInt(qs('#card-ebina .c-total .num').textContent||'0')||0},
+                     chofu:{done:0,stop:0,skip:0,total:parseInt(qs('#card-chofu .c-total .num').textContent||'0')||0} };
+    updateIndexCounters(counters);
+  });
 });
