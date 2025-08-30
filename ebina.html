@@ -29,11 +29,15 @@
       for(const k of KEYS){ try{ const s=localStorage.getItem(k); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(_ ){} }
       return [];
     }
-    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); }catch(_ ){} }
+    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); localStorage.setItem('junkai:items:v2', JSON.stringify(a)); }catch(_ ){} }catch(_ ){} }
     function migrate(items){
       let changed=false;
       items.forEach(it=>{ 
         if(typeof it.state==='undefined'){ const st=it.status||''; it.state = (st==='停')?'stopped':(st==='不要'?'skip':'normal'); changed=true; }
+
+function normStr(s){ return String(s||'').replace(/\s+/g,'').replace(/巡回/g,'').toLowerCase(); }
+function makeId(it){ return [normStr(it.city), normStr(it.station), normStr(it.model), normStr(it.plate)].join('|'); }
+function keyOf(it){ return it._id || makeId(it); }
         if(typeof it.done==='undefined'){ it.done = (it.status==='済')?1:0; changed=true; }
         it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
       });
@@ -102,14 +106,14 @@
           it.done = ev.target.checked ? 1 : 0;
           it.updatedAt = ev.target.checked ? Date.now() : null;
           it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
-          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status; saveItems(a); } }catch(_ ){}
+          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=> (x._id||makeId(x)) === keyOf(it) ); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status; saveItems(a); } }catch(_ ){}
           if(it.done) enqueueLog({ timestamp: it.updatedAt, city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', state: it.state||'normal', done:1 });
           dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
           applyClass(itemEl,it); applyVisual(itemEl,it);
         });
 
         sel.addEventListener('change',()=>{ it.state=sel.value; it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':'')); it.updatedAt=Date.now();
-          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.status=it.status; t.updatedAt=it.updatedAt; saveItems(a); } }catch(_ ){}
+          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=> (x._id||makeId(x)) === keyOf(it) ); if(t){ t.state=it.state; t.status=it.status; t.updatedAt=it.updatedAt; saveItems(a); } }catch(_ ){}
           applyClass(itemEl,it); applyVisual(itemEl,it);
         });
 
