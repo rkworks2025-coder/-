@@ -46,6 +46,7 @@
   </div>
   <script>
     (function() {
+      const INSPECT_URL = '';
       const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
       const LS_KEY = 'junkai:items:v2';
 
@@ -210,6 +211,9 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
+  try{ localStorage.setItem('junkai:LOG_URL', GAS_URL);
+  try{ localStorage.setItem('junkai:INSPECT_URL', INSPECT_URL); }catch(_){ } }catch(_){ }
+
         document.getElementById('syncBtn').addEventListener('click', sync);
         document.getElementById('recalcBtn').addEventListener('click', recalc);
         document.getElementById('exportJson').addEventListener('click', exportJson);

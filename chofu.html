@@ -54,7 +54,56 @@
 
       function applyClass(el,it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
 function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc107', green='#d8f0df'; let bg=green; if(it.state==='stopped') bg=gray; else if(it.state==='skip') bg=yellow; else if(it.done) bg=pink; el.style.backgroundColor=bg; }
-// === Foundation: ID & Handlers ===
+// === Inspect Utilities ===
+      function getInspectUrl(){
+        try{ return localStorage.getItem('junkai:INSPECT_URL') || ''; }catch(_){ return ''; }
+      }
+      // === /Inspect Utilities ===
+
+      // === Logger Utilities ===
+      const LOG_LS_KEY = 'junkai:pendingLogs';
+      function getLogUrl(){
+        try{ return localStorage.getItem('junkai:LOG_URL') || ''; }catch(_){ return ''; }
+      }
+      function loadQueue(){
+        try{ const s = localStorage.getItem(LOG_LS_KEY); return s? JSON.parse(s): []; }catch(_){ return []; }
+      }
+      function saveQueue(q){
+        try{ localStorage.setItem(LOG_LS_KEY, JSON.stringify(q)); }catch(_){}
+      }
+      async function trySend(record){
+        const url = getLogUrl();
+        if(!url) return false;
+        try{
+          const res = await fetch(url + '?action=log', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json' },
+            body: JSON.stringify(record),
+            mode:'cors', credentials:'omit', redirect:'follow'
+          });
+          return res.ok;
+        }catch(_){ return false; }
+      }
+      async function flushQueue(){
+        let q = loadQueue();
+        if(!q.length) return;
+        const next = [];
+        for(const rec of q){
+          const ok = await trySend(rec);
+          if(!ok) next.push(rec);
+        }
+        saveQueue(next);
+      }
+      function enqueueLog(rec){
+        const q = loadQueue();
+        q.push(rec); saveQueue(q);
+        // fire-and-forget
+        flushQueue();
+      }
+      window.addEventListener('focus', ()=>{ flushQueue(); });
+      // === /Logger Utilities ===
+
+      // === Foundation: ID & Handlers ===
       const INSPECT_URL = ''; // 後で設定
       function buildItemId(it){ return [it.city||'', it.station||'', it.model||'', it.plate||''].join('|'); }
 
@@ -73,9 +122,20 @@ function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc1
         const now = checked ? Date.now() : null;
         it.done = checked ? 1 : 0;
         it.updatedAt = now;
-        // status整合
         it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
         findAndUpdate(it, {done:it.done, updatedAt:it.updatedAt, status:it.status});
+        if(checked){
+          enqueueLog({
+            timestamp: now,
+            city: it.city||'',
+            station: it.station||'',
+            model: it.model||'',
+            plate: it.plate||'',
+            state: it.state||'normal',
+            done: 1
+          });
+        }
+      });
       }
       function onStateChanged(it, newState){
         it.state = newState;
@@ -84,8 +144,12 @@ function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc1
         findAndUpdate(it, {state:it.state, status:it.status, updatedAt:it.updatedAt});
       }
       function openInspection(it){
-        // 後続タスクで実装予定（土台のみ）
+        const base = getInspectUrl();
+        if(!base){ alert('点検URLが未設定です（indexで設定してから再読み込みしてください）'); return; }
         const q = new URLSearchParams({ station: it.station||'', model: it.model||'', plate: it.plate||'' }).toString();
+        const url = base + (base.indexOf('?')>=0 ? '&' : '?') + q;
+        try{ window.open(url, '_blank'); }catch(_){ window.location.href = url; }
+      }).toString();
         const url = (INSPECT_URL||'#') + (INSPECT_URL ? ('?'+q) : '');
         // window.location.href = url; // まだ遷移はしない
         return url;
@@ -135,6 +199,7 @@ function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc1
             render();
           });
           right.appendChild(sel);
+          const inspectBtn=document.createElement('button'); inspectBtn.className='inspect-btn'; inspectBtn.textContent='点検'; inspectBtn.addEventListener('click', ()=>openInspection(it)); right.appendChild(inspectBtn);
           row1.appendChild(right);
           itemEl.appendChild(row1);
           const row2=document.createElement('div'); row2.className='row2';
