@@ -77,34 +77,15 @@
           if (it.city === '大和市') key = 'yamato';
           else if (it.city === '海老名市') key = 'ebina';
           else if (it.city === '調布市') key = 'chofu';
-          if (key) {
-            counts[key].total++;
-            if (it.status === '済') counts[key].done++;
-          }
+          if (!key) continue;
+          counts[key].total++;
+          const doneFlag = (typeof it.done !== 'undefined') ? (it.done ? 1 : 0) : (it.status === '済' ? 1 : 0);
+          if (doneFlag) counts[key].done++;
         }
         counts.overall.done = counts.yamato.done + counts.ebina.done + counts.chofu.done;
+        counts.overall.total = counts.yamato.total + counts.yamato.total*0 + counts.ebina.total + counts.chofu.total;
         counts.overall.total = counts.yamato.total + counts.ebina.total + counts.chofu.total;
         return counts;
-      }
-
-      function renderIndex() {
-        const items = loadItems();
-        const counts = computeCounts(items);
-        function update(key, id) {
-          const done = counts[key].done;
-          const total = counts[key].total;
-          const percent = total ? Math.floor(done * 100 / total) : 0;
-          $(id).textContent = `${done}/${total} (${percent}%)`;
-        }
-        update('yamato', '#yamato-count');
-        update('ebina', '#ebina-count');
-        update('chofu', '#chofu-count');
-        const ovDone = counts.overall.done;
-        const ovTotal = counts.overall.total;
-        const ovPercent = ovTotal ? Math.floor(ovDone * 100 / ovTotal) : 0;
-        $('#overall-count').textContent = `${ovDone}/${ovTotal} (${ovPercent}%)`;
-      }
-
       function showProgress(message) {
         const modal = $('#progressModal');
         const bar = $('#progressBar');
