@@ -233,37 +233,5 @@
       });
     })();
   </script>
-
-  <script>
-    (function(){
-      const CITIES = ['大和市','海老名市','調布市'];
-      const norm = s => (s||'').replace(/\s+/g,'').replace('巡回','');
-      function compute(){
-        try{
-          const raw = localStorage.getItem('junkai:items') || localStorage.getItem('junkai:items:v2');
-          const a = raw ? JSON.parse(raw) : [];
-          const map = {}; CITIES.forEach(c=> map[c]={done:0,total:0});
-          a.forEach(it=>{
-            const c = CITIES.find(cc => norm(cc)===norm(it.city));
-            if(!c) return; map[c].total++; if(it.done) map[c].done++;
-          });
-          return map;
-        }catch(_){ return null; }
-      }
-      function apply(map){
-        if(!map) return;
-        const idMap = {'大和市':['count-yamato','yamatoCount'],'海老名市':['count-ebina','ebinaCount'],'調布市':['count-chofu','chofuCount']};
-        Object.keys(map).forEach(c=>{
-          const t = map[c].total, d = map[c].done, pct = t? Math.floor(d*100/t):0;
-          const ids = idMap[c] || [];
-          ids.forEach(id=>{ const el = document.getElementById(id); if(el) el.textContent = `${d}/${t} (${pct}%)`; });
-        });
-      }
-      function recalcFromLocal(){ const m = compute(); apply(m); }
-      window.addEventListener('storage', recalcFromLocal);
-      document.addEventListener('DOMContentLoaded', recalcFromLocal);
-    })();
-  </script>
-
 </body>
 </html>
