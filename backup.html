@@ -1,1 +1,54 @@
-<!doctype html><html><body><p>backup</p></body></html>
+<!doctype html>
+<meta charset="utf-8">
+<title>巡回リスト Backup/Restore</title>
+<style>
+  body{font-family:system-ui, sans-serif; padding:16px; line-height:1.5}
+  button{padding:10px 14px; margin:4px 8px 12px 0}
+  small{color:#666}
+</style>
+<h1>巡回リスト バックアップ/復元</h1>
+<p>
+  <button id="exp">バックアップ保存</button>
+  <button id="imp">バックアップ復元</button><br>
+  <small>※同じドメイン上で使ってね（例：github.io配下）。</small>
+</p>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const ts = () => new Date().toISOString().replace(/[:.]/g,'-');
+  const dl = (name, text, type) => {
+    const a=document.createElement('a');
+    a.download=name; a.href=URL.createObjectURL(new Blob([text],{type}));
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $('exp').onclick = () => {
+    const data = {
+      type:"巡回リスト-backup",
+      timestamp:new Date().toISOString(),
+      origin:location.origin,
+      path:location.pathname,
+      href:location.href,
+      localStorage:Object.fromEntries(Array.from({length:localStorage.length},(_,i)=>{const k=localStorage.key(i); return [k, localStorage.getItem(k)];}))
+    };
+    dl(`巡回リスト-backup_${location.pathname.replace(/[\/]+/g,'_')}_${ts()}.json`,
+       JSON.stringify(data,null,2),'application/json');
+    alert('このページのlocalStorageをバックアップしたわ。');
+  };
+  $('imp').onclick = async () => {
+    const input=document.createElement('input'); input.type='file'; input.accept='application/json';
+    input.onchange = async () => {
+      const f=input.files&&input.files[0]; if(!f) return;
+      try{
+        const json = JSON.parse(await f.text());
+        if(json.type!=='巡回リスト-backup'){ alert('形式が違うわ。'); return; }
+        if(json.origin!==location.origin){ alert('ドメインが違うので復元不可よ。'); return; }
+        if(!confirm('localStorageを上書きして再読み込みするわ。よろしい？')) return;
+        localStorage.clear();
+        for(const [k,v] of Object.entries(json.localStorage||{})) localStorage.setItem(k,v);
+        location.reload();
+      }catch(e){ alert('復元に失敗: '+e.message); }
+    };
+    input.click();
+  };
+})();
+</script>
