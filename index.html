@@ -8,14 +8,16 @@
 </head>
 <body>
   <div class="appbar">
-    <div class="title">巡回リスト</div>
+    <div class="title">巡回リスト <span style="font-size:12px;color:#0af;">v1</span></div>
     <div class="btns">
       <button id="syncBtn" class="btn primary" onclick="try{if(window._sync){window._sync();return false}}catch(e){}">同期</button>
       <button id="recalcBtn" class="btn">再計算</button>
     </div>
   </div>
   <div class="wrap">
+    <div id="buildBanner" style="margin:8px 0;padding:6px 10px;border:1px solid #2a2a2a;border-radius:8px;color:#0af;">BUILD v1 LOADED</div>
     <p id="statusText" class="hint">同期してください</p>
+    <script>try{var st=document.getElementById("statusText"); if(st) st.textContent="準備OK v1";}catch(e){}</script>
     <section class="cards">
       <a id="card-yamato" class="card" href="yamato.html">
         <h2>大和市 巡回</h2>
