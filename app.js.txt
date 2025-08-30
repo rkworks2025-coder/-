@@ -17,13 +17,8 @@
   }
   window.__JUNKAI_MOUNTED__ = true;
 
-  // ---- 設定（URLをHTMLから取得）----
-  const appConfigEl = document.getElementById('app-config');
-  if (!appConfigEl || !appConfigEl.dataset.gasUrl) {
-    console.error('GAS URL not found. Please set it in a data attribute on the #app-config element in index.html.');
-    return;
-  }
-  const GAS_URL = appConfigEl.dataset.gasUrl;
+  // ---- 設定（GAS URLをここに直接記述）----
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
   console.log('GAS URL loaded:', GAS_URL);
 
   // ---- DOM ヘルパ ----
@@ -134,20 +129,20 @@
         throw new Error(`HTTP Error! status: ${resp.status}, message: ${errorText}`);
       }
 
-      const rawData = await resp.text();
-      try {
-        const data = JSON.parse(rawData);
-        if (!Array.isArray(data)) {
-          throw new Error('返されたデータがJSON配列ではありません。');
-        }
-        latestRows = data;
-        const counts = computeCounts(latestRows);
-        renderCounts(counts);
-        if (statusText) statusText.textContent = '同期完了！';
-      } catch (jsonErr) {
-        console.error('JSONパースエラー:', jsonErr, '生データ:', rawData);
-        if (statusText) statusText.textContent = `エラー：返されたデータがJSON形式ではありません。GASのログを確認してください。 (生データ: ${rawData.substring(0, 100)}...)`;
+      const responseJson = await resp.json();
+      if (responseJson.ok === false) {
+        throw new Error(`GASエラー: ${responseJson.error}`);
       }
+      
+      const data = responseJson.data;
+      if (!Array.isArray(data)) {
+        throw new Error('返されたデータが配列ではありません。');
+      }
+
+      latestRows = data;
+      const counts = computeCounts(latestRows);
+      renderCounts(counts);
+      if (statusText) statusText.textContent = '同期完了！';
 
     } catch (err) {
       console.error('同期処理エラー:', err);
@@ -192,4 +187,3 @@
     mountIndex();
   }
 })();
-
