@@ -90,8 +90,8 @@
           row1.appendChild(right);
           itemEl.appendChild(row1);
           const row2=document.createElement('div'); row2.className='row2';
-          const modelSpan=document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `<b>車種</b>${it.model||''}`;
-          const plateSpan=document.createElement('span'); plateSpan.className='kv'; plateSpan.innerHTML = `<b>登録番号</b>${it.plate||''}`;
+          const modelSpan=document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `${it.model||''}`;
+          const plateSpan=document.createElement('span'); plateSpan.className='kv'; plateSpan.innerHTML = `${it.plate||''}`;
           row2.appendChild(modelSpan); row2.appendChild(plateSpan);
           itemEl.appendChild(row2);
           listEl.appendChild(itemEl);

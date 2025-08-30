@@ -127,7 +127,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   margin-bottom: 12px;
-  background: #fff;
+  background: #d8f0df;
   transition: background 0.2s;
 }
 
