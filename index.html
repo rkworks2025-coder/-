@@ -45,189 +45,42 @@
     </div>
   </div>
   <script>
-    (function() {
-      const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
-      const LS_KEY = 'junkai:items:v2';
 
-      const $ = (sel) => document.querySelector(sel);
-
-      function loadItems() {
-        try {
-          const str = localStorage.getItem(LS_KEY);
-          return str ? JSON.parse(str) : [];
-        } catch (e) {
-          console.warn('Failed to parse localStorage', e);
-          return [];
+  (function(){
+    const LS_KEY = 'junkai:items:v2';
+    function load(){ try { const s=localStorage.getItem(LS_KEY); return s? JSON.parse(s): []; } catch(e){ return []; } }
+    function migrate(items){
+      let changed=false;
+      items.forEach(it=>{
+        if (it.done===undefined || it.state===undefined){
+          const st = it.status||'';
+          it.done = (st==='済') ? 1 : 0;
+          it.state = (st==='停') ? 'stopped' : (st==='不要' ? 'skip' : 'normal');
+          changed=true;
         }
-      }
-
-      function saveItems(items) {
-        localStorage.setItem(LS_KEY, JSON.stringify(items));
-      }
-
-      function computeCounts(items) {
-        const counts = {
-          yamato: { done: 0, total: 0 },
-          ebina: { done: 0, total: 0 },
-          chofu: { done: 0, total: 0 },
-          overall: { done: 0, total: 0 }
-        };
-        for (const it of items) {
-          let key;
-          if (it.city === '大和市') key = 'yamato';
-          else if (it.city === '海老名市') key = 'ebina';
-          else if (it.city === '調布市') key = 'chofu';
-          if (key) {
-            counts[key].total++;
-            if (it.status === '済') counts[key].done++;
-          }
-        }
-        counts.overall.done = counts.yamato.done + counts.ebina.done + counts.chofu.done;
-        counts.overall.total = counts.yamato.total + counts.ebina.total + counts.chofu.total;
-        return counts;
-      }
-
-      function renderIndex() {
-        const items = loadItems();
-        const counts = computeCounts(items);
-        function update(key, id) {
-          const done = counts[key].done;
-          const total = counts[key].total;
-          const percent = total ? Math.floor(done * 100 / total) : 0;
-          $(id).textContent = `${done}/${total} (${percent}%)`;
-        }
-        update('yamato', '#yamato-count');
-        update('ebina', '#ebina-count');
-        update('chofu', '#chofu-count');
-        const ovDone = counts.overall.done;
-        const ovTotal = counts.overall.total;
-        const ovPercent = ovTotal ? Math.floor(ovDone * 100 / ovTotal) : 0;
-        $('#overall-count').textContent = `${ovDone}/${ovTotal} (${ovPercent}%)`;
-      }
-
-      function showProgress(message) {
-        const modal = $('#progressModal');
-        const bar = $('#progressBar');
-        const msg = $('#progressMessage');
-        if (msg) msg.textContent = message;
-        if (bar) bar.style.width = '25%';
-        if (modal) modal.classList.add('visible');
-      }
-
-      function updateProgress(percent) {
-        const bar = $('#progressBar');
-        if (bar) bar.style.width = `${percent}%`;
-      }
-
-      function hideProgress() {
-        const modal = $('#progressModal');
-        if (modal) {
-          setTimeout(() => modal.classList.remove('visible'), 500);
-        }
-      }
-
-      async function sync() {
-        showProgress('同期中…');
-        updateProgress(10);
-        try {
-          const res = await fetch(GAS_URL + '?action=pull');
-          updateProgress(50);
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`HTTP ${res.status}: ${text}`);
-          }
-          const json = await res.json();
-          updateProgress(80);
-          if (!json || !Array.isArray(json.data)) {
-            throw new Error('データ形式が正しくありません');
-          }
-          const raw = json.data;
-          const oldItems = loadItems();
-          const statusMap = {};
-          for (const it of oldItems) {
-            const key = `${it.city}|${it.station}|${it.model}|${it.plate}`;
-            statusMap[key] = { status: it.status, updatedAt: it.updatedAt };
-          }
-          const items = raw.map(row => {
-            const obj = { city: row[0], station: row[1], model: row[2], plate: row[3] };
-            const key = `${obj.city}|${obj.station}|${obj.model}|${obj.plate}`;
-            if (statusMap[key]) {
-              obj.status = statusMap[key].status;
-              obj.updatedAt = statusMap[key].updatedAt;
-            } else {
-              obj.status = '';
-              obj.updatedAt = null;
-            }
-            return obj;
-          });
-          saveItems(items);
-          renderIndex();
-          $('#statusText').textContent = '同期完了！';
-        } catch (err) {
-          console.error('Sync error', err);
-          $('#statusText').textContent = '同期エラー: ' + (err.message || err);
-        } finally {
-          updateProgress(100);
-          hideProgress();
-        }
-      }
-
-      function recalc() {
-        renderIndex();
-        $('#statusText').textContent = '再計算完了';
-      }
-
-      function exportJson() {
-        const items = loadItems();
-        const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'junkai_items.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-
-      function importJson(file) {
-        const reader = new FileReader();
-        reader.onload = function() {
-          try {
-            const items = JSON.parse(reader.result);
-            if (!Array.isArray(items)) {
-              throw new Error('配列ではありません');
-            }
-            saveItems(items);
-            renderIndex();
-            $('#statusText').textContent = '読み込み完了';
-          } catch (err) {
-            console.error('Import error', err);
-            $('#statusText').textContent = 'JSON読み込みエラー: ' + (err.message || err);
-          }
-        };
-        reader.readAsText(file);
-      }
-
-      document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('syncBtn').addEventListener('click', sync);
-        document.getElementById('recalcBtn').addEventListener('click', recalc);
-        document.getElementById('exportJson').addEventListener('click', exportJson);
-        document.getElementById('importJson').addEventListener('click', () => {
-          document.getElementById('jsonFile').click();
-        });
-        document.getElementById('jsonFile').addEventListener('change', (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            importJson(file);
-          }
-          e.target.value = '';
-        });
-        // 更新は storage イベントでも反映させる
-        window.addEventListener('storage', () => renderIndex());
-        renderIndex();
+        it.status = it.done ? '済' : (it.state==='stopped' ? '停' : (it.state==='skip' ? '不要' : ''));
       });
-    })();
-  </script>
+      if (changed) localStorage.setItem(LS_KEY, JSON.stringify(items));
+      return items;
+    }
+    function renderIndex(){
+      const items = migrate(load());
+      const byCity = { '大和市':[], '海老名市':[], '調布市':[] };
+      items.forEach(it=>{ if (byCity[it.city]) byCity[it.city].push(it); });
+      function set(id, txt){ const el = document.getElementById(id); if (el) el.textContent = txt; }
+      function count(arr){ const total=arr.length; const done=arr.filter(x=>x.done).length; const pct= total? Math.floor(done*100/total):0; return `${done}/${total} (${pct}%)`; }
+      set('yamato-count', count(byCity['大和市']));
+      set('ebina-count', count(byCity['海老名市']));
+      set('chofu-count', count(byCity['調布市']));
+    }
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const recalc = document.getElementById('recalcBtn');
+      if (recalc) recalc.addEventListener('click', renderIndex);
+      window.addEventListener('storage', renderIndex);
+      renderIndex();
+    });
+  })();
+
+</script>
 </body>
 </html>

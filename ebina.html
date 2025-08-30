@@ -17,130 +17,115 @@
     <p id="empty" class="empty">まだ同期されていません</p>
   </div>
   <script>
-    (function() {
-      const CITY = '海老名市';
+
+    (function(){
+      const CITY = document.title.replace(' 巡回','');
       const LS_KEY = 'junkai:items:v2';
-      const statuses = ['', '済', '停', '不要'];
-      const $ = (sel) => document.querySelector(sel);
-      function load() {
-        try {
-          const str = localStorage.getItem(LS_KEY);
-          return str ? JSON.parse(str) : [];
-        } catch (e) {
-          return [];
-        }
+      const STATE_LABEL = { normal:'通常', stopped:'稼働停止', skip:'巡回不要' };
+      const STATE_NEXT = { normal:'stopped', stopped:'skip', skip:'normal' };
+
+      const $ = (sel, root=document)=>root.querySelector(sel);
+
+      function load(){
+        try { const s = localStorage.getItem(LS_KEY); return s? JSON.parse(s): []; } catch(e){ return []; }
       }
-      function save(items) {
+      function save(items){
         localStorage.setItem(LS_KEY, JSON.stringify(items));
+        window.dispatchEvent(new StorageEvent('storage', {key: LS_KEY}));
       }
-      function format(ts) {
-        if (!ts) return '';
-        const d = new Date(ts);
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mm = String(d.getMinutes()).padStart(2, '0');
-        return `${m}/${day} ${hh}:${mm}`;
-      }
-      function nextStatus(current) {
-        const idx = statuses.indexOf(current || '');
-        return statuses[(idx + 1) % statuses.length];
-      }
-      function render() {
-        const listEl = $('#list');
-        const emptyEl = $('#empty');
-        const counterEl = $('#counter');
-        const allItems = load();
-        const items = allItems.filter(it => it.city === CITY);
-        if (!items || items.length === 0) {
-          listEl.innerHTML = '';
-          emptyEl.style.display = 'block';
-          counterEl.textContent = '';
-          return;
-        }
-        emptyEl.style.display = 'none';
-        listEl.innerHTML = '';
-        let doneCount = 0;
-        items.forEach((it) => {
-          if (it.status === '済') doneCount++;
+      // 既存statusから新フィールドへ移行
+      function migrate(items){
+        let changed=false;
+        items.forEach(it=>{
+          if (it.city==null) return;
+          if (it.done===undefined || it.state===undefined){
+            const st = it.status||'';
+            it.done = (st==='済') ? 1 : 0;
+            it.state = (st==='停') ? 'stopped' : (st==='不要' ? 'skip' : 'normal');
+            changed=true;
+          }
+          // 将来互換: statusはミラーリング
+          it.status = it.done ? '済' : (it.state==='stopped' ? '停' : (it.state==='skip' ? '不要' : ''));
         });
-        counterEl.textContent = `${doneCount}/${items.length}`;
-        items.forEach((it, idx) => {
+        if (changed) save(items);
+        return items;
+      }
+
+      function text(el, s){ el.textContent = s; }
+
+      function applyClass(el, it){
+        el.classList.remove('is-stopped','is-skip','is-done');
+        if (it.state==='stopped') el.classList.add('is-stopped');
+        else if (it.state==='skip') el.classList.add('is-skip');
+        if (it.done) el.classList.add('is-done');
+      }
+
+      function render(){
+        const items = migrate(load()).filter(it=>it.city===CITY);
+        const listEl = $('#list'); listEl.innerHTML='';
+        if (!items.length){ const d=document.createElement('div'); d.className='empty'; d.textContent='リストなし'; listEl.appendChild(d); updateCounter(0,0); return; }
+
+        let done=0; const total=items.length;
+        items.forEach(it=>{ if (it.done) done++; });
+
+        items.forEach(it=>{
           const itemEl = document.createElement('div');
           itemEl.className = 'item';
-          if (it.status === '済') itemEl.classList.add('done');
-          else if (it.status === '停') itemEl.classList.add('stop');
-          else if (it.status === '不要') itemEl.classList.add('skip');
-          const row1 = document.createElement('div');
-          row1.className = 'row1';
+
           const left = document.createElement('div');
-          left.className = 'left';
-          const idxSpan = document.createElement('span');
-          idxSpan.className = 'idx';
-          idxSpan.textContent = String(idx + 1);
-          const chk = document.createElement('button');
-          chk.className = 'checkbox';
-          if (it.status === '済') {
-            chk.classList.add('checked');
-            chk.textContent = '✓';
-          } else if (it.status === '停') {
-            chk.classList.add('stop');
-            chk.textContent = '停';
-          } else if (it.status === '不要') {
-            chk.classList.add('skip');
-            chk.textContent = '不要';
-          }
-          chk.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            const newStatus = nextStatus(it.status);
-            it.status = newStatus;
-            it.updatedAt = new Date().getTime();
-            const list = load();
-            for (let j = 0; j < list.length; j++) {
-              const obj = list[j];
-              if (obj.city === it.city && obj.station === it.station && obj.model === it.model && obj.plate === it.plate) {
-                list[j].status = newStatus;
-                list[j].updatedAt = it.updatedAt;
-                break;
-              }
-            }
-            save(list);
-            render();
+          left.className = 'meta';
+          const row1 = document.createElement('div'); row1.className='row1';
+          const station = document.createElement('span'); station.className='kv'; station.innerHTML = `<b>ステーション</b>${it.station||'-'}`;
+          const model = document.createElement('span'); model.className='kv'; model.innerHTML = `<b>車種</b>${it.model||'-'}`;
+          row1.appendChild(station); row1.appendChild(model);
+          const row2 = document.createElement('div'); row2.className='row2';
+          const plate = document.createElement('span'); plate.className='kv'; plate.innerHTML = `<b>登録番号</b>${it.plate||'-'}`;
+          row2.appendChild(plate);
+          left.appendChild(row1); left.appendChild(row2);
+
+          const ctrl = document.createElement('div'); ctrl.className='ctrl';
+          const doneChk = document.createElement('input'); doneChk.type='checkbox'; doneChk.className='donechk'; doneChk.checked=!!it.done;
+          const stateBtn = document.createElement('button'); stateBtn.className='statebtn'; text(stateBtn, STATE_LABEL[it.state||'normal']);
+
+          ctrl.appendChild(doneChk); ctrl.appendChild(stateBtn);
+
+          itemEl.appendChild(left); itemEl.appendChild(ctrl);
+          applyClass(itemEl, it);
+
+          doneChk.addEventListener('change', ()=>{
+            const all = load(); const t = all.find(a=>a.id===it.id);
+            if (t){ t.done = doneChk.checked ? 1 : 0; t.status = t.done ? '済' : (t.state==='stopped'?'停': (t.state==='skip'?'不要':'')); save(all); }
+            applyClass(itemEl, t||it);
+            // 再計算してヘッダ更新
+            const itemsNow = load().filter(x=>x.city===CITY); let d=0; itemsNow.forEach(x=>{ if (x.done) d++; }); updateCounter(d, itemsNow.length);
           });
-          left.appendChild(idxSpan);
-          left.appendChild(chk);
-          const stationSpan = document.createElement('span');
-          stationSpan.textContent = it.station || '';
-          left.appendChild(stationSpan);
-          row1.appendChild(left);
-          const dateSpan = document.createElement('span');
-          dateSpan.className = 'date';
-          dateSpan.textContent = format(it.updatedAt);
-          row1.appendChild(dateSpan);
-          itemEl.appendChild(row1);
-          const row2 = document.createElement('div');
-          row2.className = 'row2';
-          const modelSpan = document.createElement('span');
-          modelSpan.className = 'kv';
-          const mdl = document.createElement('b');
-          mdl.textContent = '';
-          modelSpan.appendChild(mdl);
-          modelSpan.appendChild(document.createTextNode(it.model || '-'));
-          row2.appendChild(modelSpan);
-          const plateSpan = document.createElement('span');
-          plateSpan.className = 'kv';
-          const pl = document.createElement('b');
-          pl.textContent = '';
-          plateSpan.appendChild(pl);
-          plateSpan.appendChild(document.createTextNode(it.plate || '-'));
-          row2.appendChild(plateSpan);
-          itemEl.appendChild(row2);
+          stateBtn.addEventListener('click', ()=>{
+            const all = load(); const t = all.find(a=>a.id===it.id);
+            if (t){
+              t.state = STATE_NEXT[t.state||'normal'];
+              t.status = t.done ? '済' : (t.state==='stopped'?'停': (t.state==='skip'?'不要':''));
+              save(all);
+              text(stateBtn, STATE_LABEL[t.state]);
+              applyClass(itemEl, t);
+            }
+          });
+
           listEl.appendChild(itemEl);
         });
+
+        updateCounter(done, total);
       }
+
+      function updateCounter(done,total){
+        const el = document.getElementById('counter');
+        const pct = total? Math.floor(done*100/total): 0;
+        el.textContent = `${done}/${total} (${pct}%)`;
+      }
+
       document.addEventListener('DOMContentLoaded', render);
       window.addEventListener('storage', render);
     })();
-  </script>
+
+</script>
 </body>
 </html>

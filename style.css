@@ -283,3 +283,11 @@ body {
   font-size: 14px;
   text-align: center;
 }
+
+/* === UI修正: 独立チェック(作業済)＋状態トグル === */
+.item.is-stopped { background: var(--gray-bg) !important; color: #333; }
+.item.is-skip { background: var(--yellow) !important; color: #333; }
+.item.is-done { background: var(--pink) !important; }
+.ctrl { display:flex; align-items:center; gap:10px; }
+.ctrl .statebtn{ border:1px solid var(--border); background:#fff; padding:6px 10px; border-radius:8px; font-size:13px; }
+.ctrl .donechk{ width:18px; height:18px; }
