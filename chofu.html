@@ -17,15 +17,22 @@
     <p id="empty" class="empty">まだ同期されていません</p>
   </div>
   
+  
   <script>
     (function(){ 
-      const CITY = '調布市';
-      const KEYS = ['junkai:items:v2','junkai:items'];
+      const CITY_CANON = '調布市'; // 例: 大和市, 海老名市, 調布市
       const $ = (s,r=document)=>r.querySelector(s);
+      const KEYS = ['junkai:items','junkai:items:v2']; // indexは 'junkai:items' を使用
+
       function load(){ 
-        for (const k of KEYS){ try{ const s=localStorage.getItem(k); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(_){
-        } }
+        for (const k of KEYS){
+          try{ const s=localStorage.getItem(k); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(_){}
+        }
         return [];
+      }
+      function canonCity(s){
+        if(!s) return '';
+        return String(s).replace(/巡回/g,'').replace(/\s+/g,'').trim();
       }
       function migrate(items){
         let changed=false;
@@ -38,23 +45,28 @@
           }
           it.status = it.done ? '済' : (it.state==='stopped' ? '停' : (it.state==='skip' ? '不要' : ''));
         });
-        if (changed) try{ localStorage.setItem('junkai:items:v2', JSON.stringify(items)); }catch(_){}
+        if (changed){ try{ localStorage.setItem('junkai:items', JSON.stringify(items)); }catch(__){} }
         return items;
       }
       function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getMonth()+1).padStart(2,'0'); const D=String(d.getDate()).padStart(2,'0'); const h=String(d.getHours()).padStart(2,'0'); const m=String(d.getMinutes()).padStart(2,'0'); return `${M}/${D} ${h}:${m}`; }
       function updateCounter(done,total){ const el=$('#counter'); const pct= total? Math.floor(done*100/total):0; if(el) el.textContent = `${done}/${total} (${pct}%)`; }
       function applyClass(el, it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
+
       function render(){ 
         const all = migrate(load());
         const listEl = $('#list'); const emptyEl = $('#empty');
-        const cityItems = all.filter(it=> (it.city||'').replace(' 巡回','').trim() === CITY );
-        // debug banner
-        if(emptyEl) emptyEl.textContent = cityItems.length? '' : 'まだ同期されていません';
+        const canon = canonCity(CITY_CANON);
+        const cityItems = all.filter(it=>{
+          const c = canonCity(it.city);
+          return c===canon || (c && canon && c.indexOf(canon) !== -1);
+        });
+        if (emptyEl) emptyEl.textContent = cityItems.length? '' : 'まだ同期されていません';
         listEl.innerHTML='';
         if (!cityItems.length) { updateCounter(0,0); return; }
         let done=0; const total = cityItems.length;
         cityItems.forEach(it=>{ if(it.done) done++; });
         updateCounter(done,total);
+
         cityItems.forEach((it, idx)=>{
           const itemEl = document.createElement('div'); itemEl.className='item';
           applyClass(itemEl, it);
@@ -62,17 +74,18 @@
           const left=document.createElement('div'); left.className='left';
           const idxSpan=document.createElement('span'); idxSpan.className='idx'; idxSpan.textContent=String(idx+1);
           const doneBox=document.createElement('input'); doneBox.type='checkbox'; doneBox.className='checkbox'; doneBox.checked=!!it.done;
-          doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } it.done=ev.target.checked?1:0; it.updatedAt=Date.now(); try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; localStorage.setItem('junkai:items:v2', JSON.stringify(a)); } }catch(__){} render(); });
+          doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } it.done=ev.target.checked?1:0; it.updatedAt=Date.now();
+            try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); } }catch(__){} render();
+          });
           const stationSpan=document.createElement('span'); stationSpan.textContent = it.station||'';
           left.appendChild(idxSpan); left.appendChild(doneBox); left.appendChild(stationSpan);
           row1.appendChild(left);
           const right=document.createElement('div');
           const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent=fmt(it.updatedAt);
           const stateBtn=document.createElement('button'); stateBtn.className='checkbox'; stateBtn.textContent = it.state==='stopped'?'停':(it.state==='skip'?'不要':'状態');
-          stateBtn.addEventListener('click',()=>{ const input = prompt('状態を選択：
-0=通常
-1=稼働停止（グレー）
-2=巡回不要（黄色）', it.state==='stopped'?'1':(it.state==='skip'?'2':'0')); if(input===null) return; const code=String(input).trim(); const map={'0':'normal','1':'stopped','2':'skip'}; if(!(code in map)) return; it.state=map[code]; it.updatedAt=Date.now(); try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.updatedAt=it.updatedAt; localStorage.setItem('junkai:items:v2', JSON.stringify(a)); } }catch(__){} render(); });
+          stateBtn.addEventListener('click',()=>{ const input = prompt('状態を選択：\n0=通常\n1=稼働停止（グレー）\n2=巡回不要（黄色）', it.state==='stopped'?'1':(it.state==='skip'?'2':'0')); if(input===null) return; const code=String(input).trim(); const map={'0':'normal','1':'stopped','2':'skip'}; if(!(code in map)) return; it.state=map[code]; it.updatedAt=Date.now();
+            try{ const a=migrate(load()); const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.updatedAt=it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); } }catch(__){} render();
+          });
           right.appendChild(dateSpan); right.appendChild(stateBtn);
           row1.appendChild(right);
           itemEl.appendChild(row1);
@@ -88,6 +101,7 @@
       window.addEventListener('storage', render);
     })();
   </script>
+
 
 </body>
 </html>
