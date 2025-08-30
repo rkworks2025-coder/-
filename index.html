@@ -1,1 +1,136 @@
-<!doctype html><html><body><p>index placeholder</p></body></html>
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>巡回リスト</title>
+  <link rel="stylesheet" href="style.css?v=20250830-merge1" />
+</head>
+<body>
+  <header class="appbar">
+    <div class="title">巡回リスト</div>
+    <div class="btns">
+      <button id="recalcBtn" class="btn">再計算</button>
+      <button id="syncBtn" class="btn btn-primary">同期</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p id="statusText" class="hint">GASと同期して各エリアに反映します。</p>
+    <section id="cityCards" class="cards">
+      <a id="card-yamato" class="card" href="yamato.html" data-city="大和市">
+        <h2>大和市</h2>
+        <div class="meta">
+          <span class="chip">済 <span id="yamato-done">0</span></span>
+          <span class="chip">停 <span id="yamato-stop">0</span></span>
+          <span class="chip">不要 <span id="yamato-skip">0</span></span>
+          <span class="chip">総 <span id="yamato-total">0</span></span>
+        </div>
+      </a>
+      <a id="card-ebina" class="card" href="ebina.html" data-city="海老名市">
+        <h2>海老名市</h2>
+        <div class="meta">
+          <span class="chip">済 <span id="ebina-done">0</span></span>
+          <span class="chip">停 <span id="ebina-stop">0</span></span>
+          <span class="chip">不要 <span id="ebina-skip">0</span></span>
+          <span class="chip">総 <span id="ebina-total">0</span></span>
+        </div>
+      </a>
+      <a id="card-chofu" class="card" href="chofu.html" data-city="調布市">
+        <h2>調布市</h2>
+        <div class="meta">
+          <span class="chip">済 <span id="chofu-done">0</span></span>
+          <span class="chip">停 <span id="chofu-stop">0</span></span>
+          <span class="chip">不要 <span id="chofu-skip">0</span></span>
+          <span class="chip">総 <span id="chofu-total">0</span></span>
+        </div>
+      </a>
+    </section>
+    <p id="overallHint" class="empty">まだ同期されていません</p>
+  </main>
+
+  <div id="progressModal" class="modal" aria-hidden="true">
+    <div class="dialog">
+      <h3 id="progressTitle">同期中…</h3>
+      <div class="barwrap"><div id="progressBar" class="bar"></div></div>
+    </div>
+  </div>
+
+  <script>
+    // === 設定 ===
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec"; // 最新の Web アプリ URL
+    const VER = "20250830-merge1";
+
+    // === UI 要素 ===
+    const els = {
+      syncBtn: document.getElementById('syncBtn'),
+      recalcBtn: document.getElementById('recalcBtn'),
+      statusText: document.getElementById('statusText'),
+      progressModal: document.getElementById('progressModal'),
+      progressBar: document.getElementById('progressBar'),
+      yamato: { done: '#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total' },
+      ebina : { done: '#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total'  },
+      chofu : { done: '#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total'  },
+      overallHint: document.getElementById('overallHint'),
+    };
+
+    function $(sel) { return document.querySelector(sel); }
+
+    function setCounts(cityKey, counts) {
+      $(els[cityKey].done ).textContent = counts.done  || 0;
+      $(els[cityKey].stop ).textContent = counts.stop  || 0;
+      $(els[cityKey].skip ).textContent = counts.skip  || 0;
+      $(els[cityKey].total).textContent = counts.total || 0;
+    }
+
+    function showModal(on=true) {
+      if (on) els.progressModal.classList.add('show'); else els.progressModal.classList.remove('show');
+    }
+
+    async function syncAll() {
+      try {
+        els.statusText.textContent = '同期開始…';
+        showModal(true);
+        els.progressBar.style.width = '8%';
+        const res = await fetch(GAS_URL + '?action=pull&v=' + encodeURIComponent(VER), { cache:'no-store' });
+        els.progressBar.style.width = '32%';
+        const json = await res.json();
+        els.progressBar.style.width = '48%';
+        if (!json.ok) throw new Error(json.error || '同期失敗');
+        const rows = json.data || [];
+        // ローカル保存（各ページで読む）
+        localStorage.setItem('junkai_data', JSON.stringify(rows));
+        els.progressBar.style.width = '72%';
+        // 集計
+        const cityCounts = { '大和市':{}, '海老名市':{}, '調布市':{} };
+        const init = () => ({done:0, stop:0, skip:0, total:0});
+        const getC = (c) => cityCounts[c] || (cityCounts[c] = init());
+        rows.forEach(r => {
+          const city = r.city || r.市区町村 || r.都市 || '';
+          const st = (r.status || '').toString(); // 'done' | 'stop' | 'skip' など想定
+          const c = getC(city);
+          c.total += 1;
+          if (st === 'done') c.done += 1;
+          else if (st === 'stop') c.stop += 1;
+          else if (st === 'skip') c.skip += 1;
+        });
+        // 反映
+        setCounts('yamato', cityCounts['大和市'] || init());
+        setCounts('ebina',  cityCounts['海老名市'] || init());
+        setCounts('chofu',  cityCounts['調布市'] || init());
+        els.overallHint.textContent = `同期完了（20250830-merge1）: 合計 {0} 件`.replace('{0}', rows.length);
+        els.progressBar.style.width = '100%';
+      } catch (e) {
+        console.error(e);
+        alert('同期エラー: ' + e.message);
+        els.statusText.textContent = '同期失敗';
+      } finally {
+        setTimeout(() => showModal(false), 300);
+      }
+    }
+
+    if (els.syncBtn) els.syncBtn.addEventListener('click', syncAll);
+    if (els.recalcBtn) els.recalcBtn.addEventListener('click', () => { els.statusText.textContent = '再計算しました'; });
+  </script>
+</body>
+</html>

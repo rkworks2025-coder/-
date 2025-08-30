@@ -1,1 +1,32 @@
-<!doctype html><html><body><p>chofu</p></body></html>
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>調布市</title>
+<link rel="stylesheet" href="style.css?v=20250830-merge1">
+</head>
+<body>
+<header class="appbar">
+  <div class="title">調布市</div>
+  <div class="btns"><a class="btn" href="index.html">戻る</a></div>
+</header>
+<main class="wrap">
+  <div id="list" class="cards"></div>
+</main>
+<script>
+const city = "調布市";
+const listEl = document.getElementById('list');
+function render() {
+  const raw = localStorage.getItem('junkai_data');
+  if (!raw) { listEl.innerHTML = '<p class="empty">まだ同期されていません</p>'; return; }
+  const rows = JSON.parse(raw);
+  const items = rows.filter(r => (r.city||r['市区町村']||'') === city);
+  if (!items.length) { listEl.innerHTML = '<p class="empty">このエリアのデータがまだありません</p>'; return; }
+  listEl.innerHTML = items.map(r => {
+    const st  = r.status || '';
+    const stn = r.station || r['ステーション名'] || '';
+    const car = r.fullNumber || r['フルナンバー'] || r['車番'] || '';
+    return `<div class="card"><h2>${stn}</h2><div class="meta"><span class="chip">車両</span><span class="chip">${car}</span><span class="chip">${st||'未'}</span></div></div>`;
+  }).join('');
+}
+render();
+</script>
+</body></html>
