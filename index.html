@@ -1,7 +1,7 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>巡回リスト</title>
-<link rel="stylesheet" href="style.css?v=20250830"/></head>
+<link rel="stylesheet" href="style.css?v=20250831"/></head>
 <body><header class="appbar"><div class="title">巡回リスト</div>
 <div class="btns"><button id="recalcBtn" class="btn">再計算</button>
 <button id="syncBtn" class="btn btn-primary">同期</button></div></header>
@@ -9,10 +9,89 @@
 <section class="cards"><a class="card" href="yamato.html">大和市</a>
 <a class="card" href="ebina.html">海老名市</a>
 <a class="card" href="chofu.html">調布市</a></section></main>
+
 <script>
-const GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
-const LS_KEY_ITEMS='junkai:items:v1';
-function normalize(d){{const out=[];for(const r of (Array.isArray(d)?d:(d.data||[]))){{if(Array.isArray(r))out.push({{city:r[0],station:r[1],model:r[2],plate:r[3]}});}}return out}}
-async function sync(){{const res=await fetch(GAS_URL+'?action=pull');const j=await res.json();const items=normalize(j);localStorage.setItem(LS_KEY_ITEMS,JSON.stringify(items));document.getElementById('statusText').textContent='同期完了';}}
-document.getElementById('syncBtn').onclick=sync;
-</script></body></html>
+// index inline patch 83.1
+var GAS_URL = (typeof GAS_URL!=='undefined' && GAS_URL) ? GAS_URL :
+  'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+var LS_KEY_ITEMS = 'junkai:items:v1';
+
+var els = {
+  syncBtn: document.getElementById('syncBtn'),
+  recalcBtn: document.getElementById('recalcBtn'),
+  status: document.getElementById('statusText')
+};
+
+function parseRows(arr) { // from 2D array to normalized items
+  var out = [];
+  for (var i=0; i<(arr?arr.length:0); i++) {
+    var r = arr[i] || [];
+    var city = r[0] || '';
+    var station = r[1] || '';
+    var model = r[2] || '';
+    var plate = r[3] || '';
+    var status = (r[4] || '').toString();
+    if (!city || !station) continue;
+    out.push({ city: city, station: station, model: model, plate: plate, status: status });
+  }
+  return out;
+}
+
+function save(items) {
+  try { localStorage.setItem(LS_KEY_ITEMS, JSON.stringify(items)); }
+  catch(e){ console.warn('localStorage save failed', e); }
+}
+
+function load() {
+  try {
+    var s = localStorage.getItem(LS_KEY_ITEMS);
+    return s ? JSON.parse(s) : [];
+  } catch(e){ return []; }
+}
+
+function countByCity(items) {
+  var keys = {'大和市':0,'海老名市':0,'調布市':0};
+  var total = 0;
+  for (var i=0;i<items.length;i++){ var it=items[i]; if (keys.hasOwnProperty(it.city)) keys[it.city]++; total++; }
+  keys.total = total;
+  return keys;
+}
+
+function renderCounts() {
+  var items = load();
+  var cnt = countByCity(items);
+  var cards = document.querySelectorAll('.cards .card');
+  for (var i=0;i<cards.length;i++){
+    var a = cards[i];
+    var name = a.textContent.trim();
+    var n = (cnt.hasOwnProperty(name) ? cnt[name] : 0);
+    var badge = a.querySelector('.badge');
+    if (!badge) { badge = document.createElement('span'); badge.className = 'badge'; a.appendChild(badge); }
+    badge.textContent = n + '件';
+  }
+  if (els.status) els.status.textContent = items.length ? '同期完了' : '同期してください';
+}
+
+async function sync() {
+  try {
+    if (els.status) els.status.textContent = '同期中…';
+    var res = await fetch(GAS_URL + '?action=pull', { cache: 'no-store' });
+    var data = await res.json();
+    var items = parseRows((data && (data.values || data.rows)) || data || []);
+    save(items);
+    renderCounts();
+  } catch (e) {
+    console.error(e);
+    if (els.status) els.status.textContent = '同期失敗';
+  }
+}
+
+function recalc() { renderCounts(); }
+
+document.addEventListener('DOMContentLoaded', function(){
+  renderCounts();
+  if (els.syncBtn) els.syncBtn.onclick = sync;
+  if (els.recalcBtn) els.recalcBtn.onclick = recalc;
+});
+</script>
+</body></html>

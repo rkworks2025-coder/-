@@ -2,3 +2,15 @@ body { font-family: sans-serif; }
 .list{display:grid;gap:10px;margin-top:10px}.item{background:#fff;border:1px solid #ccc;border-radius:8px;padding:8px}
 .row1{display:flex;justify-content:space-between;margin-bottom:4px}.badge{background:#eef;color:#00f;padding:2px 6px;border-radius:12px;font-size:12px}
 .row2{font-size:13px;color:#555;display:flex;gap:8px;flex-wrap:wrap}.kv b{color:#000}
+
+/* === patch 83.1 === */
+.empty{color:#777;text-align:center;margin:20px 0}
+.badge{display:inline-block;background:#eef;color:#00f;padding:2px 6px;border-radius:12px;font-size:12px;margin-left:6px}
+.tag-done{background:#ffe0ef}
+.tag-stop{background:#eee}
+.tag-skip{background:#fff7cc}
+.item.done{background:#ffe0ef}
+.item.stop{background:#f3f3f3}
+.item.skip{background:#fff7cc}
+.progress{height:6px;background:#eee;border-radius:4px;overflow:hidden;margin-top:6px}
+.progress>div{height:6px;width:0}

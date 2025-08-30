@@ -4,17 +4,51 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>調布市</title>
-<link rel="stylesheet" href="style.css?v=20250830"/>
+<link rel="stylesheet" href="style.css?v=20250831"/>
 </head>
 <body>
 <header class="appbar"><a class="backlink" href="index.html">←戻る</a><div class="title">調布市</div></header>
 <main class="wrap"><section id="list" class="list"></section><p id="empty" class="empty">まだ同期されていません</p></main>
+
 <script>
-const LS_KEY_ITEMS='junkai:items:v1';const CITY='調布市';
-function $(s){return document.querySelector(s)}
-function el(t,a={},c=[]){const n=document.createElement(t);for(const k in a)n.setAttribute(k,a[k]);c.forEach(x=>n.appendChild(typeof x==='string'?document.createTextNode(x):x));return n;}
-function load(){try{const r=localStorage.getItem(LS_KEY_ITEMS);return r?JSON.parse(r):[]}catch(_ ){return []}}
-function render(rows){const list=$('#list'),empty=$('#empty');list.innerHTML='';const rs=rows.filter(it=>it.city===CITY);if(rs.length===0){empty.style.display='block';return}empty.style.display='none';for(const it of rs){const card=el('div',{class:'item'},[el('div',{class:'row1'},[document.createTextNode(it.station||'(不明)'),el('span',{class:'badge'},[CITY])]),el('div',{class:'row2'},[el('span',{class:'kv'},[el('b',{},['車種']),' '+(it.model||'-')]),el('span',{class:'kv'},[el('b',{},['登録番号']),' '+(it.plate||'-')])])]);list.appendChild(card);}}
-document.addEventListener('DOMContentLoaded',()=>render(load()));
+// area inline patch 83.1
+var LS_KEY_ITEMS='junkai:items:v1';
+var CITY='調布市';
+
+function load(){ try{var s=localStorage.getItem(LS_KEY_ITEMS);return s?JSON.parse(s):[]}catch(e){return[]}}
+function el(tag, cls, txt){var x=document.createElement(tag); if(cls) x.className=cls; if(txt!=null) x.textContent=txt; return x;}
+
+function statusClass(s){
+  if (!s) return '';
+  if (s.indexOf('完')>=0 || s.toLowerCase().indexOf('done')>=0) return 'done';
+  if (s.indexOf('停')>=0 || s.toLowerCase().indexOf('stop')>=0) return 'stop';
+  if (s.indexOf('要')>=0 || s.toLowerCase().indexOf('skip')>=0) return 'skip';
+  return '';
+}
+
+function render(items){
+  var list=document.getElementById('list');
+  var empty=document.getElementById('empty');
+  list.innerHTML='';
+  var data=[];
+  for (var i=0;i<(items?items.length:0);i++){ var it=items[i]; if (it.city===CITY) data.push(it); }
+  if (!data.length){ if (empty) empty.style.display='block'; return; }
+  if (empty) empty.style.display='none';
+  for (var j=0;j<data.length;j++){
+    var it=data[j];
+    var card = el('div','item '+statusClass(it.status||''));
+    var row1 = el('div','row1');
+    row1.appendChild(el('div','kv', it.station||'-'));
+    var tags = el('div'); if (it.status){ var b = el('span','badge', it.status); tags.appendChild(b); }
+    row1.appendChild(tags); card.appendChild(row1);
+    var row2 = el('div','row2');
+    row2.appendChild(el('span','kv','車種: '+(it.model||'-')));
+    row2.appendChild(el('span','kv','登録番号: '+(it.plate||'-')));
+    card.appendChild(row2);
+    list.appendChild(card);
+  }
+}
+
+document.addEventListener('DOMContentLoaded',function(){ render(load()); });
 </script>
 </body></html>
