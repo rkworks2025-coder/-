@@ -52,6 +52,46 @@
       function updateCounter(done,total){ const el=$('#counter'); const pct= total? Math.floor(done*100/total):0; if(el) el.textContent = `${done}/${total} (${pct}%)`; }
       function applyClass(el, it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
 
+      function applyClass(el,it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
+function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc107', green='#d8f0df'; let bg=green; if(it.state==='stopped') bg=gray; else if(it.state==='skip') bg=yellow; else if(it.done) bg=pink; el.style.backgroundColor=bg; }
+// === Foundation: ID & Handlers ===
+      const INSPECT_URL = ''; // 後で設定
+      function buildItemId(it){ return [it.city||'', it.station||'', it.model||'', it.plate||''].join('|'); }
+
+      function saveAll(items){
+        try{ localStorage.setItem('junkai:items', JSON.stringify(items)); }catch(_){}
+      }
+      function findAndUpdate(it, upd){
+        try{
+          const raw = localStorage.getItem('junkai:items');
+          const a = raw ? JSON.parse(raw) : [];
+          const t = a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate);
+          if(t){ Object.assign(t, upd); saveAll(a); }
+        }catch(__){}
+      }
+      function onItemChecked(it, checked){
+        const now = checked ? Date.now() : null;
+        it.done = checked ? 1 : 0;
+        it.updatedAt = now;
+        // status整合
+        it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
+        findAndUpdate(it, {done:it.done, updatedAt:it.updatedAt, status:it.status});
+      }
+      function onStateChanged(it, newState){
+        it.state = newState;
+        it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
+        it.updatedAt = Date.now();
+        findAndUpdate(it, {state:it.state, status:it.status, updatedAt:it.updatedAt});
+      }
+      function openInspection(it){
+        // 後続タスクで実装予定（土台のみ）
+        const q = new URLSearchParams({ station: it.station||'', model: it.model||'', plate: it.plate||'' }).toString();
+        const url = (INSPECT_URL||'#') + (INSPECT_URL ? ('?'+q) : '');
+        // window.location.href = url; // まだ遷移はしない
+        return url;
+      }
+      // === /Foundation ===
+
       function render(){ 
         const all = migrate(load());
         const listEl = $('#list'); const emptyEl = $('#empty');
@@ -68,8 +108,7 @@
         updateCounter(done,total);
 
         cityItems.forEach((it, idx)=>{
-          const itemEl = document.createElement('div'); itemEl.className='item';
-          applyClass(itemEl, it);
+          const itemEl = document.createElement('div'); itemEl.className='item card'; itemEl.dataset.itemId = buildItemId(it); applyClass(itemEl, it); applyVisual(itemEl,it);
           const row1=document.createElement('div'); row1.className='row1';
           const left=document.createElement('div'); left.className='left';
           const lead=document.createElement('span'); lead.className='lead';
@@ -91,12 +130,8 @@
           opts.forEach(o=>{ const op=document.createElement('option'); op.value=o.k; op.textContent=o.label; sel.appendChild(op); });
           sel.value = (it.state||'normal');
           sel.addEventListener('change', ()=>{
-            it.state = sel.value; it.updatedAt = Date.now();
-            try{
-              const a = load();
-              const t = a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate);
-              if(t){ t.state = it.state; t.status = t.done ? '済' : (t.state==='stopped'?'停':(t.state==='skip'?'不要':'')); t.updatedAt = it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); }
-            }catch(__){}
+            onStateChanged(it, sel.value);
+            applyClass(itemEl,it); applyVisual(itemEl,it);
             render();
           });
           right.appendChild(sel);

@@ -318,3 +318,10 @@ body {
 .item.stop, .item.stop *{ color:#000 !important; }
 /* 黄色も少しコントラスト確保 */
 .item.skip{ color:#222 !important; }
+
+/* enforce compact size for state-select */
+select.state-select{
+  height:24px !important; line-height:24px !important;
+  min-width:110px !important; font-size:12px !important;
+  padding:2px 16px 2px 8px !important; margin:0 !important;
+}
