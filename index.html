@@ -4,19 +4,46 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=20250830-2" />
+  <link rel="stylesheet" href="style.css?v=rollback1" />
+  <style>
+    :root { --accent:#2b6bf6; --fg:#0e1a2b; --muted:#64748b; --chip:#eff4ff; }
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;margin:0;background:#f6f7fb;color:var(--fg);}
+    .appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid #e6e8ef;}
+    .title{font-size:20px;font-weight:800;letter-spacing:.04em;}
+    .btns{display:flex;gap:10px;}
+    .btn{appearance:none;border:1px solid #d7dbe7;padding:8px 14px;border-radius:12px;background:#fff;font-weight:700;font-size:14px;cursor:pointer}
+    .btn-primary{background:var(--chip);border-color:#c9d6ff;color:#1e40af;}
+    .wrap{max-width:820px;margin:18px auto;padding:0 14px 60px;}
+    .hint{margin:6px 2px 14px;color:var(--muted);font-size:13px}
+    .cards{display:grid;grid-template-columns:1fr;gap:14px}
+    .card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e6e8ef;border-radius:16px;padding:18px 16px;box-shadow:0 1px 0 rgba(8,15,35,.03);}
+    .card h2{margin:0 0 8px 0;font-size:18px;letter-spacing:.03em}
+    .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#f2f5fb;border:1px solid #e6e8ef}
+    .empty{margin:28px 2px 0 2px;color:var(--muted);font-size:14px}
+
+    .modal{position:fixed;inset:0;background:rgba(8,15,35,.5);display:none;align-items:center;justify-content:center;z-index:50}
+    .modal.show{display:flex}
+    .dialog{width:min(520px,90vw);background:#111827;color:#fff;border-radius:14px;padding:18px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .barwrap{height:8px;background:#1f2937;border-radius:999px;overflow:hidden;margin-top:12px}
+    .bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399)}
+    .dialog h3{margin:0 0 8px 0;font-size:18px}
+
+    .debug{max-width:820px;margin:16px auto;padding:10px 14px;background:#fff;border:1px solid #e6e8ef;border-radius:12px;font:12px/1.5 ui-monospace,Consolas,Menlo,monospace;color:#334155;white-space:pre-wrap}
+  </style>
 </head>
 <body>
   <header class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
       <button id="recalcBtn" class="btn">再計算</button>
-      <button id="syncBtn"   class="btn btn-primary">同期</button>
+      <button id="syncBtn" class="btn btn-primary">同期</button>
     </div>
   </header>
 
   <main class="wrap">
     <p id="statusText" class="hint">GASと同期して各エリアに反映します。</p>
+
     <section id="cityCards" class="cards">
       <a id="card-yamato" class="card" href="yamato.html" data-city="大和市">
         <h2>大和市</h2>
@@ -46,6 +73,7 @@
         </div>
       </a>
     </section>
+
     <p id="overallHint" class="empty">まだ同期されていません</p>
   </main>
 
@@ -56,24 +84,70 @@
     </div>
   </div>
 
-  <script src="app.js?v=20250830-2"></script>
+  <div id="debug" class="debug" style="display:none"></div>
+
   <script>
-    // app.js のマウントを確実に呼ぶ
-    if (window.JunkaiApp && typeof window.JunkaiApp.mountIndex === "function") {
-      window.JunkaiApp.mountIndex({
-        els: {
-          syncBtn: document.getElementById("syncBtn"),
-          recalcBtn: document.getElementById("recalcBtn"),
-          statusText: document.getElementById("statusText"),
-          progressModal: document.getElementById("progressModal"),
-          progressBar: document.getElementById("progressBar"),
-          cityCards: document.getElementById("cityCards"),
-          yamato: { done:"#yamato-done", stop:"#yamato-stop", skip:"#yamato-skip", total:"#yamato-total" },
-          ebina : { done:"#ebina-done",  stop:"#ebina-stop",  skip:"#ebina-skip",  total:"#ebina-total"  },
-          chofu : { done:"#chofu-done",  stop:"#chofu-stop",  skip:"#chofu-skip",  total:"#chofu-total"  },
-        }
-      });
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec";
+  const cityKeys = ["大和市","海老名市","調布市"];
+  const els = {
+    syncBtn: document.getElementById("syncBtn"),
+    recalcBtn: document.getElementById("recalcBtn"),
+    statusText: document.getElementById("statusText"),
+    modal: document.getElementById("progressModal"),
+    bar: document.getElementById("progressBar"),
+    debug: document.getElementById("debug"),
+    ids: {
+      "大和市": { "total":"#yamato-total", "done":"#yamato-done", "stop":"#yamato-stop", "skip":"#yamato-skip" },
+      "海老名市": { "total":"#ebina-total",  "done":"#ebina-done",  "stop":"#ebina-stop",  "skip":"#ebina-skip"  },
+      "調布市": { "total":"#chofu-total",   "done":"#chofu-done",   "stop":"#chofu-stop",   "skip":"#chofu-skip"   }
     }
+  };
+
+  function showModal(on) { els.modal.classList[on? "add":"remove"]("show"); }
+  function setBar(p) { els.bar.style.width = Math.max(0, Math.min(100, p)) + "%"; }
+  function log(msg) { els.debug.style.display="block"; els.debug.textContent += (msg + "\n"); }
+
+  async function syncNow() { 
+    try{
+      els.statusText.textContent = "同期開始…";
+      els.debug.textContent=""; els.debug.style.display="none";
+      setBar(8); showModal(true);
+
+      const res = await fetch(GAS_URL + "?action=pull", { cache:"no-store" });
+      setBar(35);
+      if(!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+      const json = await res.json().catch(e=>{ throw new Error("JSON parse error: "+e.message); });
+      setBar(55);
+      if(!json || json.ok===false) throw new Error("GAS error: " + (json && json.error || "unknown"));
+
+      const rows = Array.isArray(json.data) ? json.data : [];
+      const byCity = Object.fromEntries(cityKeys.map(k=>[k, {total:0, done:0, stop:0, skip:0}]));
+      for(const r of rows) { 
+        // 柔軟に city を拾う
+        const c = r.city || r.city_name || r["市区町村"] || r["エリア"] || "";
+        if(byCity[c] !== undefined) byCity[c].total += 1;
+      }
+      // 反映
+      for(const ck of cityKeys){
+        const map = els.ids[ck];
+        const v = byCity[ck] || {total:0,done:0,stop:0,skip:0};
+        for(const k of ["total","done","stop","skip"]) { 
+          const el = document.querySelector(map[k]); if(el) el.textContent = v[k]|0;
+        }
+      }
+
+      els.statusText.textContent = "同期完了";
+      setBar(100); setTimeout(()=>showModal(false), 300);
+    }catch(err){
+      showModal(false);
+      els.statusText.textContent = "同期失敗";
+      alert("同期失敗: " + err.message);
+      log("[ERROR] " + err.stack);
+    }
+  }
+
+  els.syncBtn.addEventListener("click", syncNow);
+  els.recalcBtn.addEventListener("click", ()=>{ els.statusText.textContent="再計算（ロールバック版）"; });
   </script>
 </body>
 </html>
