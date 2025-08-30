@@ -7,8 +7,8 @@
 :root {
   --accent: #2b6bf6;
   --pink: #ffe6ec;
-  --gray-bg: #c9c9c9;
-  --yellow: #ffe48a;
+  --gray-bg: #999999;
+  --yellow: #ffc107;
   --border: #e5e7eb;
   --fg: #0f172a;
   --muted: #64748b;
@@ -287,3 +287,14 @@ body {
 /* done checkbox size */
 .donebox{ width:18px; height:18px; margin-right:8px; }
 .right{ display:flex; align-items:center; gap:10px; }
+
+/* dropdown for state selection */
+.state-dropdown{
+  position:absolute; z-index:9999; background:#fff; color:#222;
+  border:1px solid #ccc; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.2);
+  min-width:140px; overflow:hidden;
+}
+.state-dropdown button{
+  display:block; width:100%; text-align:left; padding:10px 12px; border:0; background:#fff; font-size:14px;
+}
+.state-dropdown button:hover{ background:#f2f2f2; }

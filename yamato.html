@@ -83,19 +83,52 @@
           const right=document.createElement('div');
           const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
           const stateBtn=document.createElement('button'); stateBtn.className='checkbox';
-          const setStateLabel = ()=>{ stateBtn.textContent = (it.state==='stopped')?'停止':(it.state==='skip'?'不要':'通常'); };
+          const labelFromState = (s)=> s==='stopped'?'停止':(s==='skip'?'不要':'通常');
+          const setStateLabel = ()=>{ stateBtn.textContent = labelFromState(it.state||'normal'); };
           setStateLabel();
-          stateBtn.addEventListener('click',()=>{
-            const next = it.state==='normal' ? 'stopped' : (it.state==='stopped' ? 'skip' : 'normal');
-            it.state = next; it.updatedAt = Date.now();
-            try{
-              const a = load(); // migrate(load())でも良いが軽量化
-              const t = a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate);
-              if(t){ t.state = it.state; t.status = t.done ? '済' : (t.state==='stopped'?'停':(t.state==='skip'?'不要':'')); t.updatedAt = it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); }
-            }catch(__){}
-            setStateLabel();
-            render();
-          });
+
+          // ドロップダウン生成
+          function openDropdown(ev){
+            closeDropdown();
+            const menu = document.createElement('div'); menu.className='state-dropdown';
+            const opts = [
+              {k:'normal', label:'通常'},
+              {k:'stopped', label:'停止'},
+              {k:'skip', label:'不要'}
+            ];
+            opts.forEach(o=>{
+              const b=document.createElement('button'); b.textContent=o.label;
+              b.addEventListener('click', (e)=>{
+                it.state = o.k; it.updatedAt = Date.now();
+                try{
+                  const a = load();
+                  const t = a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate);
+                  if(t){ t.state = it.state; t.status = t.done ? '済' : (t.state==='stopped'?'停':(t.state==='skip'?'不要':'')); t.updatedAt = it.updatedAt; localStorage.setItem('junkai:items', JSON.stringify(a)); }
+                }catch(__){}
+                setStateLabel();
+                closeDropdown();
+                render();
+              });
+              menu.appendChild(b);
+            });
+            document.body.appendChild(menu);
+            const r = stateBtn.getBoundingClientRect();
+            menu.style.left = (window.scrollX + r.left) + 'px';
+            menu.style.top = (window.scrollY + r.bottom + 6) + 'px';
+            // 外側クリックで閉じる
+            setTimeout(()=>{
+              document.addEventListener('click', onDocClick, { once:true });
+            }, 0);
+            function onDocClick(e){
+              if(!menu.contains(e.target)) closeDropdown();
+            }
+            stateBtn._menu = menu;
+          }
+          function closeDropdown(){
+            if(stateBtn._menu){ stateBtn._menu.remove(); stateBtn._menu = null; }
+          }
+
+          stateBtn.addEventListener('click',(e)=>{ e.stopPropagation(); openDropdown(e); });
           right.appendChild(stateBtn);
           row1.appendChild(right);
           itemEl.appendChild(row1);
