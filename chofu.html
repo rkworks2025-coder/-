@@ -16,138 +16,174 @@
     <section id="list" class="list"></section>
     <p id="empty" class="empty">まだ同期されていません</p>
   </div>
-  
-  
-  
   <script>
-  (function(){ 
-    const CITY = '調布市';
-    const $ = (s,r=document)=>r.querySelector(s);
-    const KEYS = ['junkai:items','junkai:items:v2'];
 
-    function loadItems(){ 
-      for(const k of KEYS){ try{ const s=localStorage.getItem(k); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(_ ){} }
-      return [];
+    // === GAS helpers ===
+    const GAS_URL = (window.GAS_URL||'').trim();
+    async function gasPull(){
+      if(!GAS_URL) return null;
+      try{
+        const res = await fetch(GAS_URL + '?action=pull', {method:'GET', mode:'cors', credentials:'omit'});
+        if(!res.ok) return null;
+        const data = await res.json();
+        const set = new Set();
+        if (Array.isArray(data.checked)) {
+          data.checked.forEach(x=> set.add(String(x)));
+        } else if (data && Array.isArray(data.InspectionLog)) {
+          data.InspectionLog.forEach(row=>{
+            if(row.checked || row.done){
+              const key = String(row.city||'') + '|' + String(row.plate||row.index||'');
+              set.add(key);
+            }
+          });
+        }
+        return {checked:set};
+      }catch(_){ return null; }
     }
-    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); }catch(_ ){} }
-    function migrate(items){
-      let changed=false;
-      items.forEach(it=>{ 
-        if(typeof it.state==='undefined'){ const st=it.status||''; it.state = (st==='停')?'stopped':(st==='不要'?'skip':'normal'); changed=true; }
-        if(typeof it.done==='undefined'){ it.done = (it.status==='済')?1:0; changed=true; }
-        it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
+    function makePullKey(it){ return String(it.city||'') + '|' + String(it.plate||it.index||''); }
+    async function applyCheckedFromServer(items){
+      const pulled = await gasPull();
+      if(!pulled) return items;
+      const set = pulled.checked;
+      items.forEach(it=>{
+        const k = makePullKey(it);
+        if(set.has(k)){ it.done = 1; it.status = '済'; it.updatedAt = it.updatedAt || Date.now(); }
       });
-      if(changed) saveItems(items);
       return items;
     }
-    function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getMonth()+1).padStart(2,'0'); const D=String(d.getDate()).padStart(2,'0'); const h=String(d.getHours()).padStart(2,'0'); const m=String(d.getMinutes()).padStart(2,'0'); return `${M}/${D} ${h}:${m}`; }
-
-function normKeyPart(s){ return String(s||'').replace(/\s+/g,'').replace(/巡回/g,'').toLowerCase(); }
-function makeKey(it){ return [normKeyPart(it.city), normKeyPart(it.station), normKeyPart(it.model), normKeyPart(it.plate)].join('|'); }
-function loadOverrides(){
-  try{ const s = localStorage.getItem('junkai:overrides'); return s? JSON.parse(s): {}; }catch(_){ return {}; }
-}
-function saveOverrides(obj){
-  try{ localStorage.setItem('junkai:overrides', JSON.stringify(obj)); }catch(_){}
-}
-
-
-    function applyClass(el,it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
-    function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc107', green='#d8f0df'; let bg=green; if(it.state==='stopped') bg=gray; else if(it.state==='skip') bg=yellow; else if(it.done) bg=pink; el.style.backgroundColor=bg; }
-
-    const LOG_LS_KEY='junkai:pendingLogs';
-    function getLogUrl(){ try{ return localStorage.getItem('junkai:LOG_URL')||''; }catch(_ ){ return ''; } }
-    function loadQueue(){ try{ const s=localStorage.getItem(LOG_LS_KEY); return s?JSON.parse(s):[]; }catch(_ ){ return []; } }
-    function saveQueue(q){ try{ localStorage.setItem(LOG_LS_KEY, JSON.stringify(q)); }catch(_ ){} }
-    async function trySend(rec){ const u=getLogUrl(); if(!u) return false; try{ const r=await fetch(u+'?action=log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rec),mode:'cors',credentials:'omit'}); return r.ok; }catch(_ ){ return false; } }
-    async function flushQueue(){ let q=loadQueue(); if(!q.length) return; const next=[]; for(const rec of q){ const ok=await trySend(rec); if(!ok) next.push(rec); } saveQueue(next); }
-    function enqueueLog(rec){ const q=loadQueue(); q.push(rec); saveQueue(q); flushQueue(); }
-    window.addEventListener('focus', flushQueue);
-
-    function getInspectUrl(){ try{ return localStorage.getItem('junkai:INSPECT_URL')||''; }catch(_ ){ return ''; } }
-
-    function render(){ 
-      const all = migrate(loadItems());
-      const listEl = document.querySelector('#list'); const emptyEl = document.querySelector('#empty');
-      const norm = s=> (s||'').replace(/\s+/g,'').replace('巡回','');
-      const items = all.filter(it=> norm(it.city) === norm(CITY) );
-      // merge overrides (persisted per-item)
-      const ov = loadOverrides();
-      items.forEach(it=>{
-        const k = makeKey(it);
-        const o = ov[k];
-        if(o){
-          if(typeof o.done !== 'undefined') it.done = o.done;
-          if(typeof o.updatedAt !== 'undefined') it.updatedAt = o.updatedAt;
-          if(typeof o.state !== 'undefined') it.state = o.state;
-          if(typeof o.status !== 'undefined') it.status = o.status;
-        }
-      });
-
-      // sort on render: unchecked first, then station, then plate
-      items.sort((a,b)=> (a.done - b.done) || String(a.station||'').localeCompare(String(b.station||'')) || String(a.plate||'').localeCompare(String(b.plate||'')) );
-      listEl.innerHTML='';
-      if(!items.length){ if(emptyEl) emptyEl.textContent='まだ同期されていません'; const c=document.querySelector('#counter'); if(c) c.textContent='0/0 (0%)'; return; }
-      if(emptyEl) emptyEl.textContent='';
-      let done=0; items.forEach(it=>{ if(it.done) done++; });
-      const c=document.querySelector('#counter'); if(c) c.textContent = `${done}/${items.length} (${ Math.floor(done*100/items.length) }%)`;
-
-      items.forEach((it,idx)=>{ 
-        const itemEl=document.createElement('div'); itemEl.className='item card'; applyClass(itemEl,it); applyVisual(itemEl,it);
-        const row1=document.createElement('div'); row1.className='row1';
-        const left=document.createElement('div'); left.className='left';
-        const lead=document.createElement('span'); lead.className='lead';
-        const idxSpan=document.createElement('span'); idxSpan.className='idx'; idxSpan.textContent=String(idx+1);
-        const doneBox=document.createElement('input'); doneBox.type='checkbox'; doneBox.className='checkbox'; doneBox.checked=!!it.done;
-        lead.appendChild(idxSpan); lead.appendChild(doneBox);
-        const stationSpan=document.createElement('span'); stationSpan.textContent=it.station||'';
-        left.appendChild(lead); left.appendChild(stationSpan);
-        row1.appendChild(left);
-
-        const right=document.createElement('div'); right.className='right';
-        const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
-        const sel=document.createElement('select'); sel.className='state-select';
-        [['normal','通常'],['stopped','停止'],['skip','不要']].forEach(p=>{ const op=document.createElement('option'); op.value=p[0]; op.textContent=p[1]; sel.appendChild(op); });
-        sel.value=it.state||'normal';
-        const inspectBtn=document.createElement('button'); inspectBtn.className='inspect-btn'; inspectBtn.textContent='点検';
-        right.appendChild(dateSpan); right.appendChild(sel); right.appendChild(inspectBtn);
-        row1.appendChild(right);
-        itemEl.appendChild(row1);
-
-        const row2=document.createElement('div'); row2.className='row2';
-        const spacer=document.createElement('span'); spacer.className='lead';
-        const plateSpan=document.createElement('span'); plateSpan.className='kv'; plateSpan.innerHTML = `${it.plate||''}`;
-        const modelSpan=document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `${it.model||''}`;
-        row2.appendChild(spacer); row2.appendChild(plateSpan); row2.appendChild(modelSpan);
-        itemEl.appendChild(row2);
-
-        doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } 
-          it.done = ev.target.checked ? 1 : 0;
-          it.updatedAt = ev.target.checked ? Date.now() : null;
-          it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
-          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status; saveItems(a); } }catch(_ ){}
-          if(it.done) enqueueLog({ timestamp: it.updatedAt, city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', state: it.state||'normal', done:1 });
-          dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
-          applyClass(itemEl,it); applyVisual(itemEl,it);
-        });
-
-        sel.addEventListener('change',()=>{ it.state=sel.value; it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':'')); it.updatedAt=Date.now();
-          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.status=it.status; t.updatedAt=it.updatedAt; saveItems(a); } }catch(_ ){}
-          applyClass(itemEl,it); applyVisual(itemEl,it);
-        });
-
-        inspectBtn.addEventListener('click',()=>{ const base=getInspectUrl(); if(!base){ alert('点検URLが未設定です'); return; } const q=new URLSearchParams({ station:it.station||'', model:it.model||'', plate:it.plate||'' }).toString(); const url=base+(base.indexOf('?')>=0?'&':'?')+q; try{ window.open(url,'_blank'); }catch(_ ){ window.location.href=url; } });
-
-        listEl.appendChild(itemEl);
-      });
+    async function postToggle(it){
+      if(!GAS_URL) return;
+      try{
+        await fetch(GAS_URL+'?action=toggle', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', index: (typeof it.index!=='undefined'?it.index:null), checked: !!it.done, ts: it.updatedAt })});
+      }catch(_){}
     }
+    // === /GAS helpers ===
 
-    document.addEventListener('DOMContentLoaded', render);
-    window.addEventListener('storage', render);
-  })();
+    (function() {
+      const CITY = '調布市';
+      const LS_KEY = 'junkai:items:v2';
+      const statuses = ['', '済', '停', '不要'];
+      const $ = (sel) => document.querySelector(sel);
+      function load() {
+        try {
+          const str = localStorage.getItem(LS_KEY);
+          return str ? JSON.parse(str) : [];
+        } catch (e) {
+          return [];
+        }
+      }
+      function save(items) {
+        localStorage.setItem(LS_KEY, JSON.stringify(items));
+      }
+      function format(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${m}/${day} ${hh}:${mm}`;
+      }
+      function nextStatus(current) {
+        const idx = statuses.indexOf(current || '');
+        return statuses[(idx + 1) % statuses.length];
+      }
+      async function render(firstLoad) {
+        const listEl = $('#list');
+        const emptyEl = $('#empty');
+        const counterEl = $('#counter');
+        const allItems = load();
+        const items = allItems.filter(it => it.city === CITY);
+        if (!items || items.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          counterEl.textContent = '';
+          return;
+        }
+        emptyEl.style.display = 'none';
+        listEl.innerHTML = '';
+        let doneCount = 0;
+        items.forEach((it) => {
+          if (it.status === '済') doneCount++;
+        });
+        counterEl.textContent = `${doneCount}/${items.length}`;
+        items.forEach((it, idx) => {
+          const itemEl = document.createElement('div');
+          itemEl.className = 'item';
+          if (it.status === '済') itemEl.classList.add('done');
+          else if (it.status === '停') itemEl.classList.add('stop');
+          else if (it.status === '不要') itemEl.classList.add('skip');
+          const row1 = document.createElement('div');
+          row1.className = 'row1';
+          const left = document.createElement('div');
+          left.className = 'left';
+          const idxSpan = document.createElement('span');
+          idxSpan.className = 'idx';
+          idxSpan.textContent = String(idx + 1);
+          const chk = document.createElement('button');
+          chk.className = 'checkbox';
+          if (it.status === '済') {
+            chk.classList.add('checked');
+            chk.textContent = '✓';
+          } else if (it.status === '停') {
+            chk.classList.add('stop');
+            chk.textContent = '停';
+          } else if (it.status === '不要') {
+            chk.classList.add('skip');
+            chk.textContent = '不要';
+          }
+          chk.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const newStatus = nextStatus(it.status);
+            it.status = newStatus;
+            it.updatedAt = new Date().getTime();
+            const list = load();
+            for (let j = 0; j < list.length; j++) {
+              const obj = list[j];
+              if (obj.city === it.city && obj.station === it.station && obj.model === it.model && obj.plate === it.plate) {
+                list[j].status = newStatus;
+                list[j].updatedAt = it.updatedAt;
+                break;
+              }
+            }
+            save(list);
+            render();
+          });
+          left.appendChild(idxSpan);
+          left.appendChild(chk);
+          const stationSpan = document.createElement('span');
+          stationSpan.textContent = it.station || '';
+          left.appendChild(stationSpan);
+          row1.appendChild(left);
+          const dateSpan = document.createElement('span');
+          dateSpan.className = 'date';
+          dateSpan.textContent = format(it.updatedAt);
+          row1.appendChild(dateSpan);
+          itemEl.appendChild(row1);
+          const row2 = document.createElement('div');
+          row2.className = 'row2';
+          const modelSpan = document.createElement('span');
+          modelSpan.className = 'kv';
+          const mdl = document.createElement('b');
+          mdl.textContent = '';
+          modelSpan.appendChild(mdl);
+          modelSpan.appendChild(document.createTextNode(it.model || '-'));
+          row2.appendChild(modelSpan);
+          const plateSpan = document.createElement('span');
+          plateSpan.className = 'kv';
+          const pl = document.createElement('b');
+          pl.textContent = '';
+          plateSpan.appendChild(pl);
+          plateSpan.appendChild(document.createTextNode(it.plate || '-'));
+          row2.appendChild(plateSpan);
+          itemEl.appendChild(row2);
+          listEl.appendChild(itemEl);
+        });
+      }
+      document.addEventListener('DOMContentLoaded', ()=>render(true));
+      window.addEventListener('storage', render);
+    })();
   </script>
-    
-
-
 </body>
 </html>
