@@ -26,7 +26,7 @@
     const GAS_URL = (window.GAS_URL||'').trim();
     function normK(s){ return String(s||'').replace(/\s+/g,'').replace(/-/g,'').toLowerCase(); }
     function makePullKey(it){ return normK(it.city)+'|'+normK(it.plate||it.index||''); }
-    function setStatus(msg){ try{ const el=document.getElementById('gasStatus'); if(el) el.textContent = 'GAS: ' + msg; }catch(_){ } }
+    function setStatus(msg){ try{ const el=document.getElementById('gasStatus'); if(el) el.textContent = 'GAS: ' + msg; }catch(_{}){ } }
     async function gasPull(){
       if(!GAS_URL){ setStatus('no GAS_URL'); return null; }
       try{
