@@ -22,13 +22,25 @@
       }
     }
     // === /GAS pull ===
-window.GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';</script>
+window.GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+<script>
+function ensureNoDataVisibility(){
+  var noDataEl = document.getElementById('noData') || document.querySelector('.no-data');
+  var cards = document.querySelectorAll('.card');
+  if(noDataEl){
+    noDataEl.style.display = cards.length ? 'none' : '';
+  }
+}
+document.addEventListener('readystatechange', ()=>{ if(document.readyState==='complete'){ ensureNoDataVisibility(); } });
+</script>
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>海老名市 巡回</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<div id="syncBadge" style="position:sticky;top:0;right:0;z-index:9999;font-size:12px;padding:4px 8px;background:#eef5ff;border-bottom:1px solid #cfe3ff;display:none;">同期中…</div>
   <header class="appbar">
     <a href="index.html" class="backlink">← 戻る</a>
     <div class="title">海老名市 巡回</div>
@@ -165,7 +177,7 @@ function saveOverrides(obj){
       });
     }
 
-    document.addEventListener('DOMContentLoaded', ()=>render(true));
+    document.addEventListener('DOMContentLoaded', async ()=>{ render(false); const b=document.getElementById('syncBadge'); if(b) b.style.display='block'; await render(true); if(b) b.style.display='none'; });
     window.addEventListener('storage', render);
   })();
   </script>
