@@ -21,6 +21,41 @@
   
   
   <script>
+
+    // === GAS helpers (debug) ===
+    const GAS_URL = (window.GAS_URL||'').trim();
+    function normK(s){ return String(s||'').replace(/\s+/g,'').replace(/-/g,'').toLowerCase(); }
+    function makePullKey(it){ return normK(it.city)+'|'+normK(it.plate||it.index||''); }
+    function setStatus(msg){ try{ const el=document.getElementById('gasStatus'); if(el) el.textContent = 'GAS: ' + msg; }catch(_){ } }
+    async function gasPull(){
+      if(!GAS_URL){ setStatus('no GAS_URL'); return null; }
+      try{
+        const res = await fetch(GAS_URL + '?action=pull', {method:'GET', mode:'cors', credentials:'omit'});
+        if(!res.ok){ setStatus('pull NG ('+res.status+')'); return null; }
+        const data = await res.json();
+        const set = new Set();
+        if (Array.isArray(data.checked)) data.checked.forEach(x=> set.add(String(x).toLowerCase()));
+        setStatus('pull OK • checked=' + set.size);
+        return {checked:set};
+      }catch(err){
+        setStatus('pull error');
+        return null;
+      }
+    }
+    async function postToggle(it){
+      if(!GAS_URL){ setStatus('no GAS_URL'); return; }
+      try{
+        const res = await fetch(GAS_URL+'?action=toggle', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', index: (typeof it.index!=='undefined'?it.index:null), checked: !!it.done, ts: it.updatedAt })
+        });
+        setStatus('toggle ' + (res.ok?'OK':'NG'));
+      }catch(err){
+        setStatus('toggle error');
+      }
+    }
+    // === /helpers ===
+
   (function(){ 
     const CITY = '大和市';
     const $ = (s,r=document)=>r.querySelector(s);
@@ -67,8 +102,9 @@ function saveOverrides(obj){
 
     function getInspectUrl(){ try{ return localStorage.getItem('junkai:INSPECT_URL')||''; }catch(_ ){ return ''; } }
 
-    function render(){ 
-      const all = migrate(loadItems());
+    async function render(firstLoad){ 
+      let all = migrate(loadItems());
+      if(firstLoad){ const pulled = await gasPull(); if(pulled){ const set=pulled.checked; all.forEach(it=>{ if(set.has(makePullKey(it))) it.done=1; }); } }
       const listEl = document.querySelector('#list'); const emptyEl = document.querySelector('#empty');
       const norm = s=> (s||'').replace(/\s+/g,'').replace('巡回','');
       const items = all.filter(it=> norm(it.city) === norm(CITY) );
@@ -107,7 +143,8 @@ function saveOverrides(obj){
 
         const right=document.createElement('div'); right.className='right';
         const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
-        const sel=document.createElement('select'); sel.className='state-select';
+        postToggle(it);
+          const sel=document.createElement('select'); sel.className='state-select';
         [['normal','通常'],['stopped','停止'],['skip','不要']].forEach(p=>{ const op=document.createElement('option'); op.value=p[0]; op.textContent=p[1]; sel.appendChild(op); });
         sel.value=it.state||'normal';
         const inspectBtn=document.createElement('button'); inspectBtn.className='inspect-btn'; inspectBtn.textContent='点検';
@@ -129,6 +166,7 @@ function saveOverrides(obj){
           try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status; saveItems(a); } }catch(_ ){}
           if(it.done) enqueueLog({ timestamp: it.updatedAt, city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', state: it.state||'normal', done:1 });
           dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
+          postToggle(it);
           applyClass(itemEl,it); applyVisual(itemEl,it);
         });
 
@@ -143,7 +181,7 @@ function saveOverrides(obj){
       });
     }
 
-    document.addEventListener('DOMContentLoaded', render);
+    document.addEventListener('DOMContentLoaded', ()=>render(true));
     window.addEventListener('storage', render);
   })();
   </script>
