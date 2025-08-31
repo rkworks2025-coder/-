@@ -313,33 +313,5 @@
 })();
 </script>
 
-
-<script>
-(function(){
-  function killLegacyButtons(){
-    var labels = ['再計算','JSON','保存','復元'];
-    var btns = Array.from(document.querySelectorAll('button, a, .btn'));
-    btns.forEach(function(el){
-      try{
-        var t = (el.textContent||'').trim();
-        if(!t) return;
-        var hit = labels.some(function(k){ return t.indexOf(k) !== -1; });
-        if(hit){
-          // extra guard: only remove small control buttons, not big containers
-          if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button' || /btn/i.test(el.className||'')){
-            el.remove();
-          }
-        }
-      }catch(_){}
-    });
-  }
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', killLegacyButtons);
-  }else{
-    killLegacyButtons();
-  }
-})();
-</script>
-
 </body>
 </html>
