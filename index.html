@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ja">
 <head>
+<script>window.GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>巡回リスト</title>
+  <title>巡回リスト (v4)</title>
   <link rel="stylesheet" href="style.css" />
-<script>window.GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';</script>
 </head>
 <body>
   <div class="appbar">
@@ -47,7 +47,8 @@
   </div>
   <script>
     (function() {
-      const GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+      const INSPECT_URL = '';
+      const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
       const LS_KEY = 'junkai:items:v2';
 
       const $ = (sel) => document.querySelector(sel);
@@ -211,6 +212,9 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
+  try{ localStorage.setItem('junkai:LOG_URL', GAS_URL);
+  try{ localStorage.setItem('junkai:INSPECT_URL', INSPECT_URL); }catch(_){ } }catch(_){ }
+
         document.getElementById('syncBtn').addEventListener('click', sync);
         document.getElementById('recalcBtn').addEventListener('click', recalc);
         document.getElementById('exportJson').addEventListener('click', exportJson);

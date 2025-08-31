@@ -4,11 +4,11 @@
  * 各行の状態に応じた色分けやプログレスバーの表示を含みます。
  */
 
-:root {
+:root{--leadw:96px;
   --accent: #2b6bf6;
   --pink: #ffe6ec;
-  --gray-bg: #f2f3f5;
-  --yellow: #fff7e5;
+  --gray-bg: #b3b3b3;
+  --yellow: #ffc107;
   --border: #e5e7eb;
   --fg: #0f172a;
   --muted: #64748b;
@@ -127,7 +127,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   margin-bottom: 12px;
-  background: #fff;
+  background: #d8f0df;
   transition: background 0.2s;
 }
 
@@ -283,3 +283,52 @@ body {
   font-size: 14px;
   text-align: center;
 }
+
+/* done checkbox size */
+.donebox{ width:18px; height:18px; margin-right:8px; }
+.right{ display:flex; align-items:center; gap:10px; }
+
+/* dropdown for state selection */
+.state-dropdown{
+  position:absolute; z-index:9999; background:#fff; color:#222;
+  border:1px solid #ccc; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.2);
+  min-width:140px; overflow:hidden;
+}
+.state-dropdown button{
+  display:block; width:100%; text-align:left; padding:10px 12px; border:0; background:#fff; font-size:14px;
+}
+.state-dropdown button:hover{ background:#f2f2f2; }
+
+/* state select dropdown */
+.state-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;border:1px solid #ccc;border-radius:8px;padding:6px 22px 6px 10px;font-size:13px;background:#fff;color:#222;display:inline-flex;align-items:center;justify-content:center;height:28px;line-height:28px;min-width:120px;}
+/* simple caret */
+.state-select:after{ content:''; position:absolute; right:10px; top:50%; transform:translateY(-50%); }
+
+/* align + indent */
+.row1{ display:flex; align-items:center; justify-content:space-between; }
+.left{ display:flex; align-items:center; gap:8px; }
+.right{ display:flex; align-items:center; gap:10px; }
+.lead{ display:inline-flex; align-items:center; gap:8px; width:var(--leadw); } /* idx+checkboxぶんの幅 */
+.row2{ display:flex; align-items:center; gap:12px; margin-top:6px; }
+.row2 .lead{ visibility:hidden; } /* インデント用ダミー */
+
+/* state select vertical center & size */
+.state-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;border:1px solid #ccc;border-radius:8px;padding:6px 22px 6px 10px;font-size:13px;background:#fff;color:#222;display:inline-flex;align-items:center;justify-content:center;height:28px;line-height:28px;min-width:120px;}
+/* 灰カード時は文字を黒系に */
+.item.stop, .item.stop *{ color:#000 !important; }
+/* 黄色も少しコントラスト確保 */
+.item.skip{ color:#222 !important; }
+
+/* enforce compact size for state-select */
+select.state-select{
+  height:24px !important; line-height:24px !important;
+  min-width:110px !important; font-size:12px !important;
+  padding:2px 16px 2px 8px !important; margin:0 !important;
+}
+
+/* inspect button */
+.inspect-btn{
+  border:1px solid #2a7; border-radius:8px; padding:6px 10px; background:#fff; color:#2a7;
+  font-size:13px; line-height:1; display:inline-flex; align-items:center; justify-content:center; min-width:64px;
+}
+.inspect-btn:active{ opacity:.8; }
