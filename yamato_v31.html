@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ja">
+<head>
+
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+<script>
+
+    // === GAS pull (read-only) ===
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+    function normK(s){ return String(s||'').replace(/\s+/g,'').replace(/-/g,'').toLowerCase(); }
+    function makeKey(city, plate){ return normK(city)+'|'+normK(plate||''); }
+    function keyOfItem(it){ return makeKey(it.city, it.plate||it.index||''); }
+    async function gasPull(){ 
+      if(!GAS_URL) return null;
+      try{ 
+        const res = await fetch(GAS_URL + '?action=pull', {method:'GET', mode:'cors', credentials:'omit'});
+        if(!res.ok) return null;
+        const data = await res.json();
+        const set = new Set();
+        if(Array.isArray(data.checked)){ data.checked.forEach(v=> set.add(String(v).toLowerCase().replace(/\s+/g,'').replace(/-/g,''))); }
+        return {checked:set};
+      }catch(_){
+        return null;
+      }
+    }
+    // === /GAS pull ===
+window.GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+<script>
+function ensureNoDataVisibility(){
+  var noDataEl = document.getElementById('noData') || document.querySelector('.no-data');
+  var cards = document.querySelectorAll('.card');
+  if(noDataEl){
+    noDataEl.style.display = cards.length ? 'none' : '';
+  }
+}
+document.addEventListener('readystatechange', ()=>{ if(document.readyState==='complete'){ ensureNoDataVisibility(); } });
+
+    function publishSummary(city, done, total){
+      try{
+        const key = 'junkai:summary';
+        const s = localStorage.getItem(key);
+        const cur = s ? JSON.parse(s) : {};
+        const label = (city.indexOf('大和')===0)? 'yamato' : (city.indexOf('海老名')===0)? 'ebina' : (city.indexOf('調布')===0)? 'chofu' : null;
+        if(label){
+          cur[label] = { done: done, total: total, ts: Date.now() };
+          localStorage.setItem(key, JSON.stringify(cur));
+        }
+      }catch(_){}
+    }
+
+</script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>大和市 巡回</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="syncBadge" style="position:sticky;top:0;right:0;z-index:9999;font-size:12px;padding:4px 8px;background:#eef5ff;border-bottom:1px solid #cfe3ff;display:none;">同期中…</div>
+  <header class="appbar">
+    <a href="index.html" class="backlink">← 戻る</a>
+    <div class="title">大和市 巡回</div>
+    <span id="counter" class="counter"></span>
+  </header>
+  <div class="wrap">
+    <section id="list" class="list"></section>
+    <p id="empty" class="empty">まだ同期されていません</p>
+  </div>
+  
+  
+  
+  <script>
+  (function(){ 
+    const CITY = '大和市';
+    const $ = (s,r=document)=>r.querySelector(s);
+    const KEYS = ['junkai:items','junkai:items:v2'];
+
+    function loadItems(){ 
+      for(const k of KEYS){ try{ const s=localStorage.getItem(k); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(_ ){} }
+      return [];
+    }
+    function saveItems(a){ try{ localStorage.setItem('junkai:items', JSON.stringify(a)); }catch(_ ){} }
+    function migrate(items){
+      let changed=false;
+      items.forEach(it=>{ 
+        if(typeof it.state==='undefined'){ const st=it.status||''; it.state = (st==='停')?'stopped':(st==='不要'?'skip':'normal'); changed=true; }
+        if(typeof it.done==='undefined'){ it.done = (it.status==='済')?1:0; changed=true; }
+        it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
+      });
+      if(changed) saveItems(items);
+      return items;
+    }
+    function fmt(ts){ if(!ts) return ''; const d=new Date(ts); const M=String(d.getMonth()+1).padStart(2,'0'); const D=String(d.getDate()).padStart(2,'0'); const h=String(d.getHours()).padStart(2,'0'); const m=String(d.getMinutes()).padStart(2,'0'); return `${M}/${D} ${h}:${m}`; }
+
+function normKeyPart(s){ return String(s||'').replace(/\s+/g,'').replace(/巡回/g,'').toLowerCase(); }
+function makeKey(it){ return [normKeyPart(it.city), normKeyPart(it.station), normKeyPart(it.model), normKeyPart(it.plate)].join('|'); }
+function loadOverrides(){
+  try{ const s = localStorage.getItem('junkai:overrides'); return s? JSON.parse(s): {}; }catch(_){ return {}; }
+}
+function saveOverrides(obj){
+  try{ localStorage.setItem('junkai:overrides', JSON.stringify(obj)); }catch(_){}
+}
+
+
+    function applyClass(el,it){ el.classList.remove('stop','skip','done'); if(it.state==='stopped') el.classList.add('stop'); else if(it.state==='skip') el.classList.add('skip'); if(it.done) el.classList.add('done'); }
+    function applyVisual(el,it){ const pink='#ffd1e1', gray='#b3b3b3', yellow='#ffc107', green='#d8f0df'; let bg=green; if(it.state==='stopped') bg=gray; else if(it.state==='skip') bg=yellow; else if(it.done) bg=pink; el.style.backgroundColor=bg; }
+
+    const LOG_LS_KEY='junkai:pendingLogs';
+    function getLogUrl(){ try{ return localStorage.getItem('junkai:LOG_URL')||''; }catch(_ ){ return ''; } }
+    function loadQueue(){ try{ const s=localStorage.getItem(LOG_LS_KEY); return s?JSON.parse(s):[]; }catch(_ ){ return []; } }
+    function saveQueue(q){ try{ localStorage.setItem(LOG_LS_KEY, JSON.stringify(q)); }catch(_ ){} }
+    async function trySend(rec){ const u=getLogUrl(); if(!u) return false; try{ const r=await fetch(u+'?action=log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rec),mode:'cors',credentials:'omit'}); return r.ok; }catch(_ ){ return false; } }
+    async function flushQueue(){ let q=loadQueue(); if(!q.length) return; const next=[]; for(const rec of q){ const ok=await trySend(rec); if(!ok) next.push(rec); } saveQueue(next); }
+    function enqueueLog(rec){ const q=loadQueue(); q.push(rec); saveQueue(q); flushQueue(); }
+    window.addEventListener('focus', flushQueue);
+
+    function getInspectUrl(){ try{ return localStorage.getItem('junkai:INSPECT_URL')||''; }catch(_ ){ return ''; } }
+
+    async function render(firstLoad){ 
+      let all = migrate(loadItems());
+      if(firstLoad){ const pulled = await gasPull(); if(pulled){ const set=pulled.checked; all.forEach(it=>{ it.done = set.has(keyOfItem(it)) ? 1 : 0; it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':'')); }); }}
+      const listEl = document.querySelector('#list'); const emptyEl = document.querySelector('#empty');
+      const norm = s=> (s||'').replace(/\s+/g,'').replace('巡回','');
+      const items = all.filter(it=> norm(it.city) === norm(CITY) );
+      // merge overrides (persisted per-item)
+      const ov = loadOverrides();
+      items.forEach(it=>{
+        const k = makeKey(it);
+        const o = ov[k];
+        if(o){
+          if(typeof o.done !== 'undefined') it.done = o.done;
+          if(typeof o.updatedAt !== 'undefined') it.updatedAt = o.updatedAt;
+          if(typeof o.state !== 'undefined') it.state = o.state;
+          if(typeof o.status !== 'undefined') it.status = o.status;
+        }
+      });
+
+      // sort on render: unchecked first, then station, then plate
+      items.sort((a,b)=> (a.done - b.done) || String(a.station||'').localeCompare(String(b.station||'')) || String(a.plate||'').localeCompare(String(b.plate||'')) );
+      listEl.innerHTML='';
+      if(!items.length){ if(emptyEl) emptyEl.textContent='まだ同期されていません'; const c=document.querySelector('#counter'); if(c) c.textContent='0/0 (0%)'; return; }
+      if(emptyEl) emptyEl.textContent='';
+      let done=0; items.forEach(it=>{ if(it.done) done++; });
+      const c=document.querySelector('#counter'); if(c) c.textContent = `${done}/${items.length} (${ Math.floor(done*100/items.length) }%)`;
+
+      items.forEach((it,idx)=>{ 
+        const itemEl=document.createElement('div'); itemEl.className='item card'; applyClass(itemEl,it); applyVisual(itemEl,it);
+        const row1=document.createElement('div'); row1.className='row1';
+        const left=document.createElement('div'); left.className='left';
+        const lead=document.createElement('span'); lead.className='lead';
+        const idxSpan=document.createElement('span'); idxSpan.className='idx'; idxSpan.textContent=String(idx+1);
+        const doneBox=document.createElement('input'); doneBox.type='checkbox'; doneBox.className='checkbox'; doneBox.checked=!!it.done;
+        lead.appendChild(idxSpan); lead.appendChild(doneBox);
+        const stationSpan=document.createElement('span'); stationSpan.textContent=it.station||'';
+        left.appendChild(lead); left.appendChild(stationSpan);
+        row1.appendChild(left);
+
+        const right=document.createElement('div'); right.className='right';
+        const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
+        const sel=document.createElement('select'); sel.className='state-select';
+        [['normal','通常'],['stopped','停止'],['skip','不要']].forEach(p=>{ const op=document.createElement('option'); op.value=p[0]; op.textContent=p[1]; sel.appendChild(op); });
+        sel.value=it.state||'normal';
+        const inspectBtn=document.createElement('button'); inspectBtn.className='inspect-btn'; inspectBtn.textContent='点検';
+        right.appendChild(dateSpan); right.appendChild(sel); right.appendChild(inspectBtn);
+        row1.appendChild(right);
+        itemEl.appendChild(row1);
+
+        const row2=document.createElement('div'); row2.className='row2';
+        const spacer=document.createElement('span'); spacer.className='lead';
+        const plateSpan=document.createElement('span'); plateSpan.className='kv'; plateSpan.innerHTML = `${it.plate||''}`;
+        const modelSpan=document.createElement('span'); modelSpan.className='kv'; modelSpan.innerHTML = `${it.model||''}`;
+        row2.appendChild(spacer); row2.appendChild(plateSpan); row2.appendChild(modelSpan);
+        itemEl.appendChild(row2);
+
+        doneBox.addEventListener('change',(ev)=>{ if(!confirm('よろしいですか？')){ ev.target.checked=!ev.target.checked; return; } 
+          it.done = ev.target.checked ? 1 : 0;
+          it.updatedAt = ev.target.checked ? Date.now() : null;
+          it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':''));
+          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status; saveItems(a); } }catch(_ ){}
+          if(it.done) enqueueLog({ timestamp: it.updatedAt, city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', state: it.state||'normal', done:1 });
+          dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
+          applyClass(itemEl,it); applyVisual(itemEl,it);
+        });
+
+        sel.addEventListener('change',()=>{ it.state=sel.value; it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':'')); it.updatedAt=Date.now();
+          try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.state=it.state; t.status=it.status; t.updatedAt=it.updatedAt; saveItems(a); } }catch(_ ){}
+          applyClass(itemEl,it); applyVisual(itemEl,it);
+        });
+
+        inspectBtn.addEventListener('click',()=>{ const base=getInspectUrl(); if(!base){ alert('点検URLが未設定です'); return; } const q=new URLSearchParams({ station:it.station||'', model:it.model||'', plate:it.plate||'' }).toString(); const url=base+(base.indexOf('?')>=0?'&':'?')+q; try{ window.open(url,'_blank'); }catch(_ ){ window.location.href=url; } });
+
+        listEl.appendChild(itemEl);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', async ()=>{ render(false); const b=document.getElementById('syncBadge'); if(b) b.style.display='block'; try{ await render(true); } finally { if(b) b.style.display='none'; setTimeout(()=>{ if(b) b.style.display='none'; }, 3000); } });
+    window.addEventListener('storage', render);
+  })();
+  
+    function publishSummary(city, done, total){
+      try{
+        const key = 'junkai:summary';
+        const s = localStorage.getItem(key);
+        const cur = s ? JSON.parse(s) : {};
+        const label = (city.indexOf('大和')===0)? 'yamato' : (city.indexOf('海老名')===0)? 'ebina' : (city.indexOf('調布')===0)? 'chofu' : null;
+        if(label){
+          cur[label] = { done: done, total: total, ts: Date.now() };
+          localStorage.setItem(key, JSON.stringify(cur));
+        }
+      }catch(_){}
+    }
+
+</script>
+    
+
+
+
+<script>
+function afterFinalSummary(){
+  try{
+    const city = (typeof CITY!=='undefined'? CITY : '');
+    const cards = Array.from(document.querySelectorAll('.card'));
+    const total = cards.length;
+    const done = cards.filter(el=> el.classList.contains('done') || el.style.backgroundColor && /pink/i.test(el.style.backgroundColor)).length
+                || (function(){ // fallback: count from checkbox
+                      let c=0; document.querySelectorAll('input[type="checkbox"]').forEach(ch=>{ if(ch.checked) c++; }); return c; })();
+    if(city && total>=0){ publishSummary(city, done, total); }
+  }catch(_){}
+}
+window.addEventListener('load', afterFinalSummary);
+</script>
+
+
+<script>
+(function(){
+  try{
+    if (location.hash && /clear/i.test(location.hash)){
+      ['junkai:items','junkai:items:v2','junkai:summary','junkai:overrides'].forEach(function(k){ try{ localStorage.removeItem(k);}catch(_){} });
+      sessionStorage && sessionStorage.clear && sessionStorage.clear();
+      alert('ローカル保存をクリアしました。ページを再読み込みします。');
+      location.hash=''; location.reload();
+    }
+  }catch(_){}
+})();
+</script>
+
+<div id="buildBadge" style="position:fixed;right:8px;bottom:6px;z-index:9999;font-size:10px;padding:3px 6px;background:rgba(0,0,0,0.05);border:1px solid rgba(0,0,0,0.1);border-radius:4px;">BUILD: v31_fast2+cache 20250831-0415</div>
+<div id="buildBadge" style="position:fixed;right:8px;bottom:6px;z-index:9999;font-size:11px;padding:4px 7px;background:#ffe7a3;border:1px solid #e0be55;border-radius:4px;">BUILD: FORCE 20250831-043242</div>
+</body>
+</html>
