@@ -3,17 +3,6 @@
 <head>
 <script>
 
-    // === Fixed display index per vehicle ===
-    function _stableIndex(it){
-      if (it && it.index !== undefined && it.index !== null && String(it.index) !== '') return String(it.index);
-      const s = String(it.city||'') + '|' + String(it.plate||it.index||'');
-      let h = 0;
-      for (let i=0;i<s.length;i++){ h = ((h<<5)-h) + s.charCodeAt(i); h |= 0; }
-      const num = Math.abs(h) % 100000; // 0..99999
-      return String(num);
-    }
-
-
     // === GAS pull (read-only) ===
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
     function normK(s){ return String(s||'').replace(/\s+/g,'').replace(/-/g,'').toLowerCase(); }
