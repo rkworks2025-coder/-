@@ -228,5 +228,20 @@ function afterFinalSummary(){
 window.addEventListener('load', afterFinalSummary);
 </script>
 
+
+<script>
+(function(){
+  try{
+    if (location.hash && /clear/i.test(location.hash)){
+      ['junkai:items','junkai:items:v2','junkai:summary','junkai:overrides'].forEach(function(k){ try{ localStorage.removeItem(k);}catch(_){} });
+      sessionStorage && sessionStorage.clear && sessionStorage.clear();
+      alert('ローカル保存をクリアしました。ページを再読み込みします。');
+      location.hash=''; location.reload();
+    }
+  }catch(_){}
+})();
+</script>
+
+<div id="buildBadge" style="position:fixed;right:8px;bottom:6px;z-index:9999;font-size:10px;padding:3px 6px;background:rgba(0,0,0,0.05);border:1px solid rgba(0,0,0,0.1);border-radius:4px;">BUILD: v31_fast2+cache 20250831-0415</div>
 </body>
 </html>
