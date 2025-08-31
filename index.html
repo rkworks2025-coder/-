@@ -12,7 +12,7 @@
     <div class="title">巡回リスト</div>
     <div class="btns">
       <button id="syncBtn" class="btn primary">同期</button>
-      
+      <button id="recalcBtn" class="btn">再計算</button>
     </div>
   </div>
   <div class="wrap">
@@ -33,7 +33,11 @@
     </section>
     <h2 class="hint" style="margin-top:20px;">全エリア達成度</h2>
     <div class="meta"><span id="overall-count">0/0 (0%)</span></div>
-    
+    <div class="actions">
+      <button id="exportJson">保存(JSON)</button>
+      <button id="importJson">読み込み(JSON)</button>
+      <input type="file" id="jsonFile" accept=".json" style="display:none" />
+    </div>
   </div>
   <div id="progressModal" class="progress-modal">
     <p id="progressMessage">同期中…</p>
@@ -170,6 +174,11 @@
         }
       }
 
+      function recalc() {
+        renderIndex();
+        $('#statusText').textContent = '再計算完了';
+      }
+
       function exportJson() {
         const items = loadItems();
         const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
@@ -207,7 +216,7 @@
   try{ localStorage.setItem('junkai:INSPECT_URL', INSPECT_URL); }catch(_){ } }catch(_){ }
 
         document.getElementById('syncBtn').addEventListener('click', sync);
-        document.getElementById('recalcBtn').
+        document.getElementById('recalcBtn').addEventListener('click', recalc);
         document.getElementById('exportJson').addEventListener('click', exportJson);
         document.getElementById('importJson').addEventListener('click', () => {
           document.getElementById('jsonFile').click();
@@ -301,6 +310,34 @@
       }
     });
   });
+})();
+</script>
+
+
+<script>
+(function(){
+  function killLegacyButtons(){
+    var labels = ['再計算','JSON','保存','復元'];
+    var btns = Array.from(document.querySelectorAll('button, a, .btn'));
+    btns.forEach(function(el){
+      try{
+        var t = (el.textContent||'').trim();
+        if(!t) return;
+        var hit = labels.some(function(k){ return t.indexOf(k) !== -1; });
+        if(hit){
+          // extra guard: only remove small control buttons, not big containers
+          if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button' || /btn/i.test(el.className||'')){
+            el.remove();
+          }
+        }
+      }catch(_){}
+    });
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', killLegacyButtons);
+  }else{
+    killLegacyButtons();
+  }
 })();
 </script>
 
