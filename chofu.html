@@ -1,6 +1,39 @@
 <!doctype html>
 <html lang="ja">
 <head>
+<script>
+
+    // === Fixed display index per vehicle ===
+    function _stableIndex(it){
+      if (it && it.index !== undefined && it.index !== null && String(it.index) !== '') return String(it.index);
+      const s = String(it.city||'') + '|' + String(it.plate||it.index||'');
+      let h = 0;
+      for (let i=0;i<s.length;i++){ h = ((h<<5)-h) + s.charCodeAt(i); h |= 0; }
+      const num = Math.abs(h) % 100000; // 0..99999
+      return String(num);
+    }
+
+
+    // === GAS pull (read-only) ===
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';
+    function normK(s){ return String(s||'').replace(/\s+/g,'').replace(/-/g,'').toLowerCase(); }
+    function makeKey(city, plate){ return normK(city)+'|'+normK(plate||''); }
+    function keyOfItem(it){ return makeKey(it.city, it.plate||it.index||''); }
+    async function gasPull(){ 
+      if(!GAS_URL) return null;
+      try{ 
+        const res = await fetch(GAS_URL + '?action=pull', {method:'GET', mode:'cors', credentials:'omit'});
+        if(!res.ok) return null;
+        const data = await res.json();
+        const set = new Set();
+        if(Array.isArray(data.checked)){ data.checked.forEach(v=> set.add(String(v).toLowerCase().replace(/\s+/g,'').replace(/-/g,''))); }
+        return {checked:set};
+      }catch(_){
+        return null;
+      }
+    }
+    // === /GAS pull ===
+window.GAS_URL='https://script.google.com/macros/s/AKfycbzPYLa_qkxjqsW42IY5xIVjmZR-fCfgovr-jFiifQC9qKkMQ-I0TE8R2e4F1wAKzzlpYQ/exec';</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>調布市 巡回</title>
@@ -66,8 +99,9 @@ function saveOverrides(obj){
 
     function getInspectUrl(){ try{ return localStorage.getItem('junkai:INSPECT_URL')||''; }catch(_ ){ return ''; } }
 
-    function render(){ 
-      const all = migrate(loadItems());
+    async function render(firstLoad){ 
+      let all = migrate(loadItems());
+      if(firstLoad){ const pulled = await gasPull(); if(pulled){ const set=pulled.checked; all.forEach(it=>{ it.done = set.has(keyOfItem(it)) ? 1 : 0; it.status = it.done ? '済' : (it.state==='stopped'?'停':(it.state==='skip'?'不要':'')); }); }}
       const listEl = document.querySelector('#list'); const emptyEl = document.querySelector('#empty');
       const norm = s=> (s||'').replace(/\s+/g,'').replace('巡回','');
       const items = all.filter(it=> norm(it.city) === norm(CITY) );
@@ -142,7 +176,7 @@ function saveOverrides(obj){
       });
     }
 
-    document.addEventListener('DOMContentLoaded', render);
+    document.addEventListener('DOMContentLoaded', ()=>render(true));
     window.addEventListener('storage', render);
   })();
   </script>
