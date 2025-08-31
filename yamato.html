@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<div id="gasStatus" style="position:sticky;top:0;z-index:9999;font-size:12px;padding:6px 8px;background:#fff3cd;border-bottom:1px solid #ffeeba;">GAS: init...</div>
   <header class="appbar">
     <a href="index.html" class="backlink">← 戻る</a>
     <div class="title">大和市 巡回</div>
@@ -20,46 +21,6 @@
   
   
   <script>
-
-    // === GAS helpers ===
-    const GAS_URL = (window.GAS_URL||'').trim();
-    async function gasPull(){
-      if(!GAS_URL) return null;
-      try{
-        const res = await fetch(GAS_URL + '?action=pull', {method:'GET', mode:'cors', credentials:'omit'});
-        if(!res.ok) return null;
-        const data = await res.json();
-        const set = new Set();
-        if (Array.isArray(data.checked)) {
-          data.checked.forEach(x=> set.add(String(x)));
-        } else if (data && Array.isArray(data.InspectionLog)) {
-          data.InspectionLog.forEach(row=>{ if(row.checked||row.done) set.add(String(row.city||'')+'|'+String(row.plate||row.index||'')); });
-        }
-        return {checked:set};
-      }catch(_){
-        return null;
-      }
-    }
-    function makePullKey(it){ return String(it.city||'') + '|' + String(it.plate||it.index||''); }
-    async function applyCheckedFromServer(items){
-      const pulled = await gasPull();
-      if(!pulled) return items;
-      const set = pulled.checked;
-      items.forEach(it=>{ if(set.has(makePullKey(it))){ it.done=1; it.status='済'; it.updatedAt = it.updatedAt || Date.now(); } });
-      return items;
-    }
-    async function postToggle(it){
-      if(!GAS_URL) return;
-      try{
-        await fetch(GAS_URL+'?action=toggle', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', index: (typeof it.index!=='undefined'?it.index:null), checked: !!it.done, ts: it.updatedAt })
-        });
-      }catch(_){}
-    }
-    // === /GAS helpers ===
-
   (function(){ 
     const CITY = '大和市';
     const $ = (s,r=document)=>r.querySelector(s);
@@ -106,9 +67,8 @@ function saveOverrides(obj){
 
     function getInspectUrl(){ try{ return localStorage.getItem('junkai:INSPECT_URL')||''; }catch(_ ){ return ''; } }
 
-    async function render(firstLoad){ 
-      let all = migrate(loadItems());
-      if(firstLoad){ all = await applyCheckedFromServer(all); }
+    function render(){ 
+      const all = migrate(loadItems());
       const listEl = document.querySelector('#list'); const emptyEl = document.querySelector('#empty');
       const norm = s=> (s||'').replace(/\s+/g,'').replace('巡回','');
       const items = all.filter(it=> norm(it.city) === norm(CITY) );
@@ -147,8 +107,7 @@ function saveOverrides(obj){
 
         const right=document.createElement('div'); right.className='right';
         const dateSpan=document.createElement('span'); dateSpan.className='date'; dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
-        postToggle(it);
-          const sel=document.createElement('select'); sel.className='state-select';
+        const sel=document.createElement('select'); sel.className='state-select';
         [['normal','通常'],['stopped','停止'],['skip','不要']].forEach(p=>{ const op=document.createElement('option'); op.value=p[0]; op.textContent=p[1]; sel.appendChild(op); });
         sel.value=it.state||'normal';
         const inspectBtn=document.createElement('button'); inspectBtn.className='inspect-btn'; inspectBtn.textContent='点検';
@@ -170,7 +129,6 @@ function saveOverrides(obj){
           try{ const s=localStorage.getItem('junkai:items'); const a=s?JSON.parse(s):[]; const t=a.find(x=>x.city===it.city && x.station===it.station && x.model===it.model && x.plate===it.plate); if(t){ t.done=it.done; t.updatedAt=it.updatedAt; t.status=it.status; saveItems(a); } }catch(_ ){}
           if(it.done) enqueueLog({ timestamp: it.updatedAt, city: it.city||'', station: it.station||'', model: it.model||'', plate: it.plate||'', state: it.state||'normal', done:1 });
           dateSpan.textContent = it.done ? fmt(it.updatedAt) : '';
-          postToggle(it);
           applyClass(itemEl,it); applyVisual(itemEl,it);
         });
 
@@ -185,7 +143,7 @@ function saveOverrides(obj){
       });
     }
 
-    document.addEventListener('DOMContentLoaded', ()=>render(true));
+    document.addEventListener('DOMContentLoaded', render);
     window.addEventListener('storage', render);
   })();
   </script>
