@@ -12,7 +12,7 @@
     <div class="title">巡回リスト</div>
     <div class="btns">
       <button id="syncBtn" class="btn primary">同期</button>
-      <button id="recalcBtn" class="btn">再計算</button>
+      
     </div>
   </div>
   <div class="wrap">
@@ -33,11 +33,7 @@
     </section>
     <h2 class="hint" style="margin-top:20px;">全エリア達成度</h2>
     <div class="meta"><span id="overall-count">0/0 (0%)</span></div>
-    <div class="actions">
-      <button id="exportJson">保存(JSON)</button>
-      <button id="importJson">読み込み(JSON)</button>
-      <input type="file" id="jsonFile" accept=".json" style="display:none" />
-    </div>
+    
   </div>
   <div id="progressModal" class="progress-modal">
     <p id="progressMessage">同期中…</p>
@@ -174,11 +170,6 @@
         }
       }
 
-      function recalc() {
-        renderIndex();
-        $('#statusText').textContent = '再計算完了';
-      }
-
       function exportJson() {
         const items = loadItems();
         const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
@@ -216,7 +207,7 @@
   try{ localStorage.setItem('junkai:INSPECT_URL', INSPECT_URL); }catch(_){ } }catch(_){ }
 
         document.getElementById('syncBtn').addEventListener('click', sync);
-        document.getElementById('recalcBtn').addEventListener('click', recalc);
+        document.getElementById('recalcBtn').
         document.getElementById('exportJson').addEventListener('click', exportJson);
         document.getElementById('importJson').addEventListener('click', () => {
           document.getElementById('jsonFile').click();
@@ -234,5 +225,84 @@
       });
     })();
   </script>
+
+<script>
+(function(){
+  function n(s){ return String(s||''); }
+  function readItems(){
+    try{
+      const s = localStorage.getItem('junkai:items') || localStorage.getItem('junkai:items:v2');
+      return s ? JSON.parse(s) : [];
+    }catch(_){ return []; }
+  }
+  function summarizeByCity(items){
+    const res = { '大和市':{done:0,total:0}, '海老名市':{done:0,total:0}, '調布市':{done:0,total:0} };
+    items.forEach(it=>{
+      const city = n(it.city);
+      if(res[city]){
+        res[city].total += 1;
+        if(it.done) res[city].done += 1;
+      }
+    });
+    return res;
+  }
+  function applyToDom(cityKey, done, total){
+    const map = {
+      '大和市': ['count-yamato','yamatoCount'],
+      '海老名市': ['count-ebina','ebinaCount'],
+      '調布市': ['count-chofu','chofuCount']
+    };
+    const ids = map[cityKey] || [];
+    ids.forEach(id=>{
+      const el = document.getElementById(id);
+      if(el){
+        el.textContent = done + ' / ' + total;
+      }
+    });
+  }
+  function updateFromSummary(){
+    try{
+      const s = localStorage.getItem('junkai:summary');
+      if(!s) return false;
+      const sum = JSON.parse(s);
+      [['大和市','yamato'],['海老名市','ebina'],['調布市','chofu']].forEach(([city,label])=>{
+        const obj = sum[label];
+        if(obj && typeof obj.done==='number' && typeof obj.total==='number'){
+          applyToDom(city, obj.done, obj.total);
+        }
+      });
+      return true;
+    }catch(_){ return false; }
+  }
+  function updateCounts(){
+    if(updateFromSummary()) return;
+    const items = readItems();
+    const res = summarizeByCity(items);
+    Object.keys(res).forEach(city=>{
+      applyToDom(city, res[city].done, res[city].total);
+    });
+  }
+  // Hide any "同期してください" hint (best effort)
+  function hideSyncHint(){
+    const nodes = Array.from(document.querySelectorAll('div,span,p,small,em,strong'));
+    nodes.forEach(el=>{
+      try{
+        const t = (el.textContent||'').trim();
+        if(t.includes('同期してく')){ el.style.display='none'; }
+      }catch(_){}
+    });
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{
+    updateCounts();
+    hideSyncHint();
+    window.addEventListener('storage', (e)=>{
+      if(e.key === 'junkai:summary' || e.key === 'junkai:items' || e.key === 'junkai:items:v2'){
+        updateCounts();
+      }
+    });
+  });
+})();
+</script>
+
 </body>
 </html>

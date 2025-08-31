@@ -32,6 +32,20 @@ function ensureNoDataVisibility(){
   }
 }
 document.addEventListener('readystatechange', ()=>{ if(document.readyState==='complete'){ ensureNoDataVisibility(); } });
+
+    function publishSummary(city, done, total){
+      try{
+        const key = 'junkai:summary';
+        const s = localStorage.getItem(key);
+        const cur = s ? JSON.parse(s) : {};
+        const label = (city.indexOf('大和')===0)? 'yamato' : (city.indexOf('海老名')===0)? 'ebina' : (city.indexOf('調布')===0)? 'chofu' : null;
+        if(label){
+          cur[label] = { done: done, total: total, ts: Date.now() };
+          localStorage.setItem(key, JSON.stringify(cur));
+        }
+      }catch(_){}
+    }
+
 </script>
 
   <meta charset="utf-8" />
@@ -177,12 +191,42 @@ function saveOverrides(obj){
       });
     }
 
-    document.addEventListener('DOMContentLoaded', async ()=>{ render(false); const b=document.getElementById('syncBadge'); if(b) b.style.display='block'; await render(true); if(b) b.style.display='none'; });
+    document.addEventListener('DOMContentLoaded', async ()=>{ render(false); const b=document.getElementById('syncBadge'); if(b) b.style.display='block'; try{ await render(true); } finally { if(b) b.style.display='none'; setTimeout(()=>{ if(b) b.style.display='none'; }, 3000); } });
     window.addEventListener('storage', render);
   })();
-  </script>
+  
+    function publishSummary(city, done, total){
+      try{
+        const key = 'junkai:summary';
+        const s = localStorage.getItem(key);
+        const cur = s ? JSON.parse(s) : {};
+        const label = (city.indexOf('大和')===0)? 'yamato' : (city.indexOf('海老名')===0)? 'ebina' : (city.indexOf('調布')===0)? 'chofu' : null;
+        if(label){
+          cur[label] = { done: done, total: total, ts: Date.now() };
+          localStorage.setItem(key, JSON.stringify(cur));
+        }
+      }catch(_){}
+    }
+
+</script>
     
 
+
+
+<script>
+function afterFinalSummary(){
+  try{
+    const city = (typeof CITY!=='undefined'? CITY : '');
+    const cards = Array.from(document.querySelectorAll('.card'));
+    const total = cards.length;
+    const done = cards.filter(el=> el.classList.contains('done') || el.style.backgroundColor && /pink/i.test(el.style.backgroundColor)).length
+                || (function(){ // fallback: count from checkbox
+                      let c=0; document.querySelectorAll('input[type="checkbox"]').forEach(ch=>{ if(ch.checked) c++; }); return c; })();
+    if(city && total>=0){ publishSummary(city, done, total); }
+  }catch(_){}
+}
+window.addEventListener('load', afterFinalSummary);
+</script>
 
 </body>
 </html>
