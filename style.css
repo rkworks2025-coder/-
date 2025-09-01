@@ -1,16 +1,42 @@
-
-:root{--bg:#f7f8fb;--card:#fff;--text:#0b1220;--muted:#667085;--line:#e5e7eb;--accent:#2563eb}
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
-.header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0}
-.title{font-weight:800;font-size:22px;letter-spacing:.02em}
-.btn{padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text);font-weight:600}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.container{padding:16px}
-.grid{display:grid;gap:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:block;text-decoration:none;color:inherit;box-shadow:0 2px 4px rgba(0,0,0,.03)}
-.card .name{font-size:20px;font-weight:800;margin-bottom:8px}
-.card .meta{color:var(--muted);font-weight:700}
-.footer{position:fixed;right:12px;bottom:12px;background:#fff;padding:6px 10px;border-radius:10px;border:1px solid var(--line);color:var(--muted);font-size:12px}
-.status{margin:10px 2px 14px;color:var(--muted);font-weight:700}
-.linkrow{display:flex;gap:8px;align-items:center}
-.badge{font-size:12px;color:var(--muted);margin-left:8px}
+:root{
+  --accent:#2b6bf6; --fg:#0e1a2b; --muted:#64748b; --chip:#eff4ff;
+  --green:#e8f7ec; --pink:#ffeaf1; --gray:#f1f2f5; --yellow:#fff9db; --blue:#e8f2ff;
+}
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;margin:0;background:#f6f7fb;color:var(--fg)}
+.appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid #e6e8ef}
+.title{font-size:20px;font-weight:800;letter-spacing:.04em}
+.btns{display:flex;gap:10px}
+.btn{appearance:none;border:1px solid #d7dbe7;padding:8px 14px;border-radius:12px;background:#fff;font-weight:700;font-size:14px}
+.btn-primary{background:var(--chip);border-color:#c9d6ff;color:#1e40af}
+.wrap{max-width:860px;margin:18px auto;padding:0 14px 60px}
+.hint{margin:6px 2px 14px;color:var(--muted);font-size:13px}
+.cards{display:grid;grid-template-columns:1fr;gap:14px}
+.card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e6e8ef;border-radius:16px;padding:18px 16px;box-shadow:0 1px 0 rgba(8,15,35,.03)}
+.card:hover{background:#fafcff}
+.card h2{margin:0 0 8px 0;font-size:18px;letter-spacing:.03em}
+.meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#f2f5fb;border:1px solid #e6e8ef}
+.muted{color:var(--muted)}
+.empty{margin:28px 2px 0 2px;color:var(--muted);font-size:14px}
+.modal{position:fixed;inset:0;background:rgba(8,15,35,.5);display:none;align-items:center;justify-content:center;z-index:50}
+.modal.show{display:flex}
+.dialog{width:min(520px,90vw);background:#111827;color:#fff;border-radius:14px;padding:18px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.dialog h3{margin:0 0 8px 0;font-size:18px}
+.barwrap{height:8px;background:#1f2937;border-radius:999px;overflow:hidden;margin-top:12px}
+.bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399)}
+.row{display:flex;align-items:center;gap:10px;border:1px solid #e6e8ef;background:#fff;border-radius:12px;padding:10px 10px}
+.row + .row{margin-top:10px}
+.idx{min-width:28px;text-align:right;font-weight:700;color:#334155}
+.chk{margin:0 4px}
+.fields{flex:1;display:flex;flex-direction:column}
+.line1{font-weight:700}
+.line2{font-size:12px;color:#475569}
+right{display:flex;flex-direction:column;gap:6px}
+.state-select{padding:6px 8px;border:1px solid #d7dbe7;border-radius:10px;background:#fff}
+.btn-mini{padding:6px 10px;border:1px solid #d7dbe7;border-radius:10px;background:#fff;font-weight:700;font-size:12px}
+.bg-green{background:var(--green)}
+.bg-pink{background:var(--pink)}
+.bg-gray{background:var(--gray)}
+.bg-yellow{background:var(--yellow)}
+.bg-blue{background:var(--blue)}
