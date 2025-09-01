@@ -1,4 +1,4 @@
-<style>.ver{position:fixed;right:8px;bottom:6px;font-size:10px;color:#94a3b8;opacity:.7;pointer-events:none;z-index:9}</style><style>.ver{position:fixed;right:8px;bottom:6px;font-size:10px;color:#94a3b8;opacity:.7;pointer-events:none;z-index:9}</style><!doctype html>
+<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>市区町村を選択</title>
@@ -13,6 +13,7 @@
   .count{color:var(--muted);font-variant-numeric:tabular-nums}
   .muted{color:var(--muted);margin:8px 0 16px}
   .summary{margin-top:8px;padding:12px 16px;border:1px dashed var(--border);border-radius:12px;background:#fff;display:flex;justify-content:space-between;align-items:center}
+.ver{position:fixed;right:8px;bottom:6px;font-size:10px;color:#94a3b8;opacity:.7;pointer-events:none;z-index:9}
 </style>
 
 <header>市区町村を選択</header>
@@ -37,8 +38,8 @@
 </main>
 
 <script>
-const TOTALS = {"yamato": 60, "ebina": 89, "chofu": 54};
-const TOTAL_ALL = 203;
+const TOTALS = {"yamato": 62, "ebina": 87, "chofu": 101};
+const TOTAL_ALL = 250;
 
 function calcChecked(prefix){
   let n=0;
@@ -73,3 +74,5 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) update(
 document.addEventListener('DOMContentLoaded', update);
 </script>
 
+
+<div class="ver">v3_6</div>
