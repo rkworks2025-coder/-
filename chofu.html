@@ -49,6 +49,7 @@
     if(data.length===0){ hint.textContent="まだ同期されていません（インデックスの同期を押してください）"; return; }
     hint.textContent = `件数：${data.length}`;
 
+    // index の値で昇順（0 の場合は後方）
     data.sort((a,b)=>{ const ai=(a.index>0?a.index:1e9), bi=(b.index>0?b.index:1e9); return ai-bi || (a.station||'').localeCompare(b.station||'', 'ja'); });
 
     for(const rec of data){
@@ -91,6 +92,7 @@
   }
 
   function saveLocal(rec){
+    // city 配列を読み直して該当 number を上書き保存
     const arr = readCity(CITY);
     const i = arr.findIndex(x=> (x.number||"") === (rec.number||""));
     if (i>=0) arr[i]=rec; else arr.push(rec);
