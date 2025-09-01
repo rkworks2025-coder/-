@@ -1,3 +1,14 @@
+
+<style>
+.ver{position:fixed;right:8px;bottom:6px;font-size:10px;color:#94a3b8;opacity:.7;pointer-events:none;z-index:9}
+.btn.tiny{padding:6px 10px;font-size:12px;border-radius:8px}
+.inspect-btn{border:1px solid #d1d5db;background:#fff}
+.when{margin-left:8px;display:flex;flex-direction:column;line-height:1.0}
+.when .md{font-size:12px;color:#0f172a}
+.when .hm{font-size:11px;color:#64748b;margin-top:2px}
+.idx{width:28px;display:inline-block;text-align:right;font-variant-numeric:tabular-nums;color:#94a3b8;margin-right:6px}
+.legacy-bulk,.edit-hint{display:none!important}
+</style>
 <!doctype html>
 <html lang="ja">
 <meta charset="utf-8">
@@ -1274,3 +1285,100 @@ function attachHandlers(city){
 
 <script>document.addEventListener('DOMContentLoaded', ()=> attachHandlers('海老名市'));</script>
 </html>
+<div class="ver">v2</div>
+<script>
+(function(){
+  function removeLegacyUI(){
+    const texts = ["全てチェック","全て外す","リセット","日付を編集","日付を編集→","日付を編集 → 各行の日付ラベルをタップ"];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, null);
+    const toRemove = [];
+    while(walker.nextNode()){
+      const el = walker.currentNode;
+      const t = (el.textContent||"").trim();
+      if (!t) continue;
+      for(const kw of texts){
+        if(t.includes(kw)){
+          el.classList.add('legacy-bulk');
+          toRemove.push(el);
+          break;
+        }
+      }
+    }
+    toRemove.forEach(el=>el.remove());
+    document.querySelectorAll('.legacy-bulk,.edit-hint').forEach(el=>el.remove());
+  }
+
+  function addIndices(){
+    const rows = Array.from(document.querySelectorAll('.row, .card-row, .card, li'));
+    let n = 1;
+    rows.forEach(row=>{
+      if(row.querySelector('.idx')) return;
+      const cb = row.querySelector('input[type=\"checkbox\"]');
+      if(!cb) return;
+      const span = document.createElement('span');
+      const di = row.getAttribute('data-index');
+      span.className = 'idx';
+      span.textContent = String(di && /^\d+$/.test(di) ? di : n++);
+      cb.parentNode.insertBefore(span, cb);
+    });
+  }
+
+  function splitDateTimeTwoLines(){
+    const candidates = document.querySelectorAll('.timestamp, .time, .date, .when, [data-timestamp]');
+    candidates.forEach(el=>{
+      const raw = (el.getAttribute('data-timestamp') || el.textContent || '').trim();
+      if (el.classList && el.classList.contains('when')) return;
+      let m = raw.match(/(\d{1,2})[\/\-\.](\d{1,2})[ T](\d{1,2}):(\d{2})/);
+      if (!m) {
+        m = raw.match(/\d{4}\-\d{1,2}\-(\d{1,2})[T ](\d{1,2}):(\d{2})/);
+        if (m) { m = [null, m[1], null, m[2], m[3]]; }
+      }
+      if (!m) return;
+      const mm = (m[1]||'').toString().padStart(2,'0');
+      const dd = (m[2]||'').toString().padStart(2,'0');
+      const hh = (m[3]||'').toString().padStart(2,'0');
+      const mi = (m[4]||'').toString().padStart(2,'0');
+      const wrap = document.createElement('div');
+      wrap.className = 'when';
+      const d1 = document.createElement('div'); d1.className = 'md'; d1.textContent = mm + "/" + dd;
+      const d2 = document.createElement('div'); d2.className = 'hm'; d2.textContent = hh + ":" + mi;
+      wrap.appendChild(d1); wrap.appendChild(d2);
+      el.replaceWith(wrap);
+    });
+  }
+
+  function addInspectButtons(){
+    const rows = Array.from(document.querySelectorAll('.row, .card-row, .card, li'));
+    rows.forEach(row=>{
+      if (row.querySelector('.inspect-btn')) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn tiny inspect-btn';
+      btn.textContent = '点検';
+      btn.addEventListener('click', (ev)=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+        const station = (row.getAttribute('data-station') || '').trim();
+        const model = (row.getAttribute('data-model') || '').trim();
+        const number = (row.getAttribute('data-number') || '').trim();
+        console.log('inspect(params):', {station, model, number});
+      });
+      row.appendChild(btn);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ()=>{
+      removeLegacyUI();
+      addIndices();
+      splitDateTimeTwoLines();
+      addInspectButtons();
+    }, {once:true});
+  } else {
+    removeLegacyUI();
+    addIndices();
+    splitDateTimeTwoLines();
+    addInspectButtons();
+  }
+})();
+</script>
