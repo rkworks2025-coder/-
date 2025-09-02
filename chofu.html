@@ -7,6 +7,10 @@
 <style>
   :root{
     --bg:#f6f7fb; --surface:#fff; --border:#e6e8ee; --text:#111; --muted:#6b7280; --accent:#111; --checked:#ffe8ef;
+    /* 状態ごとの背景色 */
+    --status-normal:#e8f7ec;
+    --status-stop:#f1f2f5;
+    --status-skip:#fff9db;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
@@ -30,6 +34,17 @@
   .meta .line{white-space:normal;word-break:break-word}
   .meta .line.small{font-size:12px}
   .date-badge{min-width:54px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted);font-weight:700}
+  /* 日付表示（上段：月日、下段：時刻） */
+  .date-badge .md{font-size:12px;font-weight:700;}
+  .date-badge .hm{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* 状態セレクタ */
+  .status-select{padding:4px 6px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);margin-left:4px;}
+
+  /* 状態ごとのカード色 */
+  .card.status-normal{background:var(--status-normal);}
+  .card.status-stop{background:var(--status-stop);}
+  .card.status-skip{background:var(--status-skip);}
   .ver{position:fixed;right:8px;bottom:6px;font-size:10px;color:#94a3b8;opacity:.7;pointer-events:none;z-index:9}
 </style>
 
@@ -76,6 +91,12 @@ async function fetchRecords(){
 function storageKey(key){ return 'chk:'+CITY+':'+key; }
 function saveChecked(key,val){ localStorage.setItem(storageKey(key), JSON.stringify({checked:val, timestamp:(new Date()).toISOString()})); }
 function loadChecked(key){ try{ const v=JSON.parse(localStorage.getItem(storageKey(key))); return v&&v.checked; }catch(e){ return false; } }
+/* 状態保存用キー */
+function storageStatusKey(key){ return 'status:'+CITY+':'+key; }
+function saveStatus(key,status){ localStorage.setItem(storageStatusKey(key), status); }
+function loadStatus(key){ const s=localStorage.getItem(storageStatusKey(key)); return s||'normal'; }
+/* チェック状態とタイムスタンプを取得 */
+function getCheckedData(key){ try{ return JSON.parse(localStorage.getItem(storageKey(key))); }catch(e){ return null; } }
 
 function updateCount(total){
   const checked = document.querySelectorAll('#list input.chk:checked').length;
@@ -88,10 +109,12 @@ function buildCard(rec){
   const plate   = rec['plate']   || rec['登録番号']   || rec['number']        || rec['plate_full'] || rec['Plate'] || '';
   const key = plate || station + '-' + model;
   const checked = loadChecked(key);
+  const status = loadStatus(key);
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.key = key;
   if(checked) card.classList.add('checked');
+  card.classList.add('status-'+status);
   card.innerHTML = `
     <label class="chk-wrap">
       <input type="checkbox" class="chk"${checked?' checked':''}>
@@ -102,16 +125,50 @@ function buildCard(rec){
       <div class="meta"><div class="line">${model || ''}</div><div class="line">${plate || ''}</div></div>
       <div class="actions"><a href="https://rkworks2025-coder.github.io/r.k.w-/?station=${encodeURIComponent(station)}&model=${encodeURIComponent(model)}&plate_full=${encodeURIComponent(plate)}" target="_blank" class="inspect-link">点検</a></div>
     </div>
-    <div class="date-badge"></div>
+    <div class="date-badge"><div class="md"></div><div class="hm"></div></div>
   `;
+  // 日時バッジの更新
+  function updateBadge(){
+    const badge = card.querySelector('.date-badge');
+    const data = getCheckedData(key);
+    if(data && data.checked && data.timestamp){
+      const ts = new Date(data.timestamp);
+      const md = ('0'+(ts.getMonth()+1)).slice(-2) + '/' + ('0'+ts.getDate()).slice(-2);
+      const hm = ('0'+ts.getHours()).slice(-2) + ':' + ('0'+ts.getMinutes()).slice(-2);
+      badge.querySelector('.md').textContent = md;
+      badge.querySelector('.hm').textContent = hm;
+    } else {
+      badge.querySelector('.md').textContent = '';
+      badge.querySelector('.hm').textContent = '';
+    }
+  }
+  updateBadge();
   const checkbox = card.querySelector('input.chk');
   checkbox.addEventListener('change', () => {
     const isChecked = checkbox.checked;
     card.classList.toggle('checked', isChecked);
     saveChecked(key, isChecked);
+    updateBadge();
     updateCount(window.totalItems || 0);
     // TODO: send log to GAS (inspectionlog)
   });
+  // ステータスセレクトを生成
+  const select = document.createElement('select');
+  select.className = 'status-select';
+  [['normal','通常'],['stop','停止'],['skip','不要']].forEach(([val,label]) => {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    if(val === status) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.addEventListener('change', () => {
+    const newStatus = select.value;
+    saveStatus(key, newStatus);
+    card.classList.remove('status-normal','status-stop','status-skip');
+    card.classList.add('status-'+newStatus);
+  });
+  card.appendChild(select);
   return card;
 }
 
