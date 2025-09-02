@@ -9,7 +9,7 @@
     --bg:#f6f7fb; --surface:#fff; --border:#e6e8ee; --text:#111; --muted:#6b7280; --accent:#111; --checked:#ffe8ef;
     /* 状態ごとの背景色 */
     --status-normal:#e8f7ec;
-    --status-stop:#f1f2f5;
+    --status-stop:#e0e0e0;
     --status-skip:#fff9db;
   }
   *{box-sizing:border-box}
@@ -37,6 +37,17 @@
   /* 日付表示（上段：月日、下段：時刻） */
   .date-badge .md{font-size:12px;font-weight:700;}
   .date-badge .hm{font-size:11px;color:var(--muted);margin-top:2px;}
+  /* 点検リンクをボタン風にする */
+  .actions a {
+    display:inline-block;
+    padding:6px 10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:#fff;
+    color:var(--text);
+    text-decoration:none;
+    font-size:12px;
+  }
 
   /* 状態セレクタ */
   .status-select{padding:4px 6px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);margin-left:4px;}
