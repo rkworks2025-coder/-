@@ -6,7 +6,7 @@
   <title>大和市｜巡回</title>
   <style>
     :root{--fg:#0e1a2b;--muted:#64748b;--border:#e6e8ef;
-          --green:#e8f7ec;--pink:#ffeaf1;--gray:#dfe3ea;--yellow:#fff9db;--blue:#e8f2ff;}
+          --green:#e8f7ec;--pink:#ffeaf1;--gray:#d1d5db;--yellow:#fff9db;--blue:#e8f2ff;}
     *{box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans JP','Hiragino Kaku Gothic ProN',Meiryo,sans-serif;
          margin:0;background:#f6f7fb;color:var(--fg)}
@@ -24,7 +24,7 @@
     .fields{display:flex;flex-direction:column;gap:2px;min-width:0}
     .line1{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .line2{font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .right{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+    .right{display:flex;flex-direction:column;gap:10px;align-items:flex-end}
     .state-select{padding:6px 8px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:12px}
     .inspect-btn{padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:12px}
     .date-badge{margin-left:8px;display:flex;flex-direction:column;line-height:1.0;align-items:flex-end}
@@ -66,10 +66,9 @@
     return (Date.now()-t) < SEVEN;
   }
 
-  // ★ チェック最優先の色決定
   function rowClass(rec){
-    if (rec.checked) return "bg-pink";          // 最優先：チェックで必ずピンク
-    if (within7d(rec.last_inspected_at)) return "bg-blue"; // 次に7日ルール
+    if (rec.checked) return "bg-pink";
+    if (within7d(rec.last_inspected_at)) return "bg-blue";
     if (rec.status === "stop") return "bg-gray";
     if (rec.status === "skip") return "bg-yellow";
     return "bg-green";
@@ -108,7 +107,6 @@
     if(data.length===0){ hint.textContent='まだ同期されていません（インデックスの同期を押してください）'; return; }
     hint.textContent = `件数：${data.length}`;
 
-    // indexの値で昇順（0は後ろ）
     data.sort((a,b)=>{
       const ai=(+a.index>0?+a.index:1e9), bi=(+b.index>0?+b.index:1e9);
       return ai-bi || String(a.station||'').localeCompare(String(b.station||''),'ja');
@@ -127,7 +125,6 @@
       chk.className='chk';
       chk.checked = !!rec.checked;
 
-      // ★ 確認ダイアログ＋ピンク最優先
       chk.addEventListener('change', ()=>{
         const next = chk.checked;
         const ok = confirm(next ? 'チェックを付けます。よろしいですか？' : 'チェックを外します。よろしいですか？');
@@ -145,12 +142,10 @@
       const l2=document.createElement('div'); l2.className='line2'; l2.textContent = `${rec.model||''}　${rec.number||''}`;
       fields.appendChild(l1); fields.appendChild(l2);
 
-      // 日時2行（右寄せ）
       const badge = document.createElement('div');
       badge.className='date-badge';
       badge.innerHTML = '<div class="md"></div><div class="hm"></div>';
 
-      // 右側：ステータスと点検（未配線のまま）
       const right = document.createElement('div'); right.className='right';
 
       const sel = document.createElement('select');
@@ -162,7 +157,7 @@
       sel.addEventListener('change', ()=>{
         rec.status = sel.value;
         saveLocal(rec);
-        div.className = `row ${rowClass(rec)}`; // checked が勝つ
+        div.className = `row ${rowClass(rec)}`;
       });
 
       const btn = document.createElement('button');
@@ -170,13 +165,12 @@
       btn.type='button';
       btn.textContent='点検';
       btn.addEventListener('click', ()=>{
-        // 次版でURL配線予定。ここでは無反応（既存機能に干渉しない）
+        // 次版でURL配線予定
       });
 
       right.appendChild(sel);
       right.appendChild(btn);
 
-      // 組み立て
       div.appendChild(idx);
       div.appendChild(chk);
       div.appendChild(fields);
@@ -184,8 +178,6 @@
       div.appendChild(right);
 
       wrap.appendChild(div);
-
-      // 初期表示のバッジ更新
       updateBadge(rec, div);
     }
   }
