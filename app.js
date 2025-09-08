@@ -93,22 +93,42 @@ const Junkai = (()=>{
 
   function repaintCounters(){
     const map = {
-      "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total'},
-      "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total'},
-      "調布市":    {done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total'},
+      "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
+      "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total', rem:'#ebina-rem'},
+      "調布市":    {done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total', rem:'#chofu-rem'},
     };
-    let overall = 0;
+    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
     for(const city of CITIES){
       const arr = readCity(city);
       const cnt = countCity(arr);
-      overall += cnt.total;
+      overallTotal += cnt.total;
+      overallDone += cnt.done;
+      overallStop += cnt.stop;
+      overallSkip += cnt.skip;
       const m = map[city];
+      // update metrics for the city
       for(const k of ['done','stop','skip','total']){
         const el = document.querySelector(m[k]); if(el) el.textContent = cnt[k];
       }
+      // update remaining count: total - done - skip
+      const remCount = cnt.total - cnt.done - cnt.skip;
+      const remEl = document.querySelector(m.rem);
+      if(remEl) remEl.textContent = remCount;
     }
+    // update aggregated counts across all areas
+    const allDoneEl  = document.querySelector('#all-done');
+    const allStopEl  = document.querySelector('#all-stop');
+    const allSkipEl  = document.querySelector('#all-skip');
+    const allTotalEl = document.querySelector('#all-total');
+    const allRemEl   = document.querySelector('#all-rem');
+    if(allDoneEl)  allDoneEl.textContent  = overallDone;
+    if(allStopEl)  allStopEl.textContent  = overallStop;
+    if(allSkipEl)  allSkipEl.textContent  = overallSkip;
+    if(allTotalEl) allTotalEl.textContent = overallTotal;
+    if(allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
+    // update overall hint
     const hint = document.getElementById('overallHint');
-    if(hint) hint.textContent = overall>0 ? `総件数：${overall}` : 'まだ同期されていません';
+    if(hint) hint.textContent = overallTotal>0 ? `総件数：${overallTotal}` : 'まだ同期されていません';
   }
 
   // ====== public init for index ======
