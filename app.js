@@ -1,4 +1,3 @@
-
 // ====== 設定 ======
 const Junkai = (()=>{
 
@@ -13,6 +12,11 @@ const Junkai = (()=>{
   // ===== utils =====
   const sleep = (ms)=> new Promise(r=>setTimeout(r,ms));
 
+  /**
+   * Show or hide the progress modal and optionally update its bar width.
+   * @param {boolean} on Whether to show the modal.
+   * @param {number} pct Percentage (0–100) of the progress bar width.
+   */
   function showProgress(on, pct){
     const m = document.getElementById('progressModal');
     const bar = document.getElementById('progressBar');
@@ -20,10 +24,19 @@ const Junkai = (()=>{
     if(on) m.classList.add('show'); else m.classList.remove('show');
     if(bar && typeof pct==='number') bar.style.width = Math.max(0,Math.min(100,pct)) + '%';
   }
+  /**
+   * Update the status text displayed on the index page.
+   * @param {string} txt The text to display.
+   */
   function status(txt){
     const el = document.getElementById('statusText'); if(el) el.textContent = txt;
   }
 
+  /**
+   * Normalize a raw record object into a consistent shape.
+   * Trims strings and sets sensible defaults for optional fields.
+   * @param {Object} r Raw record object.
+   */
   function normalize(r){
     return {
       city: (r.city||'').trim(),
@@ -39,6 +52,12 @@ const Junkai = (()=>{
     };
   }
 
+  /**
+   * Helper to fetch JSON from a URL with retries.
+   * Aborts requests after TIMEOUT_MS and retries up to `retry` times.
+   * @param {string} url The URL to fetch.
+   * @param {number} retry Number of retries.
+   */
   async function fetchJSONWithRetry(url, retry=2){
     let lastErr = null;
     for(let i=0;i<=retry;i++){ 
@@ -65,15 +84,29 @@ const Junkai = (()=>{
     throw lastErr || new Error('fetch-fail');
   }
 
+  /**
+   * Save an array of records to local storage for a given city.
+   * @param {string} city City name.
+   * @param {Array<Object>} arr Array of record objects.
+   */
   function saveCity(city, arr){
     localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
   }
+  /**
+   * Read an array of records from local storage for a given city.
+   * @param {string} city City name.
+   * @returns {Array<Object>} Array of records or empty array.
+   */
   function readCity(city){
     try{ const s = localStorage.getItem(LS_KEY(city)); if(!s) return []; const a = JSON.parse(s); return Array.isArray(a)? a:[]; }catch(_){ return []; }
   }
 
+  /**
+   * Assign sequential UI indices (e.g. Y1, E2) to records within a city.
+   * @param {string} city City name.
+   * @param {Array<Object>} arr Array of records.
+   */
   function applyUIIndex(city, arr){
-    // cityごとに 1..N 採番して UI表示用に保存
     const p = PREFIX[city] || '';
     for(let i=0;i<arr.length;i++){
       arr[i].ui_index_num = i+1;
@@ -81,6 +114,10 @@ const Junkai = (()=>{
     }
   }
 
+  /**
+   * Count summary values for a city's records (done, stop, skip, total).
+   * @param {Array<Object>} arr Array of records.
+   */
   function countCity(arr){
     const c = {done:0, stop:0, skip:0, total:arr.length};
     for(const it of arr){
@@ -91,6 +128,9 @@ const Junkai = (()=>{
     return c;
   }
 
+  /**
+   * Repaint all counters on the index page and aggregated totals.
+   */
   function repaintCounters(){
     const map = {
       "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
@@ -106,16 +146,13 @@ const Junkai = (()=>{
       overallStop += cnt.stop;
       overallSkip += cnt.skip;
       const m = map[city];
-      // update metrics for the city
       for(const k of ['done','stop','skip','total']){
         const el = document.querySelector(m[k]); if(el) el.textContent = cnt[k];
       }
-      // update remaining count: total - done - skip
       const remCount = cnt.total - cnt.done - cnt.skip;
       const remEl = document.querySelector(m.rem);
       if(remEl) remEl.textContent = remCount;
     }
-    // update aggregated counts across all areas
     const allDoneEl  = document.querySelector('#all-done');
     const allStopEl  = document.querySelector('#all-stop');
     const allSkipEl  = document.querySelector('#all-skip');
@@ -126,44 +163,104 @@ const Junkai = (()=>{
     if(allSkipEl)  allSkipEl.textContent  = overallSkip;
     if(allTotalEl) allTotalEl.textContent = overallTotal;
     if(allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
-    // update overall hint
     const hint = document.getElementById('overallHint');
     if(hint) hint.textContent = overallTotal>0 ? `総件数：${overallTotal}` : 'まだ同期されていません';
   }
 
-  // ====== public init for index ======
-  async function initIndex(){
-    repaintCounters();
-    const btn = document.getElementById('syncBtn');
-    if(!btn) return;
-    btn.addEventListener('click', async()=>{
-      try{
-        showProgress(true, 5);
-        status('開始…');
-        const u = `${GAS_URL}?action=pull&_=${Date.now()}`;
-        status('GASへ問い合わせ中…');
-        showProgress(true, 35);
-        const json = await fetchJSONWithRetry(u, 2);
-        showProgress(true, 55);
-        // accept json.data or json.values as array; do not require json.ok===true to support more GAS deployments
-        if(!json || (!Array.isArray(json.data) && !Array.isArray(json.values))) throw new Error('bad-shape');
-
-        // prepare buckets for each supported city
-        const buckets = { "大和市":[], "海老名市":[], "調布市":[] };
-        // some GAS deployments return data under 'data', others under 'values'
-        let arr = Array.isArray(json.data) ? json.data : (Array.isArray(json.values) ? json.values : []);
-        // if there is no array, bail out
-        if(!Array.isArray(arr)) arr = [];
-        // fallback: if arr is empty and json itself is an array of arrays (root-level list)
-        if(arr.length === 0 && Array.isArray(json) && Array.isArray(json[0])){
-          arr = json;
+  /**
+   * Pull records from the specified sheet (全体管理 or InspectionLog) and save them into local storage.
+   * Displays progress and status messages throughout the operation.
+   * @param {string} sheet Sheet name to pull from.
+   * @param {string} actionLabel Label used in status messages (e.g. '初期同期' or '同期').
+   */
+  async function pullAndSave(sheet, actionLabel){
+    // Start progress
+    status(`${actionLabel}開始…`);
+    showProgress(true, 5);
+    try{
+      // Build URL with sheet parameter and cache-busting timestamp
+      const url = `${GAS_URL}?action=pull&sheet=${encodeURIComponent(sheet)}&_=${Date.now()}`;
+      // Fetch JSON with retry
+      status(`${actionLabel}取得中…`);
+      showProgress(true, 25);
+      const json = await fetchJSONWithRetry(url, 2);
+      // Determine data array
+      let arr = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.values) ? json.values : []);
+      if(!Array.isArray(arr)) arr = [];
+      if(arr.length === 0 && Array.isArray(json) && Array.isArray(json[0])) arr = json;
+      // Skip header row for InspectionLog if present
+      if(sheet === 'InspectionLog' && arr.length > 0 && Array.isArray(arr[0])){
+        const firstRow = arr[0].map(x => typeof x === 'string' ? x.toLowerCase() : '');
+        if(firstRow.includes('city') && firstRow.includes('station')) arr = arr.slice(1);
+      }
+      // Helper to convert yyyy/MM/dd or yyyy/MM/dd-HH:mm to ISO string
+      function toISOChecked(s){
+        if(!s) return '';
+        const str = String(s).trim();
+        const parts = str.split('-');
+        let datePart='', timePart='';
+        if(parts.length >= 2){
+          datePart = parts[0].replace(/\//g,'-');
+          timePart = parts[1].split(' ')[0];
+          const dt = new Date(`${datePart}T${timePart}:00`);
+          return Number.isFinite(dt.getTime())? dt.toISOString() : '';
+        } else {
+          datePart = str.replace(/\//g,'-');
+          const dt = new Date(`${datePart}T00:00:00`);
+          return Number.isFinite(dt.getTime())? dt.toISOString() : '';
         }
-
-        // detect header row dynamically (e.g. ['TSエリア','city','所在地','station','model','plate',...])
+      }
+      // Prepare buckets per city
+      const buckets = { "大和市":[], "海老名市":[], "調布市":[] };
+      // Process rows based on sheet type
+      if(sheet === 'InspectionLog'){
+        for(const row of arr){
+          if(!Array.isArray(row) || row.length < 7) continue;
+          const city    = (row[0]||'').toString();
+          const station = (row[1]||'').toString();
+          const model   = (row[2]||'').toString();
+          const number  = (row[3]||'').toString();
+          const idxStr  = (row[4]||'').toString();
+          const statusEng= (row[5]||'').toString();
+          const checkedAt=(row[6]||'').toString();
+          const rec = {
+            city, station, model, number,
+            status:'normal', checked:false, index:'', last_inspected_at:'',
+            ui_index: idxStr || '', ui_index_num:0
+          };
+          if(idxStr){
+            const m = idxStr.match(/^(?:[A-Za-z]|[^0-9]*)(\d+)/);
+            if(m){ const num = parseInt(m[1],10); if(Number.isFinite(num)) rec.ui_index_num = num; }
+          }
+          // Map English status to internal fields
+          switch(statusEng){
+            case 'Checked':
+              rec.checked = true;
+              rec.status = 'normal';
+              rec.last_inspected_at = toISOChecked(checkedAt);
+              break;
+            case 'stopped':
+              rec.status = 'stop';
+              break;
+            case 'Unnecessary':
+              rec.status = 'skip';
+              break;
+            case '7days_rule':
+            case '7 day rule':
+              rec.status = '7days_rule';
+              rec.checked = false;
+              rec.last_inspected_at = toISOChecked(checkedAt);
+              break;
+            default:
+              rec.status = 'normal';
+          }
+          if(buckets[city]) buckets[city].push(rec);
+        }
+      } else {
+        // Heuristics for 全体管理 or similar sheets
         let headerMap = null;
         if(arr.length > 0 && Array.isArray(arr[0])){
           const firstRow = arr[0];
-          // check if the first row contains english column names like 'city' or 'station'
           const lower = firstRow.map(x => (typeof x === 'string' ? x.trim().toLowerCase() : ''));
           if(lower.some(x => x.includes('city')) && lower.some(x => x.includes('station'))){
             headerMap = {};
@@ -175,143 +272,216 @@ const Junkai = (()=>{
               else if(col.includes('plate') || col.includes('number')) headerMap.number = i;
               else if(col.includes('status')) headerMap.status = i;
             }
-            // remove header row from array
             arr = arr.slice(1);
           }
         }
-
         for(const r of arr){
           let rowObj;
           if(Array.isArray(r)){
             if(headerMap){
-              // when headerMap is detected, use it to map columns
-              const city = r[headerMap.city ?? 0] || '';
+              const city    = r[headerMap.city ?? 0] || '';
               const station = r[headerMap.station ?? 1] || '';
-              const model = r[headerMap.model ?? 2] || '';
-              const number = r[headerMap.number ?? 3] || '';
-              const status = (headerMap.status !== undefined ? (r[headerMap.status] || '') : 'normal');
-              rowObj = { city, station, model, number, status: status || 'normal', checked:false, index:'', last_inspected_at:'' };
-            }else{
-              // skip header rows that explicitly contain 'city' in the second column
-              if(r.length >= 2 && typeof r[1] === 'string' && r[1].trim().toLowerCase() === 'city'){
-                continue;
-              }
-              // detect TS-prefixed rows: r[0] starts with 'TS' and r has at least 6 columns
+              const model   = r[headerMap.model ?? 2] || '';
+              const number  = r[headerMap.number ?? 3] || '';
+              const statusVal = (headerMap.status !== undefined ? (r[headerMap.status] || '') : 'normal');
+              rowObj = { city, station, model, number, status: statusVal || 'normal', checked:false, index:'', last_inspected_at:'' };
+            } else {
+              if(r.length >= 2 && typeof r[1] === 'string' && r[1].trim().toLowerCase() === 'city') continue;
               if(r.length >= 6 && typeof r[0] === 'string' && r[0].trim().startsWith('TS')){
-                const city = r[1] || '';
+                const city    = r[1] || '';
                 const station = r[3] || '';
-                const model = r[4] || '';
-                const number = r[5] || '';
-                const status = r[6] || 'normal';
-                rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
-              }else{
-                // fallback heuristics
+                const model   = r[4] || '';
+                const number  = r[5] || '';
+                const statusVal = r[6] || 'normal';
+                rowObj = { city, station, model, number, status: statusVal, checked:false, index:'', last_inspected_at:'' };
+              } else {
                 if(r.length >= 6){
-                  // assume r[1]=city, r[3]=station, r[4]=model, r[5]=plate
-                  const city = r[1] || r[0] || '';
+                  const city    = r[1] || r[0] || '';
                   const station = r[3] || r[1] || '';
-                  const model = r[4] || r[2] || '';
-                  const number = r[5] || r[3] || '';
-                  const status = r[6] || 'normal';
-                  rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
-                }else{
-                  // simple case: 0=city,1=station,2=model,3=number,4=status
-                  const city = r[0] || '';
+                  const model   = r[4] || r[2] || '';
+                  const number  = r[5] || r[3] || '';
+                  const statusVal = r[6] || 'normal';
+                  rowObj = { city, station, model, number, status: statusVal, checked:false, index:'', last_inspected_at:'' };
+                } else {
+                  const city    = r[0] || '';
                   const station = r[1] || '';
-                  const model = r[2] || '';
-                  const number = r[3] || '';
-                  const status = r[4] || 'normal';
-                  rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
+                  const model   = r[2] || '';
+                  const number  = r[3] || '';
+                  const statusVal = r[4] || 'normal';
+                  rowObj = { city, station, model, number, status: statusVal, checked:false, index:'', last_inspected_at:'' };
                 }
               }
             }
-          }else if(r && typeof r === 'object'){
+          } else if(r && typeof r === 'object'){
             rowObj = r;
-          }else{
+          } else {
             continue;
           }
-          const cityName = (rowObj.city || '').trim();
+          const cityName = (rowObj.city||'').trim();
           if(!buckets[cityName]) continue;
           const rec = normalize(rowObj);
+          // For initial sync, clear check state and last inspected date
+          rec.checked = false;
+          rec.last_inspected_at = '';
           buckets[cityName].push(rec);
         }
-
-        // 成功時のみ保存（空配列なら上書きしない）
-        let wrote = 0;
-        for(const city of CITIES){
-          if(buckets[city].length>0){
-            applyUIIndex(city, buckets[city]);
-            saveCity(city, buckets[city]);
-            wrote++;
-          }
+      }
+      // Assign UI indices and save
+      let wrote = 0;
+      for(const city of CITIES){
+        if(buckets[city].length > 0){
+          applyUIIndex(city, buckets[city]);
+          saveCity(city, buckets[city]);
+          wrote++;
         }
+      }
+      if(wrote === 0){
+        status(`${actionLabel}失敗：データが空でした（既存データは保持）`);
+        showProgress(false);
+        return;
+      }
+      // Update counters and finish progress
+      repaintCounters();
+      status(`${actionLabel}完了：大和${buckets['大和市'].length || 0} / 海老名${buckets['海老名市'].length || 0} / 調布${buckets['調布市'].length || 0}`);
+      showProgress(true, 100);
+    } catch(e){
+      console.error(`${actionLabel} error`, e);
+      status(`${actionLabel}失敗：通信または解析エラー（既存データは保持）`);
+    } finally {
+      setTimeout(()=>showProgress(false), 350);
+    }
+  }
 
-        if(wrote===0){ status('同期失敗：データが空でした（既存データは保持）'); showProgress(false); return; }
-
+  /**
+   * Initialize the index page: attaches event handlers to buttons and repaints counters.
+   */
+  async function initIndex(){
+    repaintCounters();
+    // Initial sync button: reset local storage then pull 全体管理
+    const initBtn = document.getElementById('initSyncBtn');
+    if(initBtn){
+      initBtn.addEventListener('click', async ()=>{
+        if(!confirm('よろしいですか？')) return;
+        // 事前にローカル保存をリセットし、カウンタを0に
+        status('リセット中…');
+        showProgress(true, 10);
+        for(const c of CITIES){
+          localStorage.removeItem(LS_KEY(c));
+        }
         repaintCounters();
-        showProgress(true, 100);
-        status(`同期完了：大和${buckets['大和市'].length||0} / 海老名${buckets['海老名市'].length||0} / 調布${buckets['調布市'].length||0}`);
-      }catch(e){
-        console.error('sync error', e);
-        status('同期失敗：通信または解析エラー（既存データは保持）');
-      }finally{ setTimeout(()=>showProgress(false), 350); }
-    });
-
-    // Attach handler for pushing InspectionLog to the sheet (if button exists)
-    const pushBtn = document.getElementById('pushLogBtn');
-    if (pushBtn) {
-      pushBtn.addEventListener('click', async () => {
-        try {
-          // collect all records from all cities
-          const all = [];
-          for (const c of CITIES) {
-            const arrCity = readCity(c);
-            if (Array.isArray(arrCity)) all.push(...arrCity);
+        // 続いて全体管理からデータを取得して保存
+        await pullAndSave('全体管理', '初期同期');
+      });
+    }
+    // Sync button: push local changes to InspectionLog then pull updated data
+    const syncBtn = document.getElementById('syncBtn');
+    if(syncBtn){
+      syncBtn.addEventListener('click', async ()=>{
+        // Step 1: push local changes
+        await (async () => {
+          status('データ送信中…');
+          showProgress(true, 15);
+          try {
+            // Gather all records across cities
+            const all = [];
+            for(const c of CITIES){
+              const arrCity = readCity(c);
+              if(Array.isArray(arrCity)) all.push(...arrCity);
+            }
+            const params = new URLSearchParams();
+            params.append('action','push');
+            params.append('data', JSON.stringify(all));
+            const res = await fetch(GAS_URL, {
+              method:'POST',
+              headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+              body: params.toString()
+            });
+            let result = null;
+            try { result = await res.json(); } catch(_){ result = null; }
+            if(result && result.ok){
+              // proceed to pull next
+              status('送信成功、同期中…');
+              showProgress(true, 35);
+            } else {
+              status('送信失敗…');
+              // continue to pull anyway to refresh statuses
+              showProgress(true, 35);
+            }
+          } catch(err){
+            console.error('push error', err);
+            status('送信エラー');
+            // continue to pull anyway
           }
-          status('シート更新中…');
-          const json = JSON.stringify(all);
-          // prepare POST body. Send as URL‑encoded to avoid URL length limits
+        })();
+        // Step 2: pull updated InspectionLog data
+        await pullAndSave('InspectionLog', '同期');
+      });
+    }
+    // Data send button: push local changes to InspectionLog only (manual)
+    const pushBtn = document.getElementById('pushLogBtn');
+    if(pushBtn){
+      pushBtn.addEventListener('click', async ()=>{
+        status('データ送信中…');
+        showProgress(true, 15);
+        try{
+          const all = [];
+          for(const c of CITIES){
+            const arrCity = readCity(c);
+            if(Array.isArray(arrCity)) all.push(...arrCity);
+          }
           const params = new URLSearchParams();
-          params.append('action', 'push');
-          params.append('data', json);
-          const url = `${GAS_URL}`;
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          params.append('action','push');
+          params.append('data', JSON.stringify(all));
+          const res = await fetch(GAS_URL, {
+            method:'POST',
+            headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
             body: params.toString()
           });
           let result = null;
-          try {
-            result = await res.json();
-          } catch(_){ result = null; }
-          if (result && result.ok) {
-            status('シート更新完了！');
+          try{ result = await res.json(); }catch(_){ result = null; }
+          if(result && result.ok){
+            status('データ送信完了！');
           } else {
             status('更新に失敗しました');
           }
         } catch(err){
           console.error('push error', err);
           status('更新エラー');
+        } finally {
+          setTimeout(()=>showProgress(false), 350);
         }
       });
     }
   }
 
   // ===== City page =====
+  /**
+   * Check if a date is within the last 7 days.
+   * @param {string} last ISO date string.
+   */
   function within7d(last){
     if(!last) return false;
     const t = Date.parse(last);
     if(!Number.isFinite(t)) return false;
     return (Date.now() - t) < (7*24*60*60*1000);
   }
+  /**
+   * Determine the CSS class to apply to a record's row based on its status.
+   * @param {Object} rec Record object.
+   */
   function rowBg(rec){
     if(rec.checked) return 'bg-pink';
-    if(rec.status==='stop') return 'bg-gray';
-    if(rec.status==='skip') return 'bg-yellow';
+    if(rec.status === 'stop') return 'bg-gray';
+    if(rec.status === 'skip') return 'bg-yellow';
+    if(rec.status === '7days_rule' || rec.status === '7 day rule') return 'bg-blue';
     if(within7d(rec.last_inspected_at)) return 'bg-blue';
     return 'bg-green';
   }
 
+  /**
+   * Mount a city's list page: populate the list and attach event handlers.
+   * @param {string} city City name.
+   */
   function mountCity(city){
     const list = document.getElementById('list');
     const hint = document.getElementById('hint');
@@ -319,42 +489,32 @@ const Junkai = (()=>{
     const arr = readCity(city);
     if(arr.length===0){ hint.textContent='まだ同期されていません（インデックスの同期を押してください）'; return; }
     hint.textContent = `件数：${arr.length}`;
-
-    // city内採番を信頼
     for(const rec of arr){
       const row = document.createElement('div');
       row.className = `row ${rowBg(rec)}`;
-
-      // left column: top row with index + checkbox; bottom row for date/time
       const left = document.createElement('div');
       left.className = 'leftcol';
-      // index element
       const idxDiv = document.createElement('div');
       idxDiv.className = 'idx';
       idxDiv.textContent = rec.ui_index || '';
-      // checkbox
       const chk = document.createElement('input');
       chk.type = 'checkbox';
       chk.checked = !!rec.checked;
       chk.className = 'chk';
-      // top container for index and checkbox
       const topLeft = document.createElement('div');
       topLeft.className = 'left-top';
       topLeft.appendChild(idxDiv);
       topLeft.appendChild(chk);
-      // date/time element (hidden when no date)
       const dtDiv = document.createElement('div');
       dtDiv.className = 'datetime';
-      // helper to update the date/time display
       function updateDateTime(){
         if(rec.last_inspected_at){
           const d = new Date(rec.last_inspected_at);
           if(Number.isFinite(d.getTime())){
+            const yyyy = d.getFullYear();
             const mm = String(d.getMonth()+1).padStart(2,'0');
             const dd = String(d.getDate()).padStart(2,'0');
-            const hh = String(d.getHours()).padStart(2,'0');
-            const mi = String(d.getMinutes()).padStart(2,'0');
-            dtDiv.innerHTML = `${mm}/${dd}<br>${hh}:${mi}`;
+            dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
             dtDiv.style.display = '';
             return;
           }
@@ -362,31 +522,45 @@ const Junkai = (()=>{
         dtDiv.innerHTML = '';
         dtDiv.style.display = 'none';
       }
-      // initialize date/time display
       updateDateTime();
-      // assemble left column
+      dtDiv.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'date';
+        if(rec.last_inspected_at){
+          const d0 = new Date(rec.last_inspected_at);
+          if(Number.isFinite(d0.getTime())){
+            input.value = d0.toISOString().slice(0,10);
+          }
+        }
+        dtDiv.appendChild(input);
+        if(typeof input.showPicker === 'function'){ input.showPicker(); } else { input.focus(); }
+        input.addEventListener('change', () => {
+          const sel = input.value;
+          dtDiv.removeChild(input);
+          if(!sel) return;
+          if(!confirm('よろしいですか？')) return;
+          const iso = new Date(sel).toISOString();
+          rec.last_inspected_at = iso;
+          persistCityRec(city, rec);
+          updateDateTime();
+          row.className = `row ${rowBg(rec)}`;
+        }, { once: true });
+      });
       left.appendChild(topLeft);
       left.appendChild(dtDiv);
-      // checkbox change handler with confirmation
       chk.addEventListener('change', () => {
         const message = chk.checked ? 'チェックを付けます。よろしいですか？' : 'チェックを外します。よろしいですか？';
-        if (!confirm(message)) {
+        if(!confirm(message)){
           chk.checked = !chk.checked;
           return;
         }
         const nowISO = new Date().toISOString();
         rec.checked = chk.checked;
-        if(chk.checked){
-          rec.last_inspected_at = nowISO;
-        } else {
-          rec.last_inspected_at = '';
-        }
+        if(chk.checked){ rec.last_inspected_at = nowISO; } else { rec.last_inspected_at = ''; }
         updateDateTime();
         persistCityRec(city, rec);
         row.className = `row ${rowBg(rec)}`;
       });
-
-      // middle column: station title and sub-line (date/time is rendered in the right column)
       const mid = document.createElement('div');
       mid.className = 'mid';
       const title = document.createElement('div');
@@ -394,27 +568,18 @@ const Junkai = (()=>{
       title.textContent = rec.station || '';
       const sub = document.createElement('div');
       sub.className = 'sub';
-      // display model and plate on separate lines to prevent overlap with right column
-      // Use innerHTML with a <br> so the two values wrap naturally
       sub.innerHTML = `${rec.model || ''}<br>${rec.number || ''}`;
-      // append title and sub into mid (stacked)
       mid.appendChild(title);
       mid.appendChild(sub);
-
-      // date/time handled inside the left column; no separate date column
-
-      // right column: holds status select and the inspection button
       const right = document.createElement('div');
       right.className = 'rightcol';
-
-
       const sel = document.createElement('select');
       sel.className = 'state';
-      [['normal', '通常'], ['stop', '停止'], ['skip', '不要']].forEach(([v, lab]) => {
+      [['normal','通常'], ['stop','停止'], ['skip','不要']].forEach(([v,lab])=>{
         const o = document.createElement('option');
         o.value = v;
         o.textContent = lab;
-        if (rec.status === v) o.selected = true;
+        if(rec.status === v) o.selected = true;
         sel.appendChild(o);
       });
       sel.addEventListener('change', () => {
@@ -426,9 +591,6 @@ const Junkai = (()=>{
       btn.className = 'btn tiny';
       btn.textContent = '点検';
       btn.addEventListener('click', () => {
-        // Build query parameters for the tire app.  The tire app expects
-        // `station`, `model` and `plate_full` as query keys.  See the
-        // tire-app's index.html: it reads `plate_full` for the full plate number.
         const q = new URLSearchParams({
           station: rec.station || '',
           model: rec.model || '',
@@ -436,11 +598,8 @@ const Junkai = (()=>{
         });
         location.href = `${TIRE_APP_URL}?${q.toString()}`;
       });
-      // append controls to right column
       right.appendChild(sel);
       right.appendChild(btn);
-
-      // append columns: left column, mid column, right column
       row.appendChild(left);
       row.appendChild(mid);
       row.appendChild(right);
@@ -448,17 +607,17 @@ const Junkai = (()=>{
     }
   }
 
+  /**
+   * Persist a record update to local storage by matching on ui_index or plate number.
+   * @param {string} city City name.
+   * @param {Object} rec Record to persist.
+   */
   function persistCityRec(city, rec){
-    // Update the record in localStorage by matching on the UI index when available.
-    // Using ui_index ensures we update the exact row instead of matching solely on number,
-    // which can be blank or duplicated across entries. Fallback to number for older records.
     const arr = readCity(city);
-    // find by ui_index if defined
     let i = -1;
     if(rec.ui_index){
       i = arr.findIndex(x => (x.ui_index || '') === (rec.ui_index || ''));
     }
-    // fallback to matching by number if no ui_index match
     if(i < 0){
       i = arr.findIndex(x => (x.number || '') === (rec.number || ''));
     }
@@ -470,8 +629,9 @@ const Junkai = (()=>{
     saveCity(city, arr);
   }
 
+  // Expose public API
   return {
-    initIndex: initIndex,
+    initIndex,
     initCity: mountCity,
   };
 })();
