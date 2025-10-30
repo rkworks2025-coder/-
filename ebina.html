@@ -1,1 +1,33 @@
-<!-- ebina.html for v8p JST安定版 -->
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>海老名市</title>
+  <!-- include version query to bust cache -->
+  <link rel="stylesheet" href="style.css?v=8k" />
+</head>
+<body>
+  <div class="ver">v8p（JST安定版）</div>
+  <header class="appbar">
+    <a class="btn" href="index.html">戻る</a>
+    <div class="title" style="margin:0 auto;">海老名市</div>
+    <div style="width:70px"></div>
+  </header>
+
+  <main class="wrap">
+    <p id="hint" class="hint">同期後に表示されます。</p>
+    <div id="list" class="list"></div>
+  </main>
+
+  <!-- include version query to bust cache -->
+  <script src="app.js?v=8k"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof Junkai !== 'undefined' && Junkai.initCity) {
+        Junkai.initCity("海老名市");
+      }
+    });
+  </script>
+</body>
+</html>
