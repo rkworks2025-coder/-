@@ -184,8 +184,13 @@ const Junkai = (()=>{
       status(`${actionLabel}取得中…`);
       showProgress(true, 25);
       const json = await fetchJSONWithRetry(url, 2);
+      
+      // ===== 修正箇所 (179行目) =====
       // Determine data array
-      let arr = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.values) ? json.values : []);
+      // [修正] json.data, json.values, json.rows のいずれかが配列であればそれを採用する
+      let arr = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.values) ? json.values : (Array.isArray(json?.rows) ? json.rows : []));
+      // ===== 修正ここまで =====
+
       if(!Array.isArray(arr)) arr = [];
       if(arr.length === 0 && Array.isArray(json) && Array.isArray(json[0])) arr = json;
       // Skip header row for InspectionLog if present
@@ -635,3 +640,4 @@ const Junkai = (()=>{
     initCity: mountCity,
   };
 })();
+
