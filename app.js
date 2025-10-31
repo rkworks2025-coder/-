@@ -1,213 +1,204 @@
-// v8u 巡回アプリ / JST基準・初期同期=GET / 同期=POST→GET
-(() => {
-  "use strict";
+/* 巡回アプリ v8v  通信安定＆7日ルール基準版
+   - 初期同期: GET /?action=pull
+   - 同期:     POST /?action=push  -> 成功後に GET /?action=pull
+   - GAS_URL: 最新デプロイURL（リュウ指定）
+*/
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
-  const APP_VERSION = "v8u";
-  const LS_KEY_DATA = "junkai:data";
-  const LS_KEY_PENDING = "junkai:pending"; // 送信待ち変更
+const Junkai = (() => {
+  const LS_KEY = "junkai:vehicles";
+  const LS_TS  = "junkai:ts";
 
-  const qs = (s, r=document) => r.querySelector(s);
+  // --- Util ---
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const now = () => Date.now();
 
-  function jstTodayStr() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,"0");
-    const dd = String(d.getDate()).padStart(2,"0");
-    return `${y}-${m}-${dd}`; // JST日付のみ
+  function saveLocal(data) {
+    localStorage.setItem(LS_KEY, JSON.stringify(data || []));
+    localStorage.setItem(LS_TS, String(now()));
+  }
+  function loadLocal() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
+    catch(e){ return []; }
   }
 
-  function within7d(dateStr) {
-    if (!dateStr) return false;
-    const parts = dateStr.split(/[-/]/).map(Number);
-    const d = new Date(parts[0], (parts[1]-1), parts[2]);
-    if (isNaN(d.getTime())) return false;
-    const now = new Date();
-    const diff = now - d; // JSTローカル
-    return diff < 7*24*60*60*1000;
+  // 表記ゆれ吸収：日本語/英語/ケース違い対応
+  function val(obj, keys) {
+    for (const k of keys) {
+      if (k in obj) return obj[k];
+      const hit = Object.keys(obj).find(x => x.toLowerCase() === k.toLowerCase());
+      if (hit) return obj[hit];
+    }
+    return "";
   }
 
-  function saveLS(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
-  function loadLS(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def; }catch(_){ return def; } }
+  // 7日ルール（JSTでOK）
+  function within7d(iso) {
+    if (!iso) return false;
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return false;
+    return (now() - t) < (7*24*60*60*1000);
+  }
 
-  async function getJSON(url){
-    const res = await fetch(url + (url.includes("?")?"&":"?") + `_=${Date.now()}`, { cache:"no-store" });
-    if(!res.ok) throw new Error("GET failed");
+  // ISO生成はJST日付入力から安全に
+  function toISOFromYYYYMMDD(yyyy_mm_dd) {
+    // "2025-11-01" -> JST 00:00
+    if (!yyyy_mm_dd) return "";
+    const [y,m,d] = yyyy_mm_dd.split("-").map(s=>parseInt(s,10));
+    if (!y || !m || !d) return "";
+    // ローカル(JST)の 00:00 として作る
+    const dt = new Date(y, m-1, d, 0, 0, 0, 0);
+    return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0,0,0,0).toISOString();
+  }
+
+  // --- 通信 ---
+  async function httpGet(params) {
+    const url = new URL(GAS_URL);
+    Object.entries(params || {}).forEach(([k,v]) => url.searchParams.set(k, v));
+    url.searchParams.set("_", String(now())); // cache bust
+    const res = await fetch(url.toString(), { method: "GET" });
+    if (!res.ok) throw new Error(`GET ${res.status}`);
     return await res.json();
   }
 
-  async function postJSON(url, body){
-    const res = await fetch(url, {
+  async function httpPost(params, body) {
+    const url = new URL(GAS_URL);
+    Object.entries(params || {}).forEach(([k,v]) => url.searchParams.set(k, v));
+    url.searchParams.set("_", String(now()));
+    const res = await fetch(url.toString(), {
       method: "POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify(body)
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
     });
-    if(!res.ok) throw new Error("POST failed");
-    return await res.json().catch(()=> ({}));
+    if (!res.ok) throw new Error(`POST ${res.status}`);
+    return await res.json();
   }
 
-  function normalizeRecord(raw){
-    // できる限り柔軟にキーを拾う（日本語/英語混在対策）
-    const r = {};
-    const g = (keys, def="") => {
-      for(const k of keys){ if (k in raw && raw[k] != null && `${raw[k]}`.trim() !== "") return String(raw[k]); }
-      return def;
-    };
-    r.id       = g(["id","ID","車両ID","plate_id","plate_full"]);
-    r.station  = g(["ステーション","station","ステーション名","Station"]);
-    r.city     = g(["市区町村","city","所在地","エリア"]);
-    r.model    = g(["車種","model","車名"]);
-    r.note     = g(["備考","note","備考欄"]);
-    r.status   = g(["status","ステータス"], ""); // "", "checked"等
-    r.last     = g(["last_inspected_at","最終点検日","last","last_at","date"], "");
-    // 日付を YYYY-MM-DD に揃える（JST）
-    if (r.last && /^\d{4}-\d{2}-\d{2}$/.test(r.last) === false) {
-      const m = r.last.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-      if (m) {
-        const y = m[1], mo = m[2].padStart(2,"0"), d = m[3].padStart(2,"0");
-        r.last = `${y}-${mo}-${d}`;
-      } else {
-        r.last = "";
-      }
-    }
-    return r;
+  // GASのpull結果を内部形式に正規化
+  function normalizeRecords(arr) {
+    return (arr || []).map(row => {
+      const station = val(row, ["ステーション名","station","ステーション","station_name"]);
+      const car     = val(row, ["車番","plate","車両番号","car","number"]);
+      const city    = val(row, ["エリア","area","地域","city"]);
+      const lastRaw = val(row, ["last_inspected_at","最終点検日時","最終点検","last"]);
+      const last    = lastRaw && /^\d{4}-\d{2}-\d{2}/.test(lastRaw)
+        ? toISOFromYYYYMMDD(lastRaw.slice(0,10))
+        : (lastRaw || ""); // すでにISOの可能性も許容
+
+      const status  = val(row, ["status","ステータス","状態"]);
+      return {
+        station: String(station || "").trim(),
+        plate:   String(car || "").trim(),
+        city:    String(city || "").trim(),
+        last_inspected_at: last,
+        status:  String(status || "").trim()
+      };
+    });
   }
 
-  function cityMatch(rec, page){
-    if (page === "index") return true;
-    // cityが無ければ station/所在地から推測
-    const label = (rec.city || rec.station || "").toString();
-    if (page === "yamato") return /大和/.test(label);
-    if (page === "ebina")  return /海老名/.test(label);
-    if (page === "chofu")  return /調布/.test(label);
-    return true;
+  // --- UI ---
+  function qs(id){ return document.querySelector(id); }
+  function setStatus(msg){ const el = qs("#syncStatus"); if (el) el.textContent = msg || ""; }
+
+  function formatDateYMD(iso){
+    if (!iso) return "-";
+    const d = new Date(iso);
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const dd= String(d.getDate()).padStart(2,"0");
+    return `${y}/${m}/${dd}`;
   }
 
-  function render(list, page){
-    const wrap = qs("#list");
-    wrap.innerHTML = "";
-    const frag = document.createDocumentFragment();
-    for(const rec of list){
-      if (!cityMatch(rec, page)) continue;
-      const card = document.createElement("article");
+  function renderList(records) {
+    const host = qs("#list");
+    if (!host) return;
+    host.innerHTML = "";
+    for (const r of records) {
+      const ok = within7d(r.last_inspected_at);
+      const card = document.createElement("div");
       card.className = "card";
-      const ok = rec.status === "checked" && within7d(rec.last);
-      const bdgClass = ok ? "badge ok" : (within7d(rec.last) ? "badge warn" : "badge");
-      const lastLabel = rec.last ? rec.last.replaceAll("/","-") : "—";
-
       card.innerHTML = `
         <div class="row">
-          <div>
-            <div><strong>${rec.station || "-"}</strong></div>
-            <div class="note">${rec.model || ""} / ${rec.id || ""}</div>
-          </div>
-          <div class="${bdgClass}">${within7d(rec.last) ? "7日以内" : "要確認"}</div>
+          <div class="title">${r.plate || "不明"}</div>
+          <span class="badge ${ok ? "ok":"warn"}">${ok ? "7日以内":"要巡回"}</span>
         </div>
-        <div class="row" style="margin-top:8px">
-          <div class="note">最終点検日: <span>${lastLabel}</span></div>
-          <div>
-            <label style="font-size:13px">
-              <input type="checkbox" data-id="${rec.id}" ${rec.status==="checked"?"checked":""}/>
-              チェック済みにする
-            </label>
-          </div>
-        </div>
+        <div class="meta">${r.station || ""} / ${r.city || ""}</div>
+        <div class="meta">最終点検: ${formatDateYMD(r.last_inspected_at)}</div>
       `;
-      frag.appendChild(card);
+      host.appendChild(card);
     }
-    wrap.appendChild(frag);
-
-    wrap.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
-      chk.addEventListener('change', (e)=>{
-        const id = e.currentTarget.getAttribute("data-id");
-        toggleChecked(id, e.currentTarget.checked);
-      });
-    });
   }
 
-  function toggleChecked(id, checked){
-    const data = loadLS(LS_KEY_DATA, []);
-    const rec = data.find(r => r.id === id);
-    if (!rec) return;
-    if (checked){
-      rec.status = "checked";
-      rec.last = jstTodayStr();
-    } else {
-      rec.status = "";
-    }
-    saveLS(LS_KEY_DATA, data);
-    // pending に記録
-    const pend = loadLS(LS_KEY_PENDING, {});
-    pend[id] = { id, status: rec.status, last: rec.last };
-    saveLS(LS_KEY_PENDING, pend);
-    // 画面更新（現在ページで再描画）
-    const page = document.body.getAttribute("data-page") || "index";
-    render(data, page);
+  function calcSummary(records){
+    const total = records.length;
+    const within = records.filter(r => within7d(r.last_inspected_at)).length;
+    const over = total - within;
+    const a = id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(id==="sumTotal"?total:id==="sumWithin"?within:over);
+    };
+    a("sumTotal"); a("sumWithin"); a("sumOver");
   }
 
-  async function initialSync(page){
-    setStatus("初期同期中…"); progress(10);
-    try{
-      const json = await getJSON(GAS_URL); // GETのみ
-      progress(50);
-      const list = Array.isArray(json) ? json.map(normalizeRecord) :
-                   Array.isArray(json?.rows) ? json.rows.map(normalizeRecord) : [];
-      saveLS(LS_KEY_DATA, list);
-      saveLS(LS_KEY_PENDING, {});
-      progress(100);
-      render(list, page);
+  // --- Public Views ---
+  async function runInitialSync() {
+    try {
+      setStatus("初期同期中…");
+      // 全体管理から必要最小項目のみpull（GAS側で不要列も返るが問題ない）
+      const json = await httpGet({ action: "pull" });
+      const items = Array.isArray(json?.data) ? json.data : [];
+      const norm = normalizeRecords(items);
+      saveLocal(norm);
+      calcSummary(norm);
+      renderList(norm);
       setStatus("初期同期完了");
-    } catch(e){
+    } catch (e) {
       console.error(e);
       setStatus("通信または解析エラー");
-      progress(0,true);
     }
   }
 
-  async function syncNow(page){
-    setStatus("同期中…"); progress(20);
-    const pend = loadLS(LS_KEY_PENDING, {});
-    const changes = Object.values(pend);
-    try{
-      // POST → 受領後 GET
-      await postJSON(GAS_URL + "?action=push", { changes, ts: Date.now() });
-      progress(60);
-      const json = await getJSON(GAS_URL);
-      const list = Array.isArray(json) ? json.map(normalizeRecord) :
-                   Array.isArray(json?.rows) ? json.rows.map(normalizeRecord) : [];
-      saveLS(LS_KEY_DATA, list);
-      saveLS(LS_KEY_PENDING, {});
-      progress(100);
-      render(list, page);
+  async function runSync() {
+    try {
+      setStatus("同期中…");
+      const local = loadLocal();
+
+      // 送信用に最小フィールドをPOST（GAS側でinspectionlogへ反映）
+      const payload = local.map(r => ({
+        plate: r.plate,
+        last_inspected_at: r.last_inspected_at,
+        status: r.status
+      }));
+
+      await httpPost({ action: "push" }, { rows: payload });
+
+      // 直後にfresh pullで整合
+      const fresh = await httpGet({ action: "pull" });
+      const norm = normalizeRecords(Array.isArray(fresh?.data) ? fresh.data : []);
+      saveLocal(norm);
+      calcSummary(norm);
+      renderList(norm);
       setStatus("同期完了");
-    }catch(e){
+    } catch (e) {
       console.error(e);
       setStatus("通信または解析エラー");
-      progress(0,true);
     }
   }
 
-  function setStatus(s){ const el = qs("#status"); if (el) el.textContent = s; }
-  function progress(p, hide){
-    const wrap = qs(".progress-wrap"); const bar = qs("#progress");
-    if (!wrap || !bar) return;
-    if (hide){ wrap.hidden = false; bar.style.width = "0%"; wrap.hidden = true; return; }
-    wrap.hidden = false; bar.style.width = `${Math.max(0,Math.min(100,p))}%`;
-    if (p >= 100){ setTimeout(()=>{ wrap.hidden = true; bar.style.width="0%"; }, 400); }
+  function mountIndex(){
+    const data = loadLocal();
+    calcSummary(data);
+    renderList(data);
+  }
+  function mountCity(cityName){
+    const data = loadLocal().filter(r => (r.city||"") === cityName);
+    renderList(data);
   }
 
-  function wire(page){
-    qs("#version")?.replaceChildren(APP_VERSION);
-    qs("#btn-init")?.addEventListener("click", ()=> initialSync(page));
-    qs("#btn-sync")?.addEventListener("click", ()=> syncNow(page));
-  }
-
-  window.Junkai = {
-    init(page){
-      wire(page);
-      // 起動時はローカル表示（無ければ空）
-      const list = loadLS(LS_KEY_DATA, []);
-      render(list, page);
-    }
+  return {
+    runInitialSync,
+    runSync,
+    mountIndex,
+    mountCity
   };
 })();
