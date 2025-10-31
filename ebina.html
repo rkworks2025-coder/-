@@ -2,38 +2,40 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>海老名エリア v8u</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>海老名エリア v8v</title>
+  <link rel="stylesheet" href="./style.css" />
 </head>
-<body data-page="ebina">
+<body>
   <header class="topbar">
     <h1>海老名エリア</h1>
-    <nav class="cities">
-      <a href="index.html">全体</a>
-      <a href="yamato.html">大和</a>
-      <a href="chofu.html">調布</a>
+    <nav class="nav">
+      <a href="./index.html">全体</a>
+      <a href="./yamato.html">大和</a>
+      <a href="./chofu.html">調布</a>
     </nav>
   </header>
 
-  <section class="controls">
-    <button id="btn-init">初期同期</button>
-    <button id="btn-sync">同期</button>
-    <span id="status" class="status"></span>
-  </section>
+  <main class="container">
+    <div class="controls">
+      <button id="btnInit">初期同期</button>
+      <button id="btnSync">同期</button>
+      <span id="syncStatus" class="status"></span>
+    </div>
 
-  <section class="progress-wrap" hidden>
-    <div class="progress" id="progress"></div>
-  </section>
+    <section id="list" class="list"></section>
+  </main>
 
-  <main id="list" class="card-list"></main>
+  <footer class="footer">
+    <span class="version-badge">v8v</span>
+  </footer>
 
-  <footer><span id="version">v8u</span></footer>
-
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
-      Junkai.init('ebina');
+      Junkai.mountCity('海老名');
+      document.getElementById('btnInit').addEventListener('click', () => Junkai.runInitialSync());
+      document.getElementById('btnSync').addEventListener('click', () => Junkai.runSync());
     });
   </script>
 </body>
