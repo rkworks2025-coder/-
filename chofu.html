@@ -2,27 +2,30 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>調布市 v8w</title>
-  <link rel="stylesheet" href="./style.css" />
-  <script defer src="./app.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>調布市</title>
+  <link rel="stylesheet" href="style.css?v=8x" />
 </head>
-<body data-page="city" data-city="chofu">
-  <header class="topbar">
-    <a class="back" href="./index.html">← 戻る</a>
-    <h1>調布市</h1>
+<body>
+  <div class="ver">v8x</div>
+  <header class="appbar">
+    <a class="btn" href="index.html">戻る</a>
+    <div class="title" style="margin:0 auto;">調布市</div>
+    <div style="width:70px"></div>
   </header>
 
-  <section class="toolbar">
-    <button id="btnInit">初期同期</button>
-    <button id="btnSync">同期</button>
-  </section>
+  <main class="wrap">
+    <p id="hint" class="hint">同期後に表示されます。</p>
+    <div id="list" class="list"></div>
+  </main>
 
-  <main id="list" class="list"></main>
-
-  <div id="toast" class="toast" hidden></div>
-  <div id="progress" class="progress" hidden><div class="bar"></div></div>
-
-  <footer class="ver">v8w</footer>
+  <script src="app.js?v=8x"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof Junkai !== 'undefined' && Junkai.initCity) {
+        Junkai.initCity('調布市');
+      }
+    });
+  </script>
 </body>
 </html>
