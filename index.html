@@ -2,38 +2,47 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>巡回アプリ v8u</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>巡回アプリ v8v</title>
+  <link rel="stylesheet" href="./style.css" />
 </head>
-<body data-page="index">
+<body>
   <header class="topbar">
     <h1>巡回アプリ</h1>
-    <nav class="cities">
-      <a href="yamato.html">大和</a>
-      <a href="ebina.html">海老名</a>
-      <a href="chofu.html">調布</a>
+    <nav class="nav">
+      <a href="./yamato.html">大和</a>
+      <a href="./ebina.html">海老名</a>
+      <a href="./chofu.html">調布</a>
     </nav>
   </header>
 
-  <section class="controls">
-    <button id="btn-init">初期同期</button>
-    <button id="btn-sync">同期</button>
-    <span id="status" class="status"></span>
-  </section>
+  <main class="container">
+    <div class="controls">
+      <button id="btnInit">初期同期</button>
+      <button id="btnSync">同期</button>
+      <span id="syncStatus" class="status"></span>
+    </div>
 
-  <section class="progress-wrap" hidden>
-    <div class="progress" id="progress"></div>
-  </section>
+    <section class="summary">
+      <div>総台数: <span id="sumTotal">-</span></div>
+      <div>7日以内（青）: <span id="sumWithin">-</span></div>
+      <div>要巡回（白）: <span id="sumOver">-</span></div>
+    </section>
 
-  <main id="list" class="card-list"></main>
+    <section id="list" class="list"></section>
+  </main>
 
-  <footer><span id="version">v8u</span></footer>
+  <footer class="footer">
+    <span class="version-badge">v8v</span>
+  </footer>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
   <script>
+    // トップページは全域一覧
     window.addEventListener('DOMContentLoaded', () => {
-      Junkai.init('index');
+      Junkai.mountIndex();
+      document.getElementById('btnInit').addEventListener('click', () => Junkai.runInitialSync());
+      document.getElementById('btnSync').addEventListener('click', () => Junkai.runSync());
     });
   </script>
 </body>
