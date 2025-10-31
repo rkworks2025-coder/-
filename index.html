@@ -4,21 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <!-- include version query to bust cache -->
-  <link rel="stylesheet" href="style.css?v=8x" />
+  <link rel="stylesheet" href="style.css?v=8y" />
 </head>
 <body>
-  <!-- Display current version -->
-  <div class="ver">v8x</div>
+  <div class="ver">v8y</div>
+
   <header class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
-      <!-- Button for initial sync from 全体管理 -->
       <button id="initSyncBtn" class="btn primary">初期同期</button>
-      <!-- Button for regular sync (push→pull InspectionLog) -->
       <button id="syncBtn" class="btn primary">同期</button>
-      <!-- Button to push local changes to InspectionLog only -->
-      <button id="pushLogBtn" class="btn primary">データ送信</button>
     </div>
   </header>
 
@@ -59,7 +54,6 @@
         </div>
       </a>
 
-      <!-- aggregated card for all areas -->
       <div class="cardlink">
         <h2>全エリア</h2>
         <div class="meta">
@@ -76,7 +70,6 @@
     </section>
   </main>
 
-  <!-- progress modal -->
   <div id="progressModal" class="modal" role="dialog" aria-modal="true" aria-label="進捗">
     <div class="dialog">
       <div id="statusTextModal">処理中…</div>
@@ -84,8 +77,7 @@
     </div>
   </div>
 
-  <!-- include version query to bust cache -->
-  <script src="app.js?v=8x"></script>
+  <script src="app.js?v=8y"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (typeof Junkai !== 'undefined' && Junkai.initIndex) {
