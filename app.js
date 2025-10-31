@@ -1,313 +1,637 @@
-// v8z：v8k UIを完全維持しつつ、通信と振り分けだけを修正
-var Junkai = (function(){
+// ====== 設定 ======
+const Junkai = (()=>{
 
-  var GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
-  var CITIES = ["大和市","海老名市","調布市"];
-  function lsKey(city){ return "junkai:city:"+city; }
+  const GAS_URL = "https://script.google.com/macros/s/AKfycby9RpFiUbYu6YX6JW9XfwbDx36_4AIlGEQMOxR3SnxgNdoRUJKfyxvF3b1SEYwuHb3X/exec";
+  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
+  const CITIES = ["大和市","海老名市","調布市"];
+  const PREFIX = { "大和市":"Y", "海老名市":"E", "調布市":"C" };
+  const LS_KEY = (c) => `junkai:city:${c}`;
+  const TIMEOUT_MS = 15000;
+  const DEBUG_ERRORS = true;
 
-  var TIMEOUT_MS = 15000;
+  // ===== utils =====
+  const sleep = (ms)=> new Promise(r=>setTimeout(r,ms));
 
-  function showProgress(show, pct){
-    var modal = document.getElementById('progressModal');
-    if(!modal) return;
-    if(show){
-      modal.classList.add('show');
-      var bar = document.getElementById('progressBar');
-      if(bar && typeof pct === 'number'){
-        if(pct<0) pct=0; if(pct>100) pct=100;
-        bar.style.width = pct+'%';
+  /**
+   * Show or hide the progress modal and optionally update its bar width.
+   * @param {boolean} on Whether to show the modal.
+   * @param {number} pct Percentage (0–100) of the progress bar width.
+   */
+  function showProgress(on, pct){
+    const m = document.getElementById('progressModal');
+    const bar = document.getElementById('progressBar');
+    if(!m) return;
+    if(on) m.classList.add('show'); else m.classList.remove('show');
+    if(bar && typeof pct==='number') bar.style.width = Math.max(0,Math.min(100,pct)) + '%';
+  }
+  /**
+   * Update the status text displayed on the index page.
+   * @param {string} txt The text to display.
+   */
+  function status(txt){
+    const el = document.getElementById('statusText'); if(el) el.textContent = txt;
+  }
+
+  /**
+   * Normalize a raw record object into a consistent shape.
+   * Trims strings and sets sensible defaults for optional fields.
+   * @param {Object} r Raw record object.
+   */
+  function normalize(r){
+    return {
+      city: (r.city||'').trim(),
+      station: (r.station||'').trim(),
+      model: (r.model||'').trim(),
+      number: (r.number||'').trim(),
+      status: (r.status||'normal').trim(),
+      checked: !!r.checked,
+      index: (Number.isFinite(+r.index) && +r.index>0)? parseInt(r.index,10) : 0,
+      last_inspected_at: (r.last_inspected_at||'').trim(),
+      ui_index: r.ui_index || '',
+      ui_index_num: r.ui_index_num || 0
+    };
+  }
+
+  /**
+   * Helper to fetch JSON from a URL with retries.
+   * Aborts requests after TIMEOUT_MS and retries up to `retry` times.
+   * @param {string} url The URL to fetch.
+   * @param {number} retry Number of retries.
+   */
+  async function fetchJSONWithRetry(url, retry=2){
+    let lastErr = null;
+    for(let i=0;i<=retry;i++){ 
+      try{
+        const ctl = new AbortController();
+        const t = setTimeout(()=>ctl.abort(), TIMEOUT_MS);
+        const res = await fetch(url, { method:'GET', cache:'no-store', redirect:'follow', signal: ctl.signal });
+        clearTimeout(t);
+        const raw = await res.text();
+        // try parse JSON (strip BOM)
+        const text = raw.replace(/^\ufeff/, '');
+        let json = null;
+        try{ json = JSON.parse(text); }
+        catch(e){ 
+          if(DEBUG_ERRORS) console.warn('JSON parse fail, first 200 chars:', text.slice(0,200));
+          throw new Error('parse-fail');
+        }
+        return json;
+      }catch(e){
+        lastErr = e;
+        await sleep(400*(i+1));
       }
-    }else{
-      modal.classList.remove('show');
-      var bar2 = document.getElementById('progressBar');
-      if(bar2) bar2.style.width = '0%';
     }
+    throw lastErr || new Error('fetch-fail');
   }
-  function status(s){
-    var a = document.getElementById('statusText');
-    var b = document.getElementById('statusTextModal');
-    if(a) a.textContent = s;
-    if(b) b.textContent = s;
-  }
-  function fetchJSON(url){
-    var ctrl = new AbortController();
-    var to = setTimeout(function(){ try{ctrl.abort('timeout');}catch(e){} }, TIMEOUT_MS);
-    return fetch(url, { signal: ctrl.signal, cache:'no-store' })
-      .then(function(res){
-        clearTimeout(to);
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        return res.json();
-      });
-  }
+
+  /**
+   * Save an array of records to local storage for a given city.
+   * @param {string} city City name.
+   * @param {Array<Object>} arr Array of record objects.
+   */
   function saveCity(city, arr){
-    try{ localStorage.setItem(lsKey(city), JSON.stringify(arr||[])); }catch(e){}
+    localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
   }
+  /**
+   * Read an array of records from local storage for a given city.
+   * @param {string} city City name.
+   * @returns {Array<Object>} Array of records or empty array.
+   */
   function readCity(city){
-    try{
-      var s = localStorage.getItem(lsKey(city));
-      return s ? JSON.parse(s) : [];
-    }catch(e){ return []; }
+    try{ const s = localStorage.getItem(LS_KEY(city)); if(!s) return []; const a = JSON.parse(s); return Array.isArray(a)? a:[]; }catch(_){ return []; }
   }
 
+  /**
+   * Assign sequential UI indices (e.g. Y1, E2) to records within a city.
+   * @param {string} city City name.
+   * @param {Array<Object>} arr Array of records.
+   */
+  function applyUIIndex(city, arr){
+    const p = PREFIX[city] || '';
+    for(let i=0;i<arr.length;i++){
+      arr[i].ui_index_num = i+1;
+      arr[i].ui_index = p + (i+1);
+    }
+  }
+
+  /**
+   * Count summary values for a city's records (done, stop, skip, total).
+   * @param {Array<Object>} arr Array of records.
+   */
+  function countCity(arr){
+    const c = {done:0, stop:0, skip:0, total:arr.length};
+    for(const it of arr){
+      if(it.status==='stop') c.stop++;
+      else if(it.status==='skip') c.skip++;
+      if(it.checked || it.status==='done') c.done++;
+    }
+    return c;
+  }
+
+  /**
+   * Repaint all counters on the index page and aggregated totals.
+   */
   function repaintCounters(){
-    var sum = {done:0,stop:0,skip:0,total:0,rem:0};
-    function fill(city, idprefix){
-      var arr = readCity(city);
-      var total = arr.length, done=0, stop=0, skip=0;
-      for(var i=0;i<arr.length;i++){
-        var r = arr[i]||{};
-        if(r.status==='済') done++;
-        else if(r.status==='停') stop++;
-        else if(r.status==='不要') skip++;
-      }
-      var rem = Math.max(0, total - (done+stop+skip));
-      var map = {done:'done', stop:'stop', skip:'skip', total:'total', rem:'rem'};
-      for(var k in map){
-        var el = document.getElementById(idprefix+'-'+map[k]);
-        if(!el) continue;
-        el.textContent = (k==='total'? total : (k==='rem'? rem : (k==='done'? done : (k==='stop'? stop : skip))));
-      }
-      sum.done+=done; sum.stop+=stop; sum.skip+=skip; sum.total+=total; sum.rem+=rem;
-    }
-    fill('大和市','yamato');
-    fill('海老名市','ebina');
-    fill('調布市','chofu');
-    var setAll = function(id,v){ var el=document.getElementById(id); if(el) el.textContent=String(v); };
-    setAll('all-done', sum.done); setAll('all-stop', sum.stop);
-    setAll('all-skip', sum.skip); setAll('all-total', sum.total); setAll('all-rem', sum.rem);
-    var hint = document.getElementById('overallHint');
-    if(hint) hint.textContent = sum.total>0 ? ('総件数：'+sum.total) : 'まだ同期されていません';
-  }
-
-  // ---- 正規化：全体管理（初期同期）からの1行 -> 内部レコード
-  function normalizeFromAdminRow(o){
-    // 期待：オブジェクト：{ステーション名, 市区町村, 車種(名), 登録番号, ...}
-    var station = String(o['ステーション名']||'').trim();
-    var city    = String(o['市区町村']||'').trim();
-    var model   = String((o['車種名']!=null?o['車種名']:o['車種'])||'').trim();
-    var plate   = String(o['登録番号']||'').trim();
-    return {
-      city: city,
-      station: station,
-      model: model,
-      plate: plate,
-      status: '',
-      last_inspected: '',
-      last_inspected_at: ''
+    const map = {
+      "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
+      "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total', rem:'#ebina-rem'},
+      "調布市":    {done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total', rem:'#chofu-rem'},
     };
-  }
-
-  // ---- 正規化：InspectionLog からの1行 -> 内部レコード
-  function normalizeFromLogRow(o){
-    var station = String(o['ステーション名']||o['station']||'').trim();
-    var city    = String(o['市区町村']||o['city']||'').trim();
-    var model   = String((o['車種名']!=null?o['車種名']:o['車種']||o['model']||'')).trim();
-    var plate   = String(o['登録番号']||o['plate']||'').trim();
-    var status  = String(o['状態']||o['status']||'').trim();
-    var last    = String(o['最終作業日']||o['last_inspected']||'').trim();
-    var lastAt  = String(o['最終作業日時']||o['last_inspected_at']||'').trim();
-    return {
-      city: city,
-      station: station,
-      model: model,
-      plate: plate,
-      status: status,
-      last_inspected: last,
-      last_inspected_at: lastAt
-    };
-  }
-
-  // ---- 初期同期：全体管理 GET → 市区町村で分配保存
-  function doInitialSync(){
-    status('初期同期開始…'); showProgress(true, 10);
-    // リセット
-    for(var i=0;i<CITIES.length;i++){ try{ localStorage.removeItem(lsKey(CITIES[i])); }catch(e){} }
-    repaintCounters();
-
-    var url = GAS_URL+'?action=pull&sheet='+encodeURIComponent('全体管理')+'&_='+(Date.now());
-    status('全体管理 取得中…'); showProgress(true, 30);
-
-    return fetchJSON(url).then(function(json){
-      if(!Array.isArray(json)) throw new Error('invalid response (not array)');
-      // 独立バケット（参照共有禁止）
-      var buckets = { '大和市':[], '海老名市':[], '調布市':[] };
-      for(var i=0;i<json.length;i++){
-        var row = json[i];
-        if(!row || typeof row!=='object') continue;
-        var rec = normalizeFromAdminRow(row);
-        if(buckets.hasOwnProperty(rec.city)) buckets[rec.city].push(rec);
+    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
+    for(const city of CITIES){
+      const arr = readCity(city);
+      const cnt = countCity(arr);
+      overallTotal += cnt.total;
+      overallDone += cnt.done;
+      overallStop += cnt.stop;
+      overallSkip += cnt.skip;
+      const m = map[city];
+      for(const k of ['done','stop','skip','total']){
+        const el = document.querySelector(m[k]); if(el) el.textContent = cnt[k];
       }
-      // 保存
-      saveCity('大和市',  buckets['大和市'].slice());
-      saveCity('海老名市', buckets['海老名市'].slice());
-      saveCity('調布市',  buckets['調布市'].slice());
-
-      repaintCounters();
-      status('初期同期完了'); showProgress(true, 95);
-    }).catch(function(err){
-      console.error(err);
-      status('初期同期エラー');
-    }).finally(function(){
-      setTimeout(function(){ showProgress(false); }, 350);
-    });
+      const remCount = cnt.total - cnt.done - cnt.skip;
+      const remEl = document.querySelector(m.rem);
+      if(remEl) remEl.textContent = remCount;
+    }
+    const allDoneEl  = document.querySelector('#all-done');
+    const allStopEl  = document.querySelector('#all-stop');
+    const allSkipEl  = document.querySelector('#all-skip');
+    const allTotalEl = document.querySelector('#all-total');
+    const allRemEl   = document.querySelector('#all-rem');
+    if(allDoneEl)  allDoneEl.textContent  = overallDone;
+    if(allStopEl)  allStopEl.textContent  = overallStop;
+    if(allSkipEl)  allSkipEl.textContent  = overallSkip;
+    if(allTotalEl) allTotalEl.textContent = overallTotal;
+    if(allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
+    const hint = document.getElementById('overallHint');
+    if(hint) hint.textContent = overallTotal>0 ? `総件数：${overallTotal}` : 'まだ同期されていません';
   }
 
-  // ---- 同期：POST(push) → InspectionLog GET で反映
-  function doSync(){
-    status('データ送信中…'); showProgress(true, 18);
-    // 全都市レコード結合
-    var all = [];
-    for(var i=0;i<CITIES.length;i++){
-      var arr = readCity(CITIES[i]);
-      if(Array.isArray(arr)) all = all.concat(arr);
-    }
-    // push
-    var params = new URLSearchParams();
-    params.append('action','push');
-    params.append('data', JSON.stringify(all));
-
-    return fetch(GAS_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
-      body: params.toString()
-    }).catch(function(e){
-      console.error('push error', e);
-    }).then(function(){
-      status('同期中…'); showProgress(true, 45);
-      // pull InspectionLog
-      var url = GAS_URL+'?action=pull&sheet='+encodeURIComponent('InspectionLog')+'&_='+(Date.now());
-      return fetchJSON(url);
-    }).then(function(json){
-      if(!Array.isArray(json)) throw new Error('invalid response (log)');
-      var buckets = { '大和市':[], '海老名市':[], '調布市':[] };
-      for(var i=0;i<json.length;i++){
-        var row = json[i];
-        if(!row || typeof row!=='object') continue;
-        var rec = normalizeFromLogRow(row);
-        if(buckets.hasOwnProperty(rec.city)) buckets[rec.city].push(rec);
+  /**
+   * Pull records from the specified sheet (全体管理 or InspectionLog) and save them into local storage.
+   * Displays progress and status messages throughout the operation.
+   * @param {string} sheet Sheet name to pull from.
+   * @param {string} actionLabel Label used in status messages (e.g. '初期同期' or '同期').
+   */
+  async function pullAndSave(sheet, actionLabel){
+    // Start progress
+    status(`${actionLabel}開始…`);
+    showProgress(true, 5);
+    try{
+      // Build URL with sheet parameter and cache-busting timestamp
+      const url = `${GAS_URL}?action=pull&sheet=${encodeURIComponent(sheet)}&_=${Date.now()}`;
+      // Fetch JSON with retry
+      status(`${actionLabel}取得中…`);
+      showProgress(true, 25);
+      const json = await fetchJSONWithRetry(url, 2);
+      // Determine data array
+      let arr = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.values) ? json.values : []);
+      if(!Array.isArray(arr)) arr = [];
+      if(arr.length === 0 && Array.isArray(json) && Array.isArray(json[0])) arr = json;
+      // Skip header row for InspectionLog if present
+      if(sheet === 'InspectionLog' && arr.length > 0 && Array.isArray(arr[0])){
+        const firstRow = arr[0].map(x => typeof x === 'string' ? x.toLowerCase() : '');
+        if(firstRow.includes('city') && firstRow.includes('station')) arr = arr.slice(1);
       }
-      saveCity('大和市',  buckets['大和市'].slice());
-      saveCity('海老名市', buckets['海老名市'].slice());
-      saveCity('調布市',  buckets['調布市'].slice());
-      repaintCounters();
-      status('同期完了'); showProgress(true, 92);
-    }).catch(function(err){
-      console.error(err);
-      status('同期エラー');
-    }).finally(function(){
-      setTimeout(function(){ showProgress(false); }, 350);
-    });
-  }
-
-  // ---- 7日ルール（表示用）
-  function within7d(iso){
-    if(!iso) return false;
-    var d = new Date(iso);
-    if(!isFinite(d.getTime())) return false;
-    var diff = (Date.now() - d.getTime())/86400000;
-    return diff <= 7 + 1e-9;
-  }
-
-  // ---- Cityページ描画
-  function persistCityRec(city, rec){
-    var arr = readCity(city);
-    var idx = -1;
-    for(var i=0;i<arr.length;i++){ if(arr[i] && arr[i].plate===rec.plate){ idx=i; break; } }
-    if(idx>=0) arr[idx]=rec; else arr.push(rec);
-    saveCity(city, arr);
-  }
-  function mountCity(city){
-    var list = document.getElementById('list');
-    var hint = document.getElementById('hint');
-    var arr = readCity(city);
-    if(!Array.isArray(arr) || arr.length===0){
-      if(hint) hint.textContent='同期後に表示されます。';
-      return;
-    }
-    if(hint) hint.remove();
-
-    for(var i=0;i<arr.length;i++){
-      var rec = arr[i];
-
-      var row = document.createElement('div'); row.className='row';
-
-      var left = document.createElement('div'); left.className='leftcol';
-      var leftTop = document.createElement('div'); leftTop.className='left-top';
-
-      var idx = document.createElement('div'); idx.className='idx'; idx.textContent=String(i+1);
-      var chk = document.createElement('input'); chk.type='checkbox'; chk.checked = rec.status==='済';
-      chk.addEventListener('change', function(recCopy){
-        return function(){
-          recCopy.status = this.checked ? '済' : '';
-          if(this.checked){
-            var now = new Date();
-            var yyyy = now.getFullYear();
-            var mm = String(now.getMonth()+1).padStart(2,'0');
-            var dd = String(now.getDate()).padStart(2,'0');
-            recCopy.last_inspected = yyyy+'/'+mm+'/'+dd;
-            recCopy.last_inspected_at = now.toISOString();
-          }
-          persistCityRec(city, recCopy);
-        };
-      }(rec));
-
-      leftTop.appendChild(idx); leftTop.appendChild(chk); left.appendChild(leftTop);
-
-      var mid = document.createElement('div'); mid.className='mid';
-      var title = document.createElement('div'); title.className='title'; title.textContent = rec.station||'';
-      var model = document.createElement('div'); model.className='model'; model.textContent = (rec.model||'')+'｜'+(rec.plate||'');
-      mid.appendChild(title); mid.appendChild(model);
-
-      var right = document.createElement('div'); right.className='rightcol';
-      var btns = document.createElement('div'); btns.className='btns';
-
-      var statusLine = document.createElement('div'); statusLine.className='statusline';
-      var chip1 = document.createElement('span'); chip1.className='chip'; chip1.textContent = rec.status?('状態：'+rec.status):'状態：未';
-      var chip2 = document.createElement('span'); chip2.className='chip'; chip2.textContent = within7d(rec.last_inspected_at)?'7日内':'7日超';
-      statusLine.appendChild(chip1); statusLine.appendChild(chip2);
-
-      var dtDiv = document.createElement('div'); dtDiv.className='datetime';
-      if(rec.last_inspected_at){
-        var d = new Date(rec.last_inspected_at);
-        if(isFinite(d.getTime())){
-          var yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
-          dtDiv.innerHTML = yyyy+'<br>'+mm+'/'+dd;
+      // Helper to convert yyyy/MM/dd or yyyy/MM/dd-HH:mm to ISO string
+      function toISOChecked(s){
+        if(!s) return '';
+        const str = String(s).trim();
+        const parts = str.split('-');
+        let datePart='', timePart='';
+        if(parts.length >= 2){
+          datePart = parts[0].replace(/\//g,'-');
+          timePart = parts[1].split(' ')[0];
+          const dt = new Date(`${datePart}T${timePart}:00`);
+          return Number.isFinite(dt.getTime())? dt.toISOString() : '';
+        } else {
+          datePart = str.replace(/\//g,'-');
+          const dt = new Date(`${datePart}T00:00:00`);
+          return Number.isFinite(dt.getTime())? dt.toISOString() : '';
         }
       }
+      // Prepare buckets per city
+      const buckets = { "大和市":[], "海老名市":[], "調布市":[] };
+      // Process rows based on sheet type
+      if(sheet === 'InspectionLog'){
+        for(const row of arr){
+          if(!Array.isArray(row) || row.length < 7) continue;
+          const city    = (row[0]||'').toString();
+          const station = (row[1]||'').toString();
+          const model   = (row[2]||'').toString();
+          const number  = (row[3]||'').toString();
+          const idxStr  = (row[4]||'').toString();
+          const statusEng= (row[5]||'').toString();
+          const checkedAt=(row[6]||'').toString();
+          const rec = {
+            city, station, model, number,
+            status:'normal', checked:false, index:'', last_inspected_at:'',
+            ui_index: idxStr || '', ui_index_num:0
+          };
+          if(idxStr){
+            const m = idxStr.match(/^(?:[A-Za-z]|[^0-9]*)(\d+)/);
+            if(m){ const num = parseInt(m[1],10); if(Number.isFinite(num)) rec.ui_index_num = num; }
+          }
+          // Map English status to internal fields
+          switch(statusEng){
+            case 'Checked':
+              rec.checked = true;
+              rec.status = 'normal';
+              rec.last_inspected_at = toISOChecked(checkedAt);
+              break;
+            case 'stopped':
+              rec.status = 'stop';
+              break;
+            case 'Unnecessary':
+              rec.status = 'skip';
+              break;
+            case '7days_rule':
+            case '7 day rule':
+              rec.status = '7days_rule';
+              rec.checked = false;
+              rec.last_inspected_at = toISOChecked(checkedAt);
+              break;
+            default:
+              rec.status = 'normal';
+          }
+          if(buckets[city]) buckets[city].push(rec);
+        }
+      } else {
+        // Heuristics for 全体管理 or similar sheets
+        let headerMap = null;
+        if(arr.length > 0 && Array.isArray(arr[0])){
+          const firstRow = arr[0];
+          const lower = firstRow.map(x => (typeof x === 'string' ? x.trim().toLowerCase() : ''));
+          if(lower.some(x => x.includes('city')) && lower.some(x => x.includes('station'))){
+            headerMap = {};
+            for(let i=0;i<firstRow.length;i++){
+              const col = lower[i];
+              if(col.includes('city')) headerMap.city = i;
+              else if(col.includes('station')) headerMap.station = i;
+              else if(col.includes('model')) headerMap.model = i;
+              else if(col.includes('plate') || col.includes('number')) headerMap.number = i;
+              else if(col.includes('status')) headerMap.status = i;
+            }
+            arr = arr.slice(1);
+          }
+        }
+        for(const r of arr){
+          let rowObj;
+          if(Array.isArray(r)){
+            if(headerMap){
+              const city    = r[headerMap.city ?? 0] || '';
+              const station = r[headerMap.station ?? 1] || '';
+              const model   = r[headerMap.model ?? 2] || '';
+              const number  = r[headerMap.number ?? 3] || '';
+              const statusVal = (headerMap.status !== undefined ? (r[headerMap.status] || '') : 'normal');
+              rowObj = { city, station, model, number, status: statusVal || 'normal', checked:false, index:'', last_inspected_at:'' };
+            } else {
+              if(r.length >= 2 && typeof r[1] === 'string' && r[1].trim().toLowerCase() === 'city') continue;
+              if(r.length >= 6 && typeof r[0] === 'string' && r[0].trim().startsWith('TS')){
+                const city    = r[1] || '';
+                const station = r[3] || '';
+                const model   = r[4] || '';
+                const number  = r[5] || '';
+                const statusVal = r[6] || 'normal';
+                rowObj = { city, station, model, number, status: statusVal, checked:false, index:'', last_inspected_at:'' };
+              } else {
+                if(r.length >= 6){
+                  const city    = r[1] || r[0] || '';
+                  const station = r[3] || r[1] || '';
+                  const model   = r[4] || r[2] || '';
+                  const number  = r[5] || r[3] || '';
+                  const statusVal = r[6] || 'normal';
+                  rowObj = { city, station, model, number, status: statusVal, checked:false, index:'', last_inspected_at:'' };
+                } else {
+                  const city    = r[0] || '';
+                  const station = r[1] || '';
+                  const model   = r[2] || '';
+                  const number  = r[3] || '';
+                  const statusVal = r[4] || 'normal';
+                  rowObj = { city, station, model, number, status: statusVal, checked:false, index:'', last_inspected_at:'' };
+                }
+              }
+            }
+          } else if(r && typeof r === 'object'){
+            rowObj = r;
+          } else {
+            continue;
+          }
+          const cityName = (rowObj.city||'').trim();
+          if(!buckets[cityName]) continue;
+          const rec = normalize(rowObj);
+          // For initial sync, clear check state and last inspected date
+          rec.checked = false;
+          rec.last_inspected_at = '';
+          buckets[cityName].push(rec);
+        }
+      }
+      // Assign UI indices and save
+      let wrote = 0;
+      for(const city of CITIES){
+        if(buckets[city].length > 0){
+          applyUIIndex(city, buckets[city]);
+          saveCity(city, buckets[city]);
+          wrote++;
+        }
+      }
+      if(wrote === 0){
+        status(`${actionLabel}失敗：データが空でした（既存データは保持）`);
+        showProgress(false);
+        return;
+      }
+      // Update counters and finish progress
+      repaintCounters();
+      status(`${actionLabel}完了：大和${buckets['大和市'].length || 0} / 海老名${buckets['海老名市'].length || 0} / 調布${buckets['調布市'].length || 0}`);
+      showProgress(true, 100);
+    } catch(e){
+      console.error(`${actionLabel} error`, e);
+      status(`${actionLabel}失敗：通信または解析エラー（既存データは保持）`);
+    } finally {
+      setTimeout(()=>showProgress(false), 350);
+    }
+  }
 
-      right.appendChild(btns);
-      right.appendChild(statusLine);
-      right.appendChild(dtDiv);
+  /**
+   * Initialize the index page: attaches event handlers to buttons and repaints counters.
+   */
+  async function initIndex(){
+    repaintCounters();
+    // Initial sync button: reset local storage then pull 全体管理
+    const initBtn = document.getElementById('initSyncBtn');
+    if(initBtn){
+      initBtn.addEventListener('click', async ()=>{
+        if(!confirm('よろしいですか？')) return;
+        // 事前にローカル保存をリセットし、カウンタを0に
+        status('リセット中…');
+        showProgress(true, 10);
+        for(const c of CITIES){
+          localStorage.removeItem(LS_KEY(c));
+        }
+        repaintCounters();
+        // 続いて全体管理からデータを取得して保存
+        await pullAndSave('全体管理', '初期同期');
+      });
+    }
+    // Sync button: push local changes to InspectionLog then pull updated data
+    const syncBtn = document.getElementById('syncBtn');
+    if(syncBtn){
+      syncBtn.addEventListener('click', async ()=>{
+        // Step 1: push local changes
+        await (async () => {
+          status('データ送信中…');
+          showProgress(true, 15);
+          try {
+            // Gather all records across cities
+            const all = [];
+            for(const c of CITIES){
+              const arrCity = readCity(c);
+              if(Array.isArray(arrCity)) all.push(...arrCity);
+            }
+            const params = new URLSearchParams();
+            params.append('action','push');
+            params.append('data', JSON.stringify(all));
+            const res = await fetch(GAS_URL, {
+              method:'POST',
+              headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+              body: params.toString()
+            });
+            let result = null;
+            try { result = await res.json(); } catch(_){ result = null; }
+            if(result && result.ok){
+              // proceed to pull next
+              status('送信成功、同期中…');
+              showProgress(true, 35);
+            } else {
+              status('送信失敗…');
+              // continue to pull anyway to refresh statuses
+              showProgress(true, 35);
+            }
+          } catch(err){
+            console.error('push error', err);
+            status('送信エラー');
+            // continue to pull anyway
+          }
+        })();
+        // Step 2: pull updated InspectionLog data
+        await pullAndSave('InspectionLog', '同期');
+      });
+    }
+    // Data send button: push local changes to InspectionLog only (manual)
+    const pushBtn = document.getElementById('pushLogBtn');
+    if(pushBtn){
+      pushBtn.addEventListener('click', async ()=>{
+        status('データ送信中…');
+        showProgress(true, 15);
+        try{
+          const all = [];
+          for(const c of CITIES){
+            const arrCity = readCity(c);
+            if(Array.isArray(arrCity)) all.push(...arrCity);
+          }
+          const params = new URLSearchParams();
+          params.append('action','push');
+          params.append('data', JSON.stringify(all));
+          const res = await fetch(GAS_URL, {
+            method:'POST',
+            headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+            body: params.toString()
+          });
+          let result = null;
+          try{ result = await res.json(); }catch(_){ result = null; }
+          if(result && result.ok){
+            status('データ送信完了！');
+          } else {
+            status('更新に失敗しました');
+          }
+        } catch(err){
+          console.error('push error', err);
+          status('更新エラー');
+        } finally {
+          setTimeout(()=>showProgress(false), 350);
+        }
+      });
+    }
+  }
 
+  // ===== City page =====
+  /**
+   * Check if a date is within the last 7 days.
+   * @param {string} last ISO date string.
+   */
+  function within7d(last){
+    if(!last) return false;
+    const t = Date.parse(last);
+    if(!Number.isFinite(t)) return false;
+    return (Date.now() - t) < (7*24*60*60*1000);
+  }
+  /**
+   * Determine the CSS class to apply to a record's row based on its status.
+   * @param {Object} rec Record object.
+   */
+  function rowBg(rec){
+    if(rec.checked) return 'bg-pink';
+    if(rec.status === 'stop') return 'bg-gray';
+    if(rec.status === 'skip') return 'bg-yellow';
+    if(rec.status === '7days_rule' || rec.status === '7 day rule') return 'bg-blue';
+    if(within7d(rec.last_inspected_at)) return 'bg-blue';
+    return 'bg-green';
+  }
+
+  /**
+   * Mount a city's list page: populate the list and attach event handlers.
+   * @param {string} city City name.
+   */
+  function mountCity(city){
+    const list = document.getElementById('list');
+    const hint = document.getElementById('hint');
+    list.innerHTML = '';
+    const arr = readCity(city);
+    if(arr.length===0){ hint.textContent='まだ同期されていません（インデックスの同期を押してください）'; return; }
+    hint.textContent = `件数：${arr.length}`;
+    for(const rec of arr){
+      const row = document.createElement('div');
+      row.className = `row ${rowBg(rec)}`;
+      const left = document.createElement('div');
+      left.className = 'leftcol';
+      const idxDiv = document.createElement('div');
+      idxDiv.className = 'idx';
+      idxDiv.textContent = rec.ui_index || '';
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = !!rec.checked;
+      chk.className = 'chk';
+      const topLeft = document.createElement('div');
+      topLeft.className = 'left-top';
+      topLeft.appendChild(idxDiv);
+      topLeft.appendChild(chk);
+      const dtDiv = document.createElement('div');
+      dtDiv.className = 'datetime';
+      function updateDateTime(){
+        if(rec.last_inspected_at){
+          const d = new Date(rec.last_inspected_at);
+          if(Number.isFinite(d.getTime())){
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const dd = String(d.getDate()).padStart(2,'0');
+            dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
+            dtDiv.style.display = '';
+            return;
+          }
+        }
+        dtDiv.innerHTML = '';
+        dtDiv.style.display = 'none';
+      }
+      updateDateTime();
+      dtDiv.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'date';
+        if(rec.last_inspected_at){
+          const d0 = new Date(rec.last_inspected_at);
+          if(Number.isFinite(d0.getTime())){
+            input.value = d0.toISOString().slice(0,10);
+          }
+        }
+        dtDiv.appendChild(input);
+        if(typeof input.showPicker === 'function'){ input.showPicker(); } else { input.focus(); }
+        input.addEventListener('change', () => {
+          const sel = input.value;
+          dtDiv.removeChild(input);
+          if(!sel) return;
+          if(!confirm('よろしいですか？')) return;
+          const iso = new Date(sel).toISOString();
+          rec.last_inspected_at = iso;
+          persistCityRec(city, rec);
+          updateDateTime();
+          row.className = `row ${rowBg(rec)}`;
+        }, { once: true });
+      });
+      left.appendChild(topLeft);
+      left.appendChild(dtDiv);
+      chk.addEventListener('change', () => {
+        const message = chk.checked ? 'チェックを付けます。よろしいですか？' : 'チェックを外します。よろしいですか？';
+        if(!confirm(message)){
+          chk.checked = !chk.checked;
+          return;
+        }
+        const nowISO = new Date().toISOString();
+        rec.checked = chk.checked;
+        if(chk.checked){ rec.last_inspected_at = nowISO; } else { rec.last_inspected_at = ''; }
+        updateDateTime();
+        persistCityRec(city, rec);
+        row.className = `row ${rowBg(rec)}`;
+      });
+      const mid = document.createElement('div');
+      mid.className = 'mid';
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = rec.station || '';
+      const sub = document.createElement('div');
+      sub.className = 'sub';
+      sub.innerHTML = `${rec.model || ''}<br>${rec.number || ''}`;
+      mid.appendChild(title);
+      mid.appendChild(sub);
+      const right = document.createElement('div');
+      right.className = 'rightcol';
+      const sel = document.createElement('select');
+      sel.className = 'state';
+      [['normal','通常'], ['stop','停止'], ['skip','不要']].forEach(([v,lab])=>{
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = lab;
+        if(rec.status === v) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => {
+        rec.status = sel.value;
+        persistCityRec(city, rec);
+        row.className = `row ${rowBg(rec)}`;
+      });
+      const btn = document.createElement('button');
+      btn.className = 'btn tiny';
+      btn.textContent = '点検';
+      btn.addEventListener('click', () => {
+        const q = new URLSearchParams({
+          station: rec.station || '',
+          model: rec.model || '',
+          plate_full: rec.number || '',
+        });
+        location.href = `${TIRE_APP_URL}?${q.toString()}`;
+      });
+      right.appendChild(sel);
+      right.appendChild(btn);
       row.appendChild(left);
       row.appendChild(mid);
       row.appendChild(right);
-
       list.appendChild(row);
     }
   }
 
-  // ---- Index初期化
-  function initIndex(){
-    repaintCounters();
-
-    var initBtn = document.getElementById('initSyncBtn');
-    if(initBtn){
-      initBtn.addEventListener('click', function(){
-        doInitialSync();
-      });
+  /**
+   * Persist a record update to local storage by matching on ui_index or plate number.
+   * @param {string} city City name.
+   * @param {Object} rec Record to persist.
+   */
+  function persistCityRec(city, rec){
+    const arr = readCity(city);
+    let i = -1;
+    if(rec.ui_index){
+      i = arr.findIndex(x => (x.ui_index || '') === (rec.ui_index || ''));
     }
-
-    var syncBtn = document.getElementById('syncBtn');
-    if(syncBtn){
-      syncBtn.addEventListener('click', function(){
-        doSync();
-      });
+    if(i < 0){
+      i = arr.findIndex(x => (x.number || '') === (rec.number || ''));
     }
+    if(i >= 0){
+      arr[i] = rec;
+    } else {
+      arr.push(rec);
+    }
+    saveCity(city, arr);
   }
 
+  // Expose public API
   return {
-    initIndex: initIndex,
-    initCity: mountCity
+    initIndex,
+    initCity: mountCity,
   };
 })();
