@@ -4,40 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>海老名市</title>
-  <!-- include version query to bust cache -->
-  <link rel="stylesheet" href="style.css?v=8k" />
+  <link rel="stylesheet" href="style.css?v=8x" />
 </head>
 <body>
-  <div class="ver">v8k</div>
-  <header class="appbar"><!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>海老名市 v8w</title>
-  <link rel="stylesheet" href="./style.css" />
-  <script defer src="./app.js"></script>
-</head>
-<body data-page="city" data-city="ebina">
-  <header class="topbar">
-    <a class="back" href="./index.html">← 戻る</a>
-    <h1>海老名市</h1>
-  </header>
-
-  <section class="toolbar">
-    <button id="btnInit">初期同期</button>
-    <button id="btnSync">同期</button>
-  </section>
-
-  <main id="list" class="list"></main>
-
-  <div id="toast" class="toast" hidden></div>
-  <div id="progress" class="progress" hidden><div class="bar"></div></div>
-
-  <footer class="ver">v8w</footer>
-</body>
-</html>
-
+  <div class="ver">v8x</div>
+  <header class="appbar">
     <a class="btn" href="index.html">戻る</a>
     <div class="title" style="margin:0 auto;">海老名市</div>
     <div style="width:70px"></div>
@@ -48,12 +19,11 @@
     <div id="list" class="list"></div>
   </main>
 
-  <!-- include version query to bust cache -->
-  <script src="app.js?v=8k"></script>
+  <script src="app.js?v=8x"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (typeof Junkai !== 'undefined' && Junkai.initCity) {
-        Junkai.initCity("海老名市");
+        Junkai.initCity('海老名市');
       }
     });
   </script>
