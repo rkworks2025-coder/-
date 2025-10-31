@@ -3,30 +3,37 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>調布市</title>
-  <!-- include version query to bust cache -->
-  <link rel="stylesheet" href="style.css?v=8k" />
+  <title>調布エリア v8u</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="ver">v8s</div>
-  <header class="appbar">
-    <a class="btn" href="index.html">戻る</a>
-    <div class="title" style="margin:0 auto;">調布市</div>
-    <div style="width:70px"></div>
+<body data-page="chofu">
+  <header class="topbar">
+    <h1>調布エリア</h1>
+    <nav class="cities">
+      <a href="index.html">全体</a>
+      <a href="yamato.html">大和</a>
+      <a href="ebina.html">海老名</a>
+    </nav>
   </header>
 
-  <main class="wrap">
-    <p id="hint" class="hint">同期後に表示されます。</p>
-    <div id="list" class="list"></div>
-  </main>
+  <section class="controls">
+    <button id="btn-init">初期同期</button>
+    <button id="btn-sync">同期</button>
+    <span id="status" class="status"></span>
+  </section>
 
-  <!-- include version query to bust cache -->
-  <script src="app.js?v=8k"></script>
+  <section class="progress-wrap" hidden>
+    <div class="progress" id="progress"></div>
+  </section>
+
+  <main id="list" class="card-list"></main>
+
+  <footer><span id="version">v8u</span></footer>
+
+  <script src="app.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      if (typeof Junkai !== 'undefined' && Junkai.initCity) {
-        Junkai.initCity("調布市");
-      }
+    window.addEventListener('DOMContentLoaded', () => {
+      Junkai.init('chofu');
     });
   </script>
 </body>
