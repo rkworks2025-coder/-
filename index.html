@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=8y" />
+  <link rel="stylesheet" href="style.css?v=8z" />
 </head>
 <body>
-  <div class="ver">v8y</div>
+  <div class="ver">v8z</div>
 
   <header class="appbar">
     <div class="title">巡回リスト</div>
@@ -77,12 +77,10 @@
     </div>
   </div>
 
-  <script src="app.js?v=8y"></script>
+  <script src="app.js?v=8z"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      if (typeof Junkai !== 'undefined' && Junkai.initIndex) {
-        Junkai.initIndex();
-      }
+    document.addEventListener('DOMContentLoaded', function(){
+      if (typeof Junkai !== 'undefined' && Junkai.initIndex) Junkai.initIndex();
     });
   </script>
 </body>
