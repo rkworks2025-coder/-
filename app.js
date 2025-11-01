@@ -43,7 +43,7 @@ const Junkai = (()=>{
       station: (r.station||'').trim(),
       model: (r.model||'').trim(),
       number: (r.number||'').trim(),
-      status: (r.status||'normal').trim(),
+      status: (r.status||'standby').trim(),
       checked: !!r.checked,
       index: (Number.isFinite(+r.index) && +r.index>0)? parseInt(r.index,10) : 0,
       last_inspected_at: (r.last_inspected_at||'').trim(),
