@@ -1,7 +1,10 @@
+// ★バージョン v10g 用の修正が適用されています (初期化エラー捕捉)
+
+try { // アプリコード全体をtryブロックで囲む
+
 // ====== 設定 ======
 const Junkai = (()=> {
 
-  // ★バージョン v10f 用の修正が適用されています (アプリ起動ロジック強化)
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec"; 
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
   const CITIES = ["大和市","海老名市","調布市"];
@@ -178,21 +181,17 @@ const Junkai = (()=> {
    * Initial data pull from '全体管理'.
    */
   async function initialSync(){
-    // ★修正1: アラートでキャンセルされたら、ここで処理を終了
     if(!confirm('初期同期を行います。現在のローカルデータはリセットされますが、よろしいですか？')) return; 
 
-    // ★修正2: ボタンを無効化し、プログレスバーを表示
     document.getElementById('initSyncBtn').disabled = true;
     showProgress(true, 5, 'リセット中...');
     
-    // 確実なローカルストレージリセットとカウンタリペイント
     CITIES.forEach(c => localStorage.removeItem(LS_KEY(c)));
-    updateIndexCounts(); // カウンターをゼロに戻す
+    updateIndexCounts(); 
     
     showProgress(true, 10, '初期データ取得中 (全体管理)');
     
     try {
-      // 1. GASからデータ取得
       const json = await pullData('全体管理');
       showProgress(true, 40, 'データ処理中');
 
@@ -207,7 +206,6 @@ const Junkai = (()=> {
       const buckets = { [CITIES[0]]:[], [CITIES[1]]:[], [CITIES[2]]:[] };
       let recordCount = 0;
       
-      // 2. データの仕分け (v10eロジック維持)
       arr.forEach((rowObj, index) => {
         const cityName = (rowObj.city||'').trim(); 
         
@@ -226,14 +224,12 @@ const Junkai = (()=> {
           ui_index_num: index 
         };
 
-        // UI表示用のindexを付与 (Y1, E2など、2桁まで)
         newRec.ui_index = `${PREFIX[cityName]}${buckets[cityName].length + 1}`; 
         
         buckets[cityName].push(newRec);
         recordCount++;
       });
       
-      // 3. Local Storageに書き込み
       CITIES.forEach(city => writeCity(city, buckets[city]));
 
       showProgress(true, 100, '初期同期完了');
@@ -243,7 +239,6 @@ const Junkai = (()=> {
       location.reload(); 
 
     } catch(e) {
-      // ★修正3: エラー発生時は必ずエラーモーダルを表示
       document.getElementById('initSyncBtn').disabled = false;
       showError(DEBUG_ERRORS ? (e.message || '不明なエラー') : '初期同期に失敗しました。', '初期同期失敗');
     }
@@ -597,3 +592,14 @@ document.addEventListener('DOMContentLoaded', () => {
         Junkai.init();
     }
 });
+
+} catch (e) {
+    // 致命的な初期化エラーをキャッチし、エラーモーダルを表示
+    const errorMsg = "Fatal Init Error: " + (e.message || '不明なエラー');
+    // DOMがロードされているか確認し、可能であればエラーモーダルを表示
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        alert(errorMsg); // 最後の手段としてalert
+    } else {
+        window.addEventListener('load', () => alert(errorMsg));
+    }
+}
