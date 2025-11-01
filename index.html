@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=10d" />
+  <link rel="stylesheet" href="style.css?v=10e" />
 </head>
 <body>
-  <div class="ver">v10d</div>
+  <div class="ver">v10e</div>
   <header class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
@@ -75,17 +75,10 @@
     </div>
   </div>
 
-  <div id="errorModal" class="modal" aria-hidden="true">
-    <div class="dialog">
-      <h3 id="errorTitle">エラー</h3>
-      <p id="errorMsg" style="color:white;"></p>
-    </div>
-  </div>
-
-  <script src="app.js?v=10d"></script>
+  <script src="app.js?v=10e"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // index.htmlはJunkai.init()を実行
+      // V10dで修正されたinit関数を呼び出す
       if (typeof Junkai !== 'undefined' && Junkai.init) {
         Junkai.init();
       }

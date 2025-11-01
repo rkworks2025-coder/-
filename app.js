@@ -1,7 +1,7 @@
 // ====== 設定 ======
 const Junkai = (()=> {
 
-  // ★バージョン v10d 用の修正が適用されています (リセット機能回復)
+  // ★バージョン v10e 用の修正が適用されています (日時・UIフォーマット統一)
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec"; 
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
   const CITIES = ["大和市","海老名市","調布市"];
@@ -48,18 +48,21 @@ const Junkai = (()=> {
   }
 
   /**
-   * Format a Date object to JST YYYY/MM/DD HH:mm:ss.
+   * Format a Date object to JST YYYY/MM/DD (日付のみ).
+   * @returns {string} Formatted JST date string (yyyy/MM/dd).
    */
-  function toJST(date){
+  function toJSTDateOnly(date){
     if(!date || isNaN(date.getTime())) return '';
-    const pad = (n) => String(n).padStart(2, '0');
-    const y = date.getFullYear();
-    const m = pad(date.getMonth() + 1);
-    const d = pad(date.getDate());
-    const h = pad(date.getHours());
-    const min = pad(date.getMinutes());
-    const s = pad(date.getSeconds());
-    return `${y}/${m}/${d} ${h}:${min}:${s}`;
+    // JSTに変換し、YYYY/MM/DD形式で返す
+    const offset = date.getTimezoneOffset() * 60000; // ローカルタイムゾーンオフセット
+    const jstTime = date.getTime() + offset + (9 * 60 * 60 * 1000); // UTC -> JST
+    const jstDate = new Date(jstTime);
+    
+    const y = jstDate.getFullYear();
+    const m = String(jstDate.getMonth() + 1).padStart(2, '0');
+    const d = String(jstDate.getDate()).padStart(2, '0');
+    
+    return `${y}/${m}/${d}`;
   }
 
   /**
@@ -105,18 +108,22 @@ const Junkai = (()=> {
    */
   function within7d(rec){
     if(!rec.last_inspected_at) return false;
-    const date = new Date(rec.last_inspected_at);
-    if(isNaN(date.getTime())) return false;
+    // last_inspected_atは yyyy/MM/dd 形式の文字列であることを前提
+    // GAS側で日付比較ロジックを実装する場合はこの関数は不要
+    const [y, m, d] = rec.last_inspected_at.split('/').map(Number);
+    if (!y || !m || !d) return false;
+    
+    const lastDate = new Date(y, m - 1, d);
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    return diff < (7 * 24 * 60 * 60 * 1000); 
+    // 日付を比較可能にするため、時刻をリセット
+    now.setHours(0, 0, 0, 0);
+    lastDate.setHours(0, 0, 0, 0);
+
+    const diff = now.getTime() - lastDate.getTime();
+    return diff < (7 * 24 * 60 * 60 * 1000) && diff >= 0; 
   }
 
-  // ===== API Calls (Push/Pullは変更なし) =====
-
-  /**
-   * Send data to GAS (POST/Push).
-   */
+  // ===== API Calls (変更なし) =====
   async function pushData(data){
     const params = new URLSearchParams();
     params.append('action', 'push');
@@ -134,14 +141,10 @@ const Junkai = (()=> {
       });
       clearTimeout(timeout);
       
-      if(!res.ok){
-        throw new Error(`HTTP Error! Status: ${res.status}`);
-      }
+      if(!res.ok){ throw new Error(`HTTP Error! Status: ${res.status}`); }
       
       const json = await res.json();
-      if(!json.ok){
-         throw new Error(`GAS Error: ${json.error || '不明なエラー'}`);
-      }
+      if(!json.ok){ throw new Error(`GAS Error: ${json.error || '不明なエラー'}`); }
       return json;
     } catch(e) {
       clearTimeout(timeout);
@@ -149,9 +152,6 @@ const Junkai = (()=> {
     }
   }
 
-  /**
-   * Get data from GAS (GET/Pull).
-   */
   async function pullData(sheetName){
     const url = new URL(GAS_URL);
     url.searchParams.append('action', 'pull');
@@ -166,14 +166,10 @@ const Junkai = (()=> {
       });
       clearTimeout(timeout);
       
-      if(!res.ok){
-        throw new Error(`HTTP Error! Status: ${res.status}`);
-      }
+      if(!res.ok){ throw new Error(`HTTP Error! Status: ${res.status}`); }
       
       const json = await res.json();
-      if(!json.ok){
-        throw new Error(`GAS Error: ${json.error || '不明なエラー'}`);
-      }
+      if(!json.ok){ throw new Error(`GAS Error: ${json.error || '不明なエラー'}`); }
       return json;
     } catch(e) {
       clearTimeout(timeout);
@@ -192,14 +188,13 @@ const Junkai = (()=> {
     document.getElementById('initSyncBtn').disabled = true;
     showProgress(true, 5, 'リセット中...');
     
-    // ★修正ポイント1: 確実なローカルストレージリセットとカウンタリペイント
+    // 確実なローカルストレージリセットとカウンタリペイント
     CITIES.forEach(c => localStorage.removeItem(LS_KEY(c)));
     updateIndexCounts(); // カウンターをゼロに戻す
     
     showProgress(true, 10, '初期データ取得中 (全体管理)');
     
     try {
-      // 1. GASからデータ取得
       const json = await pullData('全体管理');
       showProgress(true, 40, 'データ処理中');
 
@@ -212,20 +207,13 @@ const Junkai = (()=> {
       }
 
       const buckets = { [CITIES[0]]:[], [CITIES[1]]:[], [CITIES[2]]:[] };
-      const currentData = readAll(); // ★リセット後なので、ここは空配列になる
-
       let recordCount = 0;
       
-      // 2. データの仕分け
       arr.forEach((rowObj, index) => {
         const cityName = (rowObj.city||'').trim(); 
         
-        if(!buckets[cityName]){
-             if(DEBUG_ERRORS) console.warn(`Skipping record with unknown city: ${cityName}`);
-             return; 
-        } 
+        if(!buckets[cityName]){ return; } 
 
-        // v8kのロジックを忠実に再現 (リセット後なのでマージは実質不要だが、コード構造は維持)
         const newRec = {
           city: cityName,
           station: (rowObj.station || '').trim(),
@@ -233,20 +221,19 @@ const Junkai = (()=> {
           number: (rowObj.number || '').trim(),
           ui_index: (rowObj.ui_index || '').trim(), 
           index: index + 1, 
-          status: 'normal', // 新規読み込みなのでステータスはnormal
-          checked: false, // 新規読み込みなのでチェックはfalse
+          status: 'normal', 
+          checked: false, 
           last_inspected_at: '',
           ui_index_num: index 
         };
 
-        // UI表示用のindexを付与 (Y001, E001, C001)
-        newRec.ui_index = `${PREFIX[cityName]}${String(buckets[cityName].length + 1).padStart(3, '0')}`;
+        // UI表示用のindexを付与 (Y1, E2など、2桁まで)
+        newRec.ui_index = `${PREFIX[cityName]}${buckets[cityName].length + 1}`; // ゼロ埋めはしない
         
         buckets[cityName].push(newRec);
         recordCount++;
       });
       
-      // 3. Local Storageに書き込み
       CITIES.forEach(city => writeCity(city, buckets[city]));
 
       showProgress(true, 100, '初期同期完了');
@@ -256,7 +243,6 @@ const Junkai = (()=> {
       location.reload(); 
 
     } catch(e) {
-      // エラーが発生したら、リセット済みでもボタンを再有効化
       document.getElementById('initSyncBtn').disabled = false;
       showError(DEBUG_ERRORS ? (e.message || '不明なエラー') : '初期同期に失敗しました。', '初期同期失敗');
     }
@@ -299,10 +285,11 @@ const Junkai = (()=> {
           );
 
           if(logRow){
-            // ★修正ポイント2: シートから取得した status, checked, last_inspected_at で上書き
+            // シートから取得した status, checked, last_inspected_at で上書き
             rec.status = String(logRow[5]).trim() || 'normal'; 
+            // GAS側でブーリアン値（TRUE/FALSE）が書き込まれている前提
             rec.checked = logRow[6] === true || String(logRow[6]).toUpperCase() === 'TRUE';
-            // 日時データはJST形式で入っている前提
+            // 日時データは yyyy/MM/dd 形式の文字列
             rec.last_inspected_at = String(logRow[8] || '');
           } 
           // InspectionLogに見つからなかった場合、ローカルの値を維持
@@ -334,9 +321,7 @@ const Junkai = (()=> {
     }
   }
   
-  // v10cから修正した関数のみ抜粋
-
-  // 1. カウンター再描画を分離
+  // 2. renderCity (UI表示ロジック修正)
   function updateIndexCounts() {
     const all = readAll();
     let total = all.length;
@@ -361,7 +346,6 @@ const Junkai = (()=> {
                 skip++;
             }
         });
-        // カウンターIDはv8kのHTMLを参照
         const map = {
           "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
           "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total', rem:'#ebina-rem'},
@@ -387,7 +371,6 @@ const Junkai = (()=> {
     document.querySelector('#all-total').textContent = total;
     document.querySelector('#all-rem').textContent = total - allDone - allStop - allSkip;
     
-    // overallHintの更新
     const hint = document.getElementById('overallHint');
     if (hint) {
         if (total === 0) {
@@ -398,8 +381,6 @@ const Junkai = (()=> {
     }
   }
 
-
-  // 2. renderCity (UI表示ロジックはv10cと同じ)
   function renderCity(city){
     const list = document.getElementById('list'); 
     if(!list) return;
@@ -432,11 +413,16 @@ const Junkai = (()=> {
 
       const dtDiv = document.createElement('div');
       dtDiv.className = 'datetime';
+      
+      // ★修正: UI表示ロジック (yyyy/mm/dd の2行表示)
       function updateDateTime(){
         if(rec.last_inspected_at){
-          dtDiv.innerHTML = String(rec.last_inspected_at).split(' ')[0].replace(/-/g, '/') + '<br>' + String(rec.last_inspected_at).split(' ')[1];
-          dtDiv.style.display = '';
-          return;
+          const parts = String(rec.last_inspected_at).split('/');
+          if (parts.length === 3) {
+            dtDiv.innerHTML = `${parts[0]}<br>${parts[1]}/${parts[2]}`;
+            dtDiv.style.display = '';
+            return;
+          }
         }
         dtDiv.innerHTML = '';
         dtDiv.style.display = 'none';
@@ -447,10 +433,9 @@ const Junkai = (()=> {
         const input = document.createElement('input');
         input.type = 'date';
         if(rec.last_inspected_at){
-          const d0 = new Date(rec.last_inspected_at);
-          if(Number.isFinite(d0.getTime())){
-            input.value = d0.toISOString().slice(0,10);
-          }
+          // yyyy/MM/dd -> yyyy-MM-dd
+          const isoDate = rec.last_inspected_at.replace(/\//g, '-');
+          input.value = isoDate;
         }
         dtDiv.appendChild(input);
     
@@ -460,8 +445,9 @@ const Junkai = (()=> {
           dtDiv.removeChild(input);
           if(!sel) return;
           if(!confirm('よろしいですか？')) return;
-          const iso = new Date(sel); 
-          rec.last_inspected_at = toJST(iso); 
+          const [y, m, d] = sel.split('-').map(Number); // yyyy-MM-dd
+          
+          rec.last_inspected_at = `${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}`; 
           persistCityRec(city, rec);
           updateDateTime();
           row.className = `row ${rowBg(rec)}`;
@@ -481,7 +467,8 @@ const Junkai = (()=> {
 
         rec.checked = chk.checked;
         if(rec.checked){
-           rec.last_inspected_at = toJST(new Date());
+           // チェックON時：日付のみを保存
+           rec.last_inspected_at = toJSTDateOnly(new Date());
            rec.status = 'normal'; 
         } else {
            rec.last_inspected_at = '';
@@ -554,7 +541,6 @@ const Junkai = (()=> {
     });
   }
 
-  // 3. persistCityRec (v10cと同じ)
   function persistCityRec(city, rec){
     const arr = readCity(city);
     let i = -1;
@@ -575,17 +561,72 @@ const Junkai = (()=> {
   }
 
 
-  // 4. init (v10cから修正)
+  function updateIndexCounts() {
+    const all = readAll();
+    let total = all.length;
+    let allDone = 0;
+    let allStop = 0;
+    let allSkip = 0;
+
+    CITIES.forEach(city => {
+        const cityData = all.filter(r => r.city === city);
+        let done = 0;
+        let stop = 0;
+        let skip = 0;
+        
+        cityData.forEach(r => {
+            if (r.checked) {
+                done++;
+            }
+            if (r.status === 'stopped' || r.status === 'stop') {
+                stop++;
+            }
+            if (r.status === 'unnecessary' || r.status === 'skip') {
+                skip++;
+            }
+        });
+        const map = {
+          "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
+          "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total', rem:'#ebina-rem'},
+          "調布市":    {done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total', rem:'#chofu-rem'},
+        };
+        const m = map[city];
+        if (m) {
+            document.querySelector(m.done).textContent = done;
+            document.querySelector(m.stop).textContent = stop;
+            document.querySelector(m.skip).textContent = skip;
+            document.querySelector(m.total).textContent = cityData.length;
+            document.querySelector(m.rem').textContent = cityData.length - done - stop - skip;
+        }
+
+        allDone += done;
+        allStop += stop;
+        allSkip += skip;
+    });
+
+    document.querySelector('#all-done').textContent = allDone;
+    document.querySelector('#all-stop').textContent = allStop;
+    document.querySelector('#all-skip').textContent = allSkip;
+    document.querySelector('#all-total').textContent = total;
+    document.querySelector('#all-rem').textContent = total - allDone - allStop - allSkip;
+    
+    const hint = document.getElementById('overallHint');
+    if (hint) {
+        if (total === 0) {
+            hint.textContent = 'まだ同期されていません';
+        } else {
+            hint.textContent = `総件数：${total}`;
+        }
+    }
+  }
+
+
   function init(){
     document.getElementById('initSyncBtn').addEventListener('click', initialSync);
     document.getElementById('syncBtn').addEventListener('click', syncAll);
 
-    // V10dでinitIndexのカウンタ描画ロジックをupdateIndexCountsに置き換え
     updateIndexCounts(); 
     
-    // Initial render for city pages (initCity is called in HTML)
-    
-    // データがない場合はヒント表示を出す
     const total = readAll().length;
     if (total === 0) {
         document.getElementById('overallHint').textContent = 'データがありません。「初期同期」ボタンを押してください。';
@@ -594,7 +635,6 @@ const Junkai = (()=> {
     }
   }
   
-  // 5. initCity (v10cと同じ)
   function initCity(city) {
       document.getElementById('list').innerHTML = ''; 
       renderCity(city);
@@ -606,16 +646,12 @@ const Junkai = (()=> {
       }
   }
 
-  // Public interface
-  return { init: init, initCity: initCity, initialSync, syncAll, updateIndexCounts }; // updateIndexCountsも公開
+  return { init: init, initCity: initCity, initialSync, syncAll, updateIndexCounts };
 })();
 
-// DOMContentLoaded後に実行
 document.addEventListener('DOMContentLoaded', () => {
-    // URLに基づいて実行する関数を切り替え
     const url = window.location.pathname;
     if (url.endsWith('yamato.html') || url.endsWith('ebina.html') || url.endsWith('chofu.html')) {
-        // 各HTMLファイルに記述されているscriptタグでinitCityが呼び出されます
         const cityMap = {
             'yamato.html': '大和市',
             'ebina.html': '海老名市',
