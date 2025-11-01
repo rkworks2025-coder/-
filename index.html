@@ -4,20 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <!-- include version query to bust cache -->
-  <link rel="stylesheet" href="style.css?v=8k" />
+  <link rel="stylesheet" href="style.css?v=10b" />
 </head>
 <body>
-  <!-- Display current version -->
-  <div class="ver">v8k</div>
+  <div class="ver">v10b</div>
   <header class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
-      <!-- Button for initial sync from 全体管理 -->
       <button id="initSyncBtn" class="btn primary">初期同期</button>
-      <!-- Button for regular sync (pull from InspectionLog) -->
       <button id="syncBtn" class="btn primary">同期</button>
-      <!-- Button to push local changes to InspectionLog -->
       <button id="pushLogBtn" class="btn primary">データ送信</button>
     </div>
   </header>
@@ -58,7 +53,6 @@
           <span class="chip">残 <span id="chofu-rem">0</span></span>
         </div>
       </a>
-      <!-- aggregated card for all areas -->
       <div class="cardlink">
         <h2>全エリア</h2>
         <div class="meta">
@@ -81,8 +75,7 @@
     </div>
   </div>
 
-  <!-- include version query to bust cache -->
-  <script src="app.js?v=8k"></script>
+  <script src="app.js?v=10b"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (typeof Junkai !== 'undefined' && Junkai.initIndex) {
