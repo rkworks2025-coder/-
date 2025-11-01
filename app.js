@@ -33,7 +33,7 @@ function toISOChecked(s){
 }
 
 // ===== App Config =====
-const GAS_URL = '<<<GAS_URLを既存のまま使用>>>'; // 既存の値をそのまま使うこと（差し替え禁止）
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN'; // 既存の値をそのまま使うこと（差し替え禁止）
 const SHEET_MAIN = '全体管理';
 const SHEET_LOG  = 'InspectionLog'; // パラメータは大小混在許容、実体は GAS 側で inspectionlog を読む
 
