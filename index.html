@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=10g" />
+  <link rel="stylesheet" href="style.css?v=10i" />
 </head>
 <body>
-  <div class="ver">v10g</div>
+  <div class="ver">v10i</div>
   <header class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
@@ -31,6 +31,7 @@
           <span class="chip">残 <span id="yamato-rem">0</span></span>
         </div>
       </a>
+
       <a class="cardlink" href="ebina.html">
         <h2>海老名市</h2>
         <div class="meta">
@@ -41,6 +42,7 @@
           <span class="chip">残 <span id="ebina-rem">0</span></span>
         </div>
       </a>
+
       <a class="cardlink" href="chofu.html">
         <h2>調布市</h2>
         <div class="meta">
@@ -72,18 +74,21 @@
       <div class="barwrap"><div id="progressBar" class="bar"></div></div>
     </div>
   </div>
+  
   <div id="errorModal" class="modal" aria-hidden="true">
     <div class="dialog">
       <h3 id="errorTitle">エラー</h3>
-      <p id="errorMsg">詳細なエラーメッセージ</p>
-      <button class="btn primary" onclick="document.getElementById('errorModal').classList.remove('show')">閉じる</button>
+      <p id="errorMsg"></p>
     </div>
   </div>
 
-  <script src="app.js?v=10g"></script>
+  <script src="app.js?v=10i"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // v10gのinit関数はapp.js内で実行されるため、ここでは何もしません
+    // app.jsがロードされた後、initIndexを実行
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof Junkai !== 'undefined' && Junkai.initIndex) {
+            Junkai.initIndex();
+        }
     });
   </script>
 </body>
