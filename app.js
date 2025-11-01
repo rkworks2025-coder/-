@@ -1,8 +1,7 @@
 // ====== 設定 ======
 const Junkai = (()=> {
 
-  // ★バージョン v10d 用の修正が適用されています
-  // GAS URLはあなたが使用しているものを維持しています
+  // ★バージョン v10d 用の修正が適用されています (リセット機能回復)
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec"; 
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
   const CITIES = ["大和市","海老名市","調布市"];
@@ -16,9 +15,6 @@ const Junkai = (()=> {
 
   /**
    * Show or hide the progress modal and optionally update its bar width.
-   * @param {boolean} on Whether to show the modal.
-   * @param {number} pct Percentage (0–100) of the progress bar width.
-   * @param {string} title Optional title to display in the modal.
    */
   function showProgress(on, pct, title = '処理中…'){
     const m = document.getElementById('progressModal');
@@ -32,8 +28,6 @@ const Junkai = (()=> {
 
   /**
    * Show an error message in the modal.
-   * @param {string} msg Error message.
-   * @param {string} title Modal title.
    */
   function showError(msg, title='エラー'){
     showProgress(false);
@@ -47,7 +41,6 @@ const Junkai = (()=> {
   
   /**
    * Set status text in index.html
-   * @param {string} text Status message.
    */
   function setStatusText(text){
      const el = document.getElementById('statusText');
@@ -56,8 +49,6 @@ const Junkai = (()=> {
 
   /**
    * Format a Date object to JST YYYY/MM/DD HH:mm:ss.
-   * @param {Date} date Date object.
-   * @returns {string} Formatted JST string.
    */
   function toJST(date){
     if(!date || isNaN(date.getTime())) return '';
@@ -73,8 +64,6 @@ const Junkai = (()=> {
 
   /**
    * Read city data from local storage.
-   * @param {string} city City name.
-   * @returns {Array<Object>} Array of records.
    */
   function readCity(city){
     const json = localStorage.getItem(LS_KEY(city));
@@ -88,8 +77,6 @@ const Junkai = (()=> {
 
   /**
    * Persist city data to local storage.
-   * @param {string} city City name.
-   * @param {Array<Object>} arr Array of records.
    */
   function writeCity(city, arr){
     localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
@@ -97,7 +84,6 @@ const Junkai = (()=> {
   
   /**
    * Get all records from all cities.
-   * @returns {Array<Object>} All records.
    */
   function readAll(){
     return CITIES.flatMap(readCity);
@@ -105,21 +91,17 @@ const Junkai = (()=> {
 
   /**
    * Get the current status/color based on record data.
-   * @param {Object} rec Record object.
-   * @returns {string} Status class name.
    */
   function rowBg(rec){
-    if(rec.status === 'stopped' || rec.status === 'stop') return 'bg-gray'; // 稼働停止
-    if(rec.status === 'unnecessary' || rec.status === 'skip') return 'bg-yellow'; // 巡回不要
-    if(rec.status === '7days_rule' || rec.status === '7 day rule') return 'bg-blue'; // 7日ルール
-    if(rec.checked) return 'bg-pink'; // チェック済み
-    return 'bg-green'; // 通常
+    if(rec.status === 'stopped' || rec.status === 'stop') return 'bg-gray'; 
+    if(rec.status === 'unnecessary' || rec.status === 'skip') return 'bg-yellow'; 
+    if(rec.status === '7days_rule' || rec.status === '7 day rule') return 'bg-blue'; 
+    if(rec.checked) return 'bg-pink'; 
+    return 'bg-green'; 
   }
 
   /**
    * Check if a record was inspected within the last 7 days.
-   * @param {Object} rec Record object.
-   * @returns {boolean} True if within 7 days.
    */
   function within7d(rec){
     if(!rec.last_inspected_at) return false;
@@ -127,15 +109,13 @@ const Junkai = (()=> {
     if(isNaN(date.getTime())) return false;
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    return diff < (7 * 24 * 60 * 60 * 1000); // Less than 7 days
+    return diff < (7 * 24 * 60 * 60 * 1000); 
   }
 
-  // ===== API Calls =====
+  // ===== API Calls (Push/Pullは変更なし) =====
 
   /**
    * Send data to GAS (POST/Push).
-   * @param {Array<Object>} data Data to send.
-   * @returns {Promise<Object>} API response.
    */
   async function pushData(data){
     const params = new URLSearchParams();
@@ -171,8 +151,6 @@ const Junkai = (()=> {
 
   /**
    * Get data from GAS (GET/Pull).
-   * @param {string} sheetName Sheet name to pull data from.
-   * @returns {Promise<Object>} API response.
    */
   async function pullData(sheetName){
     const url = new URL(GAS_URL);
@@ -207,10 +185,17 @@ const Junkai = (()=> {
 
   /**
    * Initial data pull from '全体管理'.
-   * Merges with existing local data.
    */
   async function initialSync(){
+    if(!confirm('初期同期を行います。現在のローカルデータはリセットされますが、よろしいですか？')) return; 
+
     document.getElementById('initSyncBtn').disabled = true;
+    showProgress(true, 5, 'リセット中...');
+    
+    // ★修正ポイント1: 確実なローカルストレージリセットとカウンタリペイント
+    CITIES.forEach(c => localStorage.removeItem(LS_KEY(c)));
+    updateIndexCounts(); // カウンターをゼロに戻す
+    
     showProgress(true, 10, '初期データ取得中 (全体管理)');
     
     try {
@@ -220,7 +205,6 @@ const Junkai = (()=> {
 
       const arr = json?.data;
       if(!arr || arr.length === 0){
-        // データが空の場合でも、エラーではなく処理完了として扱う（v10c修正）
         setStatusText('初期同期完了: 「全体管理」シートにデータが見つかりませんでした。');
         showProgress(false);
         document.getElementById('initSyncBtn').disabled = false;
@@ -228,40 +212,31 @@ const Junkai = (()=> {
       }
 
       const buckets = { [CITIES[0]]:[], [CITIES[1]]:[], [CITIES[2]]:[] };
-      const currentData = readAll();
+      const currentData = readAll(); // ★リセット後なので、ここは空配列になる
+
       let recordCount = 0;
       
-      // 2. データのマージと仕分け
+      // 2. データの仕分け
       arr.forEach((rowObj, index) => {
-        // GAS側で'市区町村'が'city'に変換されている前提
         const cityName = (rowObj.city||'').trim(); 
         
-        // cityName が CITIES に含まれない場合、スキップ
         if(!buckets[cityName]){
              if(DEBUG_ERRORS) console.warn(`Skipping record with unknown city: ${cityName}`);
              return; 
         } 
 
-        // 既存データをマージ
-        let rec = currentData.find(x => 
-          (x.ui_index || '') === (rowObj.ui_index || '') ||
-          (x.number || '') === (rowObj.number || '')
-        ) || {};
-
-        // 新しいレコードオブジェクトを作成/更新
+        // v8kのロジックを忠実に再現 (リセット後なのでマージは実質不要だが、コード構造は維持)
         const newRec = {
-          ...rec, 
           city: cityName,
           station: (rowObj.station || '').trim(),
           model: (rowObj.model || '').trim(),
           number: (rowObj.number || '').trim(),
-          // ui_index は全体管理から取得（v8kの仕様）
           ui_index: (rowObj.ui_index || '').trim(), 
-          index: index + 1, // 全体管理の行番号
-          status: rec.status || 'normal', 
-          checked: rec.checked || false,
-          last_inspected_at: rec.last_inspected_at || '',
-          ui_index_num: index // 内部インデックス
+          index: index + 1, 
+          status: 'normal', // 新規読み込みなのでステータスはnormal
+          checked: false, // 新規読み込みなのでチェックはfalse
+          last_inspected_at: '',
+          ui_index_num: index 
         };
 
         // UI表示用のindexを付与 (Y001, E001, C001)
@@ -278,12 +253,12 @@ const Junkai = (()=> {
       setStatusText(`初期同期完了: 全 ${recordCount} 件のデータを保存しました。`);
 
       await sleep(500);
-      location.reload(); // 成功したらリロードしてUIを更新
+      location.reload(); 
 
     } catch(e) {
-      // エラー発生時は必ずエラーモーダルを表示（v10c修正）
+      // エラーが発生したら、リセット済みでもボタンを再有効化
       document.getElementById('initSyncBtn').disabled = false;
-      showError(DEBUG_ERRORS ? (e.message || '不明なエラー') : '初期同期に失敗しました。GASのURL、アクセス権、またはシート名を確認してください。', '初期同期失敗');
+      showError(DEBUG_ERRORS ? (e.message || '不明なエラー') : '初期同期に失敗しました。', '初期同期失敗');
     }
   }
 
@@ -295,12 +270,12 @@ const Junkai = (()=> {
     const allRecords = readAll();
     
     // 1. PUSH (送信)
-    status('データ送信中…');
-    showProgress(true, 20);
+    setStatusText('データ送信中...');
+    showProgress(true, 20, 'データ送信中...');
     try {
       await pushData(allRecords); 
-      status('送信成功、同期取得中...');
-      showProgress(true, 50);
+      setStatusText('送信成功、同期取得中...');
+      showProgress(true, 50, '同期取得中...');
     } catch(e){
       document.getElementById('syncBtn').disabled = false;
       showError(DEBUG_ERRORS ? (e.message || '不明なエラー') : 'データ送信に失敗しました。', '同期失敗');
@@ -312,6 +287,7 @@ const Junkai = (()=> {
       const json = await pullData('InspectionLog');
       const logArr = json?.values; 
 
+      
       if(!logArr || logArr.length === 0){
         setStatusText('同期完了: InspectionLogが空のため、ステータスは更新されません。');
       } else {
@@ -319,12 +295,14 @@ const Junkai = (()=> {
         
         const updatedRecords = allRecords.map(rec => {
           const logRow = logData.find(row => 
-            String(row[4] || '') === (rec.ui_index || '') // 4は ui_index 列 (0-based)
+            String(row[4] || '') === (rec.ui_index || '') 
           );
 
           if(logRow){
+            // ★修正ポイント2: シートから取得した status, checked, last_inspected_at で上書き
             rec.status = String(logRow[5]).trim() || 'normal'; 
             rec.checked = logRow[6] === true || String(logRow[6]).toUpperCase() === 'TRUE';
+            // 日時データはJST形式で入っている前提
             rec.last_inspected_at = String(logRow[8] || '');
           } 
           // InspectionLogに見つからなかった場合、ローカルの値を維持
@@ -356,62 +334,72 @@ const Junkai = (()=> {
     }
   }
   
-  // ===== UI Rendering and Event Handlers (省略せず) =====
+  // v10cから修正した関数のみ抜粋
 
-  /**
-   * Count summary values for a city's records (done, stop, skip, total).
-   * (v8kの機能維持)
-   */
-  function countCity(arr){
-    const c = {done:0, stop:0, skip:0, total:arr.length};
-    for(const it of arr){
-      if(it.status==='stop') c.stop++;
-      else if(it.status==='skip') c.skip++;
-      if(it.checked) c.done++; // checkedのみをカウント
-    }
-    return c;
-  }
-  
-  /**
-   * Repaint all counters on the index page and aggregated totals.
-   * (v8kの機能維持)
-   */
-  function repaintCounters(){
-    const map = {
-      "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
-      "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total', rem:'#ebina-rem'},
-      "調布市":    {done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total', rem:'#chofu-rem'},
-    };
-    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
-    for(const city of CITIES){
-      const arr = readCity(city);
-      const cnt = countCity(arr);
-      overallTotal += cnt.total;
-      overallDone += cnt.done;
-      overallStop += cnt.stop;
-      overallSkip += cnt.skip;
-      const m = map[city];
-      for(const k of ['done','stop','skip','total']){
-        const el = document.querySelector(m[k]); if(el) el.textContent = cnt[k];
-      }
-      const remCount = cnt.total - cnt.done - cnt.skip;
-      const remEl = document.querySelector(m.rem);
-      if(remEl) remEl.textContent = remCount;
-    }
-    const allDoneEl  = document.querySelector('#all-done');
-    const allStopEl  = document.querySelector('#all-stop');
-    const allSkipEl  = document.querySelector('#all-skip');
-    const allTotalEl = document.querySelector('#all-total');
-    const allRemEl   = document.querySelector('#all-rem');
-    if(allDoneEl)  allDoneEl.textContent  = overallDone;
-    if(allStopEl)  allStopEl.textContent  = overallStop;
-    if(allSkipEl)  allSkipEl.textContent  = overallSkip;
-    if(allTotalEl) allTotalEl.textContent = overallTotal;
-    if(allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
+  // 1. カウンター再描画を分離
+  function updateIndexCounts() {
+    const all = readAll();
+    let total = all.length;
+    let allDone = 0;
+    let allStop = 0;
+    let allSkip = 0;
+
+    CITIES.forEach(city => {
+        const cityData = all.filter(r => r.city === city);
+        let done = 0;
+        let stop = 0;
+        let skip = 0;
+        
+        cityData.forEach(r => {
+            if (r.checked) {
+                done++;
+            }
+            if (r.status === 'stopped' || r.status === 'stop') {
+                stop++;
+            }
+            if (r.status === 'unnecessary' || r.status === 'skip') {
+                skip++;
+            }
+        });
+        // カウンターIDはv8kのHTMLを参照
+        const map = {
+          "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
+          "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total', rem:'#ebina-rem'},
+          "調布市":    {done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total', rem:'#chofu-rem'},
+        };
+        const m = map[city];
+        if (m) {
+            document.querySelector(m.done).textContent = done;
+            document.querySelector(m.stop).textContent = stop;
+            document.querySelector(m.skip).textContent = skip;
+            document.querySelector(m.total).textContent = cityData.length;
+            document.querySelector(m.rem).textContent = cityData.length - done - stop - skip;
+        }
+
+        allDone += done;
+        allStop += stop;
+        allSkip += skip;
+    });
+
+    document.querySelector('#all-done').textContent = allDone;
+    document.querySelector('#all-stop').textContent = allStop;
+    document.querySelector('#all-skip').textContent = allSkip;
+    document.querySelector('#all-total').textContent = total;
+    document.querySelector('#all-rem').textContent = total - allDone - allStop - allSkip;
+    
+    // overallHintの更新
     const hint = document.getElementById('overallHint');
-    if(hint) hint.textContent = overallTotal>0 ? `総件数：${overallTotal}` : 'まだ同期されていません';
+    if (hint) {
+        if (total === 0) {
+            hint.textContent = 'まだ同期されていません';
+        } else {
+            hint.textContent = `総件数：${total}`;
+        }
+    }
   }
 
+
+  // 2. renderCity (UI表示ロジックはv10cと同じ)
   function renderCity(city){
     const list = document.getElementById('list'); 
     if(!list) return;
@@ -492,7 +480,7 @@ const Junkai = (()=> {
         }
 
         rec.checked = chk.checked;
-        if(chk.checked){
+        if(rec.checked){
            rec.last_inspected_at = toJST(new Date());
            rec.status = 'normal'; 
         } else {
@@ -525,11 +513,10 @@ const Junkai = (()=> {
         const o = document.createElement('option');
         o.value = v;
         o.textContent = lab;
-        // status==='stopped'がシートから来たら、'stop'を選択状態にする
-        if((rec.status === 'stopped' && v === 'stop') || 
-           (rec.status === 'unnecessary' && v === 'skip') ||
-           (rec.status === v)) o.selected = true;
-        
+        if(v === 'stop') v = 'stopped'; 
+        if(v === 'skip') v = 'unnecessary'; 
+
+        if(v === rec.status) o.selected = true;
         sel.appendChild(o);
       });
       
@@ -567,6 +554,7 @@ const Junkai = (()=> {
     });
   }
 
+  // 3. persistCityRec (v10cと同じ)
   function persistCityRec(city, rec){
     const arr = readCity(city);
     let i = -1;
@@ -586,32 +574,40 @@ const Junkai = (()=> {
     writeCity(city, arr);
   }
 
+
+  // 4. init (v10cから修正)
   function init(){
-    // v10cのinit関数
     document.getElementById('initSyncBtn').addEventListener('click', initialSync);
     document.getElementById('syncBtn').addEventListener('click', syncAll);
+
+    // V10dでinitIndexのカウンタ描画ロジックをupdateIndexCountsに置き換え
+    updateIndexCounts(); 
     
-    // index.htmlの描画とカウンターの更新
-    repaintCounters();
+    // Initial render for city pages (initCity is called in HTML)
+    
+    // データがない場合はヒント表示を出す
+    const total = readAll().length;
+    if (total === 0) {
+        document.getElementById('overallHint').textContent = 'データがありません。「初期同期」ボタンを押してください。';
+    } else {
+        document.getElementById('overallHint').textContent = `総件数：${total}`;
+    }
   }
   
+  // 5. initCity (v10cと同じ)
   function initCity(city) {
-      // cityページの描画
-      const list = document.getElementById('list');
-      if(list) list.innerHTML = '';
+      document.getElementById('list').innerHTML = ''; 
       renderCity(city);
-      
       const arr = readCity(city);
-      const hintEl = document.getElementById('hint');
       if (arr.length === 0) {
-          if(hintEl) hintEl.textContent = `まだ「${city}」のデータがありません。「巡回リスト」に戻って「初期同期」を押してください。`;
+          document.getElementById('hint').textContent = `まだ「${city}」のデータがありません。「巡回リスト」に戻って「初期同期」を押してください。`;
       } else {
-          if(hintEl) hintEl.textContent = `全 ${arr.length} 台`;
+          document.getElementById('hint').textContent = `全 ${arr.length} 台`;
       }
   }
 
   // Public interface
-  return { init: init, initCity: initCity, initialSync, syncAll }; // initとinitCityを公開
+  return { init: init, initCity: initCity, initialSync, syncAll, updateIndexCounts }; // updateIndexCountsも公開
 })();
 
 // DOMContentLoaded後に実行
@@ -619,8 +615,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // URLに基づいて実行する関数を切り替え
     const url = window.location.pathname;
     if (url.endsWith('yamato.html') || url.endsWith('ebina.html') || url.endsWith('chofu.html')) {
-        // 各HTMLファイルに記述されているscriptタグで呼び出される
+        // 各HTMLファイルに記述されているscriptタグでinitCityが呼び出されます
+        const cityMap = {
+            'yamato.html': '大和市',
+            'ebina.html': '海老名市',
+            'chofu.html': '調布市'
+        };
+        const currentCity = cityMap[url.substring(url.lastIndexOf('/') + 1)];
+        if (currentCity) Junkai.initCity(currentCity);
     } else {
-        Junkai.init(); // index.htmlのみJunkai.init()を実行
+        Junkai.init();
     }
 });
