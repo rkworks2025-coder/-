@@ -225,7 +225,7 @@ const Junkai = (()=>{
           const checkedAt=(row[6]||'').toString();
           const rec = {
             city, station, model, number,
-            status:'normal', checked:false, index:'', last_inspected_at:'',
+            status:'standby', checked:false, index:'', last_inspected_at:'',
             ui_index: idxStr || '', ui_index_num:0
           };
           if(idxStr){
@@ -236,7 +236,7 @@ const Junkai = (()=>{
           switch(statusEng){
             case 'Checked':
               rec.checked = true;
-              rec.status = 'normal';
+              rec.status = 'standby';
               rec.last_inspected_at = toISOChecked(checkedAt);
               break;
             case 'stopped':
@@ -252,7 +252,7 @@ const Junkai = (()=>{
               rec.last_inspected_at = toISOChecked(checkedAt);
               break;
             default:
-              rec.status = 'normal';
+              rec.status = 'standby';
           }
           if(buckets[city]) buckets[city].push(rec);
         }
@@ -575,7 +575,7 @@ const Junkai = (()=>{
       right.className = 'rightcol';
       const sel = document.createElement('select');
       sel.className = 'state';
-      [['normal','通常'], ['stop','停止'], ['skip','不要']].forEach(([v,lab])=>{
+      [['standby','通常'], ['stop','停止'], ['skip','不要']].forEach(([v,lab])=>{
         const o = document.createElement('option');
         o.value = v;
         o.textContent = lab;
