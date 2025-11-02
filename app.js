@@ -1,4 +1,3 @@
-
 // ====== 設定 ======
 const Junkai = (()=>{
 
@@ -73,7 +72,6 @@ const Junkai = (()=>{
   }
 
   function applyUIIndex(city, arr){
-    // cityごとに 1..N 採番して UI表示用に保存
     const p = PREFIX[city] || '';
     for(let i=0;i<arr.length;i++){
       arr[i].ui_index_num = i+1;
@@ -106,16 +104,13 @@ const Junkai = (()=>{
       overallStop += cnt.stop;
       overallSkip += cnt.skip;
       const m = map[city];
-      // update metrics for the city
       for(const k of ['done','stop','skip','total']){
         const el = document.querySelector(m[k]); if(el) el.textContent = cnt[k];
       }
-      // update remaining count: total - done - skip
       const remCount = cnt.total - cnt.done - cnt.skip;
       const remEl = document.querySelector(m.rem);
       if(remEl) remEl.textContent = remCount;
     }
-    // update aggregated counts across all areas
     const allDoneEl  = document.querySelector('#all-done');
     const allStopEl  = document.querySelector('#all-stop');
     const allSkipEl  = document.querySelector('#all-skip');
@@ -126,7 +121,6 @@ const Junkai = (()=>{
     if(allSkipEl)  allSkipEl.textContent  = overallSkip;
     if(allTotalEl) allTotalEl.textContent = overallTotal;
     if(allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
-    // update overall hint
     const hint = document.getElementById('overallHint');
     if(hint) hint.textContent = overallTotal>0 ? `総件数：${overallTotal}` : 'まだ同期されていません';
   }
@@ -145,25 +139,15 @@ const Junkai = (()=>{
         showProgress(true, 35);
         const json = await fetchJSONWithRetry(u, 2);
         showProgress(true, 55);
-        // accept json.data or json.values as array; do not require json.ok===true to support more GAS deployments
         if(!json || (!Array.isArray(json.data) && !Array.isArray(json.values))) throw new Error('bad-shape');
-
-        // prepare buckets for each supported city
         const buckets = { "大和市":[], "海老名市":[], "調布市":[] };
-        // some GAS deployments return data under 'data', others under 'values'
         let arr = Array.isArray(json.data) ? json.data : (Array.isArray(json.values) ? json.values : []);
-        // if there is no array, bail out
         if(!Array.isArray(arr)) arr = [];
-        // fallback: if arr is empty and json itself is an array of arrays (root-level list)
-        if(arr.length === 0 && Array.isArray(json) && Array.isArray(json[0])){
-          arr = json;
-        }
+        if(arr.length === 0 && Array.isArray(json) && Array.isArray(json[0])) arr = json;
 
-        // detect header row dynamically (e.g. ['TSエリア','city','所在地','station','model','plate',...])
         let headerMap = null;
         if(arr.length > 0 && Array.isArray(arr[0])){
           const firstRow = arr[0];
-          // check if the first row contains english column names like 'city' or 'station'
           const lower = firstRow.map(x => (typeof x === 'string' ? x.trim().toLowerCase() : ''));
           if(lower.some(x => x.includes('city')) && lower.some(x => x.includes('station'))){
             headerMap = {};
@@ -175,7 +159,6 @@ const Junkai = (()=>{
               else if(col.includes('plate') || col.includes('number')) headerMap.number = i;
               else if(col.includes('status')) headerMap.status = i;
             }
-            // remove header row from array
             arr = arr.slice(1);
           }
         }
@@ -184,7 +167,6 @@ const Junkai = (()=>{
           let rowObj;
           if(Array.isArray(r)){
             if(headerMap){
-              // when headerMap is detected, use it to map columns
               const city = r[headerMap.city ?? 0] || '';
               const station = r[headerMap.station ?? 1] || '';
               const model = r[headerMap.model ?? 2] || '';
@@ -192,11 +174,6 @@ const Junkai = (()=>{
               const status = (headerMap.status !== undefined ? (r[headerMap.status] || '') : 'normal');
               rowObj = { city, station, model, number, status: status || 'normal', checked:false, index:'', last_inspected_at:'' };
             }else{
-              // skip header rows that explicitly contain 'city' in the second column
-              if(r.length >= 2 && typeof r[1] === 'string' && r[1].trim().toLowerCase() === 'city'){
-                continue;
-              }
-              // detect TS-prefixed rows: r[0] starts with 'TS' and r has at least 6 columns
               if(r.length >= 6 && typeof r[0] === 'string' && r[0].trim().startsWith('TS')){
                 const city = r[1] || '';
                 const station = r[3] || '';
@@ -204,39 +181,31 @@ const Junkai = (()=>{
                 const number = r[5] || '';
                 const status = r[6] || 'normal';
                 rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
+              }else if(r.length >= 6){
+                const city = r[1] || r[0] || '';
+                const station = r[3] || r[1] || '';
+                const model = r[4] || r[2] || '';
+                const number = r[5] || r[3] || '';
+                const status = r[6] || 'normal';
+                rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
               }else{
-                // fallback heuristics
-                if(r.length >= 6){
-                  // assume r[1]=city, r[3]=station, r[4]=model, r[5]=plate
-                  const city = r[1] || r[0] || '';
-                  const station = r[3] || r[1] || '';
-                  const model = r[4] || r[2] || '';
-                  const number = r[5] || r[3] || '';
-                  const status = r[6] || 'normal';
-                  rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
-                }else{
-                  // simple case: 0=city,1=station,2=model,3=number,4=status
-                  const city = r[0] || '';
-                  const station = r[1] || '';
-                  const model = r[2] || '';
-                  const number = r[3] || '';
-                  const status = r[4] || 'normal';
-                  rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
-                }
+                const city = r[0] || '';
+                const station = r[1] || '';
+                const model = r[2] || '';
+                const number = r[3] || '';
+                const status = r[4] || 'normal';
+                rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
               }
             }
           }else if(r && typeof r === 'object'){
             rowObj = r;
-          }else{
-            continue;
-          }
+          }else continue;
           const cityName = (rowObj.city || '').trim();
           if(!buckets[cityName]) continue;
           const rec = normalize(rowObj);
           buckets[cityName].push(rec);
         }
 
-        // 成功時のみ保存（空配列なら上書きしない）
         let wrote = 0;
         for(const city of CITIES){
           if(buckets[city].length>0){
@@ -257,12 +226,10 @@ const Junkai = (()=>{
       }finally{ setTimeout(()=>showProgress(false), 350); }
     });
 
-    // Attach handler for pushing InspectionLog to the sheet (if button exists)
     const pushBtn = document.getElementById('pushLogBtn');
     if (pushBtn) {
       pushBtn.addEventListener('click', async () => {
         try {
-          // collect all records from all cities
           const all = [];
           for (const c of CITIES) {
             const arrCity = readCity(c);
@@ -270,7 +237,6 @@ const Junkai = (()=>{
           }
           status('シート更新中…');
           const json = JSON.stringify(all);
-          // prepare POST body. Send as URL‑encoded to avoid URL length limits
           const params = new URLSearchParams();
           params.append('action', 'push');
           params.append('data', json);
@@ -281,14 +247,9 @@ const Junkai = (()=>{
             body: params.toString()
           });
           let result = null;
-          try {
-            result = await res.json();
-          } catch(_){ result = null; }
-          if (result && result.ok) {
-            status('シート更新完了！');
-          } else {
-            status('更新に失敗しました');
-          }
+          try { result = await res.json(); } catch(_){ result = null; }
+          if (result && result.ok) status('シート更新完了！');
+          else status('更新に失敗しました');
         } catch(err){
           console.error('push error', err);
           status('更新エラー');
@@ -319,33 +280,24 @@ const Junkai = (()=>{
     const arr = readCity(city);
     if(arr.length===0){ hint.textContent='まだ同期されていません（インデックスの同期を押してください）'; return; }
     hint.textContent = `件数：${arr.length}`;
-
-    // city内採番を信頼
     for(const rec of arr){
       const row = document.createElement('div');
       row.className = `row ${rowBg(rec)}`;
-
-      // left column: top row with index + checkbox; bottom row for date/time
       const left = document.createElement('div');
       left.className = 'leftcol';
-      // index element
       const idxDiv = document.createElement('div');
       idxDiv.className = 'idx';
       idxDiv.textContent = rec.ui_index || '';
-      // checkbox
       const chk = document.createElement('input');
       chk.type = 'checkbox';
       chk.checked = !!rec.checked;
       chk.className = 'chk';
-      // top container for index and checkbox
       const topLeft = document.createElement('div');
       topLeft.className = 'left-top';
       topLeft.appendChild(idxDiv);
       topLeft.appendChild(chk);
-      // date/time element (hidden when no date)
       const dtDiv = document.createElement('div');
       dtDiv.className = 'datetime';
-      // helper to update the date/time display
       function updateDateTime(){
         if(rec.last_inspected_at){
           const d = new Date(rec.last_inspected_at);
@@ -362,12 +314,9 @@ const Junkai = (()=>{
         dtDiv.innerHTML = '';
         dtDiv.style.display = 'none';
       }
-      // initialize date/time display
       updateDateTime();
-      // assemble left column
       left.appendChild(topLeft);
       left.appendChild(dtDiv);
-      // checkbox change handler with confirmation
       chk.addEventListener('change', () => {
         const message = chk.checked ? 'チェックを付けます。よろしいですか？' : 'チェックを外します。よろしいですか？';
         if (!confirm(message)) {
@@ -386,7 +335,6 @@ const Junkai = (()=>{
         row.className = `row ${rowBg(rec)}`;
       });
 
-      // middle column: station title and sub-line (date/time is rendered in the right column)
       const mid = document.createElement('div');
       mid.className = 'mid';
       const title = document.createElement('div');
@@ -394,20 +342,12 @@ const Junkai = (()=>{
       title.textContent = rec.station || '';
       const sub = document.createElement('div');
       sub.className = 'sub';
-      // display model and plate on separate lines to prevent overlap with right column
-      // Use innerHTML with a <br> so the two values wrap naturally
       sub.innerHTML = `${rec.model || ''}<br>${rec.number || ''}`;
-      // append title and sub into mid (stacked)
       mid.appendChild(title);
       mid.appendChild(sub);
 
-      // date/time handled inside the left column; no separate date column
-
-      // right column: holds status select and the inspection button
       const right = document.createElement('div');
       right.className = 'rightcol';
-
-
       const sel = document.createElement('select');
       sel.className = 'state';
       [['normal', '通常'], ['stop', '停止'], ['skip', '不要']].forEach(([v, lab]) => {
@@ -426,9 +366,6 @@ const Junkai = (()=>{
       btn.className = 'btn tiny';
       btn.textContent = '点検';
       btn.addEventListener('click', () => {
-        // Build query parameters for the tire app.  The tire app expects
-        // `station`, `model` and `plate_full` as query keys.  See the
-        // tire-app's index.html: it reads `plate_full` for the full plate number.
         const q = new URLSearchParams({
           station: rec.station || '',
           model: rec.model || '',
@@ -436,11 +373,9 @@ const Junkai = (()=>{
         });
         location.href = `${TIRE_APP_URL}?${q.toString()}`;
       });
-      // append controls to right column
       right.appendChild(sel);
       right.appendChild(btn);
 
-      // append columns: left column, mid column, right column
       row.appendChild(left);
       row.appendChild(mid);
       row.appendChild(right);
@@ -449,29 +384,10 @@ const Junkai = (()=>{
   }
 
   function persistCityRec(city, rec){
-    // Update the record in localStorage by matching on the UI index when available.
-    // Using ui_index ensures we update the exact row instead of matching solely on number,
-    // which can be blank or duplicated across entries. Fallback to number for older records.
     const arr = readCity(city);
-    // find by ui_index if defined
     let i = -1;
     if(rec.ui_index){
       i = arr.findIndex(x => (x.ui_index || '') === (rec.ui_index || ''));
     }
-    // fallback to matching by number if no ui_index match
     if(i < 0){
-      i = arr.findIndex(x => (x.number || '') === (rec.number || ''));
-    }
-    if(i >= 0){
-      arr[i] = rec;
-    } else {
-      arr.push(rec);
-    }
-    saveCity(city, arr);
-  }
-
-  return {
-    initIndex: initIndex,
-    initCity: mountCity,
-  };
-})();
+      i = arr.findIndex(x => (x.number || '') === (rec
