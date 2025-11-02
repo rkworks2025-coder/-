@@ -9,16 +9,46 @@ async function initialSync() {
     if (!res.ok) throw new Error('通信エラー');
 
     const data = await res.json();
-    const list = data.data || data; // ← 修正箇所（GASが{data:[…]}でも配列でも両対応）
+    const list = data.data || data; // GAS出力の形式に両対応
 
     if (!Array.isArray(list) || list.length === 0) throw new Error('データが空でした');
 
     localStorage.setItem('masterData', JSON.stringify(list));
     showStatus("初期同期完了", true);
     console.log('初期同期完了', list.length, '件');
+
+    // 振り分け処理を呼び出し
+    distributeByArea(list);
+
   } catch (err) {
     showStatus("初期同期失敗：" + err.message, false);
     console.error(err);
+  }
+}
+
+// 各エリアへの振り分け処理
+function distributeByArea(list) {
+  try {
+    const yamato = [];
+    const ebina = [];
+    const chofu = [];
+
+    list.forEach(d => {
+      const city = d["市区町村"]; // ← 日本語ヘッダー対応
+      if (city === "大和市") yamato.push(d);
+      else if (city === "海老名市") ebina.push(d);
+      else if (city === "調布市") chofu.push(d);
+    });
+
+    localStorage.setItem('yamato', JSON.stringify(yamato));
+    localStorage.setItem('ebina', JSON.stringify(ebina));
+    localStorage.setItem('chofu', JSON.stringify(chofu));
+
+    console.log(`振り分け完了: 大和(${yamato.length})件 / 海老名(${ebina.length})件 / 調布(${chofu.length})件`);
+    showStatus("エリア別データを振り分け完了", true);
+  } catch (e) {
+    console.error("振り分け処理エラー:", e);
+    showStatus("振り分け処理でエラーが発生", false);
   }
 }
 
@@ -28,42 +58,4 @@ async function syncData() {
     showStatus("データ送信中…");
 
     const localData = JSON.parse(localStorage.getItem('masterData') || '[]');
-    if (localData.length === 0) throw new Error('送信データがありません');
-
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'action=push&data=' + encodeURIComponent(JSON.stringify(localData))
-    });
-
-    if (!res.ok) throw new Error('送信エラー');
-    const data = await res.json();
-    console.log('push結果:', data);
-
-    showStatus("データ送信完了、同期受信中…");
-
-    // 最新inspectionlog取得
-    const pullRes = await fetch(GAS_URL + '?action=pull&sheet=inspectionlog');
-    if (!pullRes.ok) throw new Error('同期取得エラー');
-
-    const pullData = await pullRes.json();
-    const list = pullData.data || pullData; // ← 修正箇所（受け取りも両対応）
-
-    if (!Array.isArray(list) || list.length === 0) throw new Error('同期失敗：データが空でした');
-
-    localStorage.setItem('inspectionData', JSON.stringify(list));
-    showStatus("同期完了", true);
-    console.log('同期完了', list.length, '件');
-  } catch (err) {
-    showStatus("同期失敗：" + err.message, false);
-    console.error(err);
-  }
-}
-
-// ステータス表示
-function showStatus(msg, success) {
-  const el = document.getElementById('status');
-  if (!el) return;
-  el.textContent = msg;
-  el.style.color = success ? '#0a0' : '#c00';
-}
+   
