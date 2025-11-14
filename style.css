@@ -5,7 +5,7 @@
   --card:#020617;
   --line:#1f2937;
 
-  /* 枠色に使うステータスカラー（枠＆左帯専用） */
+  /* 枠色に使うステータスカラー（枠＆帯専用） */
   --green:#22c55e;
   --pink:#fb7185;
   --gray:#6b7280;
@@ -183,7 +183,7 @@ html,body{
   background:var(--card);
   padding:10px;
 
-  /* 左帯用：中で ::before を絶対配置 */
+  /* 帯用：中で ::before / ::after を絶対配置 */
   position:relative;
   overflow:hidden;
 }
@@ -198,6 +198,18 @@ html,body{
   width:4px;
   background:transparent;
   border-radius:14px 0 0 14px;
+}
+
+/* 右側のカラー帯（左右対称用） */
+.row::after{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  right:0;
+  width:4px;
+  background:transparent;
+  border-radius:0 14px 14px 0;
 }
 
 .row .idx{
@@ -270,14 +282,15 @@ html,body{
   color:var(--fg);
 }
 
-/* bg states → 「枠＋左帯だけ色付き」仕様 */
+/* bg states → 「枠＋左右の帯だけ色付き」仕様 */
 
 /* standby / 7days など “緑系” */
 .bg-green{
   background:var(--card);
   border:1px solid var(--green);
 }
-.bg-green::before{
+.bg-green::before,
+.bg-green::after{
   background:var(--green);
 }
 
@@ -286,7 +299,8 @@ html,body{
   background:var(--card);
   border:1px solid var(--pink);
 }
-.bg-pink::before{
+.bg-pink::before,
+.bg-pink::after{
   background:var(--pink);
 }
 
@@ -295,7 +309,8 @@ html,body{
   background:var(--card);
   border:1px solid var(--gray);
 }
-.bg-gray::before{
+.bg-gray::before,
+.bg-gray::after{
   background:var(--gray);
 }
 
@@ -304,7 +319,8 @@ html,body{
   background:var(--card);
   border:1px solid var(--yellow);
 }
-.bg-yellow::before{
+.bg-yellow::before,
+.bg-yellow::after{
   background:var(--yellow);
 }
 
@@ -313,7 +329,8 @@ html,body{
   background:var(--card);
   border:1px solid var(--blue);
 }
-.bg-blue::before{
+.bg-blue::before,
+.bg-blue::after{
   background:var(--blue);
 }
 
