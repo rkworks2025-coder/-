@@ -1,356 +1,82 @@
+/* Copied from v8g/style.css with no changes for v8h */
 :root{
-  /* ダークモード用カラー定義 */
-  --fg:#e5e7eb;
-  --muted:#9ca3af;
-  --card:#020617;
-  --line:#1f2937;
-
-  /* 枠色に使うステータスカラー（枠＆帯専用） */
-  --green:#22c55e;
-  --pink:#fb7185;
-  --gray:#6b7280;
-  --yellow:#eab308;
-  --blue:#38bdf8;
-
-  --accent:#38bdf8;
+  --fg:#0f172a; --muted:#64748b; --card:#ffffff; --line:#e5e7eb;
+  --green:#e8f7ec; --pink:#ffe5ef; --gray:#d9dce2; --yellow:#fff6bf; --blue:#e8f2ff;
+  --accent:#2563eb;
 }
-
-*{
-  box-sizing:border-box;
-}
-
-/* 背景をほぼ黒に、文字色を明るく */
-html,body{
-  margin:0;
-  padding:0;
-  background:#020617;
-  color:var(--fg);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
-}
-
-/* 上部バーもダークに */
-.appbar{
-  position:sticky;
-  top:0;
-  z-index:20;
-  background:#020617;
-  border-bottom:1px solid #111827;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:12px 14px;
-}
-
-.appbar .title{
-  font-weight:800;
-  letter-spacing:.02em;
-  font-size:20px;
-}
-
-/* ボタンは黒ベース＋枠 */
-.btn{
-  appearance:none;
-  border:1px solid var(--line);
-  background:#020617;
-  border-radius:10px;
-  padding:8px 12px;
-  font-weight:700;
-  font-size:14px;
-  color:var(--fg);
-}
-
-/* 重要ボタンだけ少し明るく */
-.btn.primary{
-  background:#0f172a;
-  border-color:#1d4ed8;
-  color:#bfdbfe;
-}
-
-.wrap{
-  max-width:940px;
-  margin:16px auto;
-  padding:0 12px 80px;
-}
-
-.hint{
-  color:var(--muted);
-  font-size:13px;
-  margin:8px 2px;
-}
-
-.cards{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:12px;
-}
-
-/* カード本体もダーク、枠で区別 */
-.cardlink{
-  display:block;
-  text-decoration:none;
-  color:inherit;
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:14px;
-  padding:14px 14px;
-}
-
-.cardlink:hover{
-  background:#020617;
-  border-color:#334155;
-}
-
-.meta{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  color:var(--muted);
-  font-size:12px;
-  margin-top:6px;
-}
-
-.chip{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  background:#111827;
-  border:1px solid var(--line);
-  border-radius:999px;
-  padding:2px 8px;
-  color:var(--muted);
-}
-
-.empty{
-  color:var(--muted);
-  font-size:14px;
-  margin-top:18px;
-}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#f6f7fb;color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif}
+.appbar{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:12px 14px}
+.appbar .title{font-weight:800;letter-spacing:.02em;font-size:20px}
+.btn{appearance:none;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px}
+.btn.primary{background:#ebf2ff;border-color:#c7d2fe;color:#1e3a8a}
+.wrap{max-width:940px;margin:16px auto;padding:0 12px 80px}
+.hint{color:var(--muted);font-size:13px;margin:8px 2px}
+.cards{display:grid;grid-template-columns:1fr;gap:12px}
+.cardlink{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 14px}
+.cardlink:hover{background:#fafcff}
+.meta{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.empty{color:var(--muted);font-size:14px;margin-top:18px}
 
 /* progress modal */
-.modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.65);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  z-index:50;
-}
-
-.modal.show{
-  display:flex;
-}
-
-.dialog{
-  width:min(480px,90vw);
-  background:#020617;
-  color:#fff;
-  border-radius:12px;
-  padding:16px 14px;
-  border:1px solid #111827;
-}
-
-.barwrap{
-  height:8px;
-  background:#020617;
-  border-radius:999px;
-  overflow:hidden;
-  margin-top:10px;
-  border:1px solid #1f2937;
-}
-
-.bar{
-  height:100%;
-  width:0;
-  background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399);
-}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50}
+.modal.show{display:flex}
+.dialog{width:min(480px,90vw);background:#111827;color:#fff;border-radius:12px;padding:16px 14px}
+.barwrap{height:8px;background:#1f2937;border-radius:999px;overflow:hidden;margin-top:10px}
+.bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399)}
 
 /* city rows */
-.list{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-/* 行カード：ダーク背景＋標準枠 */
-.row{
-  display:grid;
-  grid-template-columns:auto 1fr auto;
-  gap:10px;
-  align-items:flex-start;
-  border:1px solid var(--line);
-  border-radius:14px;
-  background:var(--card);
-  padding:10px;
-
-  /* 帯用：中で ::before / ::after を絶対配置 */
-  position:relative;
-  overflow:hidden;
-}
-
-/* 左側のカラー帯（ステータスごとに色を上書き） */
-.row::before{
-  content:"";
-  position:absolute;
-  top:0;
-  bottom:0;
-  left:0;
-  width:4px;
-  background:transparent;
-  border-radius:14px 0 0 14px;
-}
-
-/* 右側のカラー帯（左右対称用） */
-.row::after{
-  content:"";
-  position:absolute;
-  top:0;
-  bottom:0;
-  right:0;
-  width:4px;
-  background:transparent;
-  border-radius:0 14px 14px 0;
-}
-
-.row .idx{
-  font-weight:800;
-  color:#e5e7eb;
-}
-
-.row .leftcol{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  align-items:flex-start;
-}
+.list{display:flex;flex-direction:column;gap:10px}
+.row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px}
+.row .idx{font-weight:800;color:#334155;/* alignment handled by flex in leftcol */}
+.row .leftcol{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
 
 /* top row inside left column holds index and checkbox */
-.row .left-top{
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-
-.row .mid{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  min-width:0;
-}
-
-/* ステーション名（タイトル） */
+.row .left-top{display:flex;align-items:center;gap:6px;}
+.row .mid{display:flex;flex-direction:column;gap:4px;min-width:0}
+/* In city pages, ensure station name wraps naturally but no more than two lines */
 .row .title{
   font-weight:800;
+  /* make station name the same size as model line (bold only) */
   font-size:16px;
+  /* allow wrapping at natural boundaries */
   white-space:normal;
+  /* limit to two lines and hide overflow */
   display:-webkit-box;
   -webkit-line-clamp:2;
   -webkit-box-orient:vertical;
   overflow:hidden;
   line-height:1.3;
 }
-
-/* 車種＋車番の行 */
+/* Keep model and plate on a single line */
+/* sub-line holds model and plate; allow wrapping to two lines */
 .row .sub{
-  color:#cbd5f5;
+  color:#475569;
+  /* allow model and plate to appear on separate lines */
   white-space:normal;
   line-height:1.2;
 }
+.rightcol{display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.state{padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.btn.tiny{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid var(--line)}
 
-.rightcol{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  align-items:flex-end;
-}
-
-/* ステータス表示 */
-.state{
-  padding:6px 8px;
-  border:1px solid var(--line);
-  border-radius:10px;
-  background:#020617;
-  color:var(--fg);
-}
-
-.btn.tiny{
-  padding:8px 12px;
-  font-size:13px;
-  border-radius:10px;
-  border:1px solid var(--line);
-  background:#020617;
-  color:var(--fg);
-}
-
-/* bg states → 「枠＋左右の帯だけ色付き」仕様 */
-
-/* standby / 7days など “緑系” */
-.bg-green{
-  background:var(--card);
-  border:1px solid var(--green);
-}
-.bg-green::before,
-.bg-green::after{
-  background:var(--green);
-}
-
-/* チェック済み（ピンク） */
-.bg-pink{
-  background:var(--card);
-  border:1px solid var(--pink);
-}
-.bg-pink::before,
-.bg-pink::after{
-  background:var(--pink);
-}
-
-/* 稼働停止（グレー） */
-.bg-gray{
-  background:var(--card);
-  border:1px solid var(--gray);
-}
-.bg-gray::before,
-.bg-gray::after{
-  background:var(--gray);
-}
-
-/* 巡回不要（黄色） */
-.bg-yellow{
-  background:var(--card);
-  border:1px solid var(--yellow);
-}
-.bg-yellow::before,
-.bg-yellow::after{
-  background:var(--yellow);
-}
-
-/* 期限切れ／要注意など（青） */
-.bg-blue{
-  background:var(--card);
-  border:1px solid var(--blue);
-}
-.bg-blue::before,
-.bg-blue::after{
-  background:var(--blue);
-}
+/* bg states */
+.bg-green{background:var(--green)}
+.bg-pink{background:var(--pink)}
+.bg-gray{background:var(--gray)}
+.bg-yellow{background:var(--yellow)}
+.bg-blue{background:var(--blue)}
 
 /* version */
-.ver{
-  position:fixed;
-  right:8px;
-  bottom:6px;
-  font-size:10px;
-  color:#64748b;
-  opacity:.7;
-  pointer-events:none;
-  z-index:9;
-}
+.ver{position:fixed;right:8px;bottom:6px;font-size:10px;color:#94a3b8;opacity:.7;pointer-events:none;z-index:9}
 
 /* date/time display within right column */
 .datetime{
   font-size:12px;
-  color:#9ca3af;
+  color:#475569;
   line-height:1.2;
   text-align:left;
+  /* allow line breaks so MM/DD and HH:MM display on separate lines */
   white-space:normal;
 }
