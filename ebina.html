@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="ja">
 <head>
@@ -5,10 +6,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>海老名市</title>
   <!-- include version query to bust cache -->
-  <link rel="stylesheet" href="style.css?v=8k" />
+  <link rel="stylesheet" href="style.css?v=6w" />
 </head>
 <body>
-  <div class="ver">v8k</div>
+  <div class="ver">v6w</div>
   <header class="appbar">
     <a class="btn" href="index.html">戻る</a>
     <div class="title" style="margin:0 auto;">海老名市</div>
@@ -21,13 +22,9 @@
   </main>
 
   <!-- include version query to bust cache -->
-  <script src="app.js?v=8k"></script>
+  <script src="app.js?v=6w"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      if (typeof Junkai !== 'undefined' && Junkai.initCity) {
-        Junkai.initCity("海老名市");
-      }
-    });
+    Junkai.initCity("海老名市");
   </script>
 </body>
 </html>
