@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s1h（初期同期専用／inspectionlog連携なし）
+// version: s1i（初期同期専用／inspectionlog連携なし）
 // 前提ヘッダー（全体管理タブの英語表記）
 // A: area, B: city, C: address, D: station, E: model,
 // F: plate, G: note, H: operator
@@ -102,7 +102,7 @@ const Junkai = (() => {
       // デフォルトは空文字（"normal"は使わない）。
       status:    (rowObj.status   || "").trim(),
 
-      checked:   !!rowObj.checked,           // ほぼ常に false からスタート
+      checked:   !!rowObj.checked,
       last_inspected_at: (rowObj.last_inspected_at || "").trim(),
 
       index:     Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0,
@@ -167,7 +167,7 @@ const Junkai = (() => {
     }
   }
 
-  // ===== index.html 用：初期同期のみ =====
+  // ===== index.html 用：初期同期のみ（リセット付き） =====
   async function initIndex() {
     repaintCounters();
 
@@ -175,6 +175,15 @@ const Junkai = (() => {
     if (!btn) return;
 
     btn.addEventListener("click", async () => {
+      // ★ 追加：確認ダイアログ＋リセット
+      const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
+      if (!ok) return;
+
+      // 各エリアのローカルデータをクリア
+      for (const city of CITIES) {
+        localStorage.removeItem(LS_KEY(city));
+      }
+
       try {
         showProgress(true, 5);
         statusText("開始…");
@@ -215,7 +224,7 @@ const Junkai = (() => {
         }
 
         if (wrote === 0) {
-          statusText("同期失敗：データが空でした（既存データは保持）");
+          statusText("同期失敗：データが空でした（既存データは保持されていません）");
           showProgress(false);
           return;
         }
@@ -229,7 +238,7 @@ const Junkai = (() => {
         );
       } catch (e) {
         console.error("sync error", e);
-        statusText("同期失敗：通信または解析エラー（既存データは保持）");
+        statusText("同期失敗：通信または解析エラー（既存データはリセット済み）");
       } finally {
         setTimeout(() => showProgress(false), 400);
       }
