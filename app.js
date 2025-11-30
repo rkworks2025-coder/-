@@ -1,398 +1,423 @@
-// 巡回アプリ s1f 対応版 app.js（元 v6w ブラック版）
+// 巡回アプリ app.js
+// version: s1h（初期同期専用／inspectionlog連携なし）
+// 前提ヘッダー（全体管理タブの英語表記）
+// A: area, B: city, C: address, D: station, E: model,
+// F: plate, G: note, H: operator
 
-// ====== 設定 ======
-const Junkai = (()=>{
+const Junkai = (() => {
 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycby9RpFiUbYu6YX6JW9XfwbDx36_4AIlGEQMOxR3SnxgNdoRUJKfyxvF3b1SEYwuHb3X/exec";
+  // ===== 設定 =====
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
-  const CITIES = ["大和市","海老名市","調布市"];
-  const PREFIX = { "大和市":"Y", "海老名市":"E", "調布市":"C" };
+
+  const CITIES = ["大和市", "海老名市", "調布市"];
+  const PREFIX = { "大和市": "Y", "海老名市": "E", "調布市": "C" };
+
   const LS_KEY = (c) => `junkai:city:${c}`;
   const TIMEOUT_MS = 15000;
-  const DEBUG_ERRORS = true;
 
-  // ===== utils =====
-  const sleep = (ms)=> new Promise(r=>setTimeout(r,ms));
+  // ===== utility =====
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  function showProgress(on, pct){
-    const m = document.getElementById('progressModal');
-    const bar = document.getElementById('progressBar');
-    if(!m) return;
-    if(on) m.classList.add('show'); else m.classList.remove('show');
-    if(bar && typeof pct==='number') bar.style.width = Math.max(0,Math.min(100,pct)) + '%';
+  function showProgress(on, pct) {
+    const m = document.getElementById("progressModal");
+    const bar = document.getElementById("progressBar");
+    if (!m) return;
+    if (on) m.classList.add("show");
+    else m.classList.remove("show");
+    if (bar && typeof pct === "number") {
+      const v = Math.max(0, Math.min(100, pct));
+      bar.style.width = v + "%";
+    }
   }
-  function status(txt){
-    const el = document.getElementById('statusText'); if(el) el.textContent = txt;
+
+  function statusText(msg) {
+    const el = document.getElementById("statusText");
+    if (el) el.textContent = msg;
   }
 
-  function normalize(r){
+  async function fetchJSONWithRetry(url, retry = 2) {
+    let lastErr = null;
+    for (let i = 0; i <= retry; i++) {
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+        const res = await fetch(url, {
+          method: "GET",
+          cache: "no-store",
+          redirect: "follow",
+          signal: ctl.signal
+        });
+        clearTimeout(t);
+
+        const raw = await res.text();
+        const text = raw.replace(/^\ufeff/, ""); // BOM除去
+        const json = JSON.parse(text);
+        return json;
+      } catch (e) {
+        lastErr = e;
+        await sleep(400 * (i + 1));
+      }
+    }
+    throw lastErr || new Error("fetch-fail");
+  }
+
+  // ===== ローカル保存 =====
+  function saveCity(city, arr) {
+    localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
+  }
+
+  function readCity(city) {
+    try {
+      const s = localStorage.getItem(LS_KEY(city));
+      if (!s) return [];
+      const a = JSON.parse(s);
+      return Array.isArray(a) ? a : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function applyUIIndex(city, arr) {
+    const p = PREFIX[city] || "";
+    for (let i = 0; i < arr.length; i++) {
+      arr[i].ui_index_num = i + 1;
+      arr[i].ui_index = p + (i + 1);
+    }
+  }
+
+  // シート1行 → 内部形式
+  function normalizeRow(rowObj) {
     return {
-      city: (r.city||'').trim(),
-      station: (r.station||'').trim(),
-      model: (r.model||'').trim(),
-      plate: (r.plate||'').trim(),
-      status: (r.status||'normal').trim(),
-      checked: !!r.checked,
-      index: (Number.isFinite(+r.index) && +r.index>0)? parseInt(r.index,10) : 0,
-      last_inspected_at: (r.last_inspected_at||'').trim(),
-      ui_index: r.ui_index || '',
-      ui_index_num: r.ui_index_num || 0
+      area:      (rowObj.area     || "").trim(),
+      city:      (rowObj.city     || "").trim(),
+      address:   (rowObj.address  || "").trim(),
+      station:   (rowObj.station  || "").trim(),
+      model:     (rowObj.model    || "").trim(),
+      plate:     (rowObj.plate    || "").trim(),
+      note:      (rowObj.note     || "").trim(),
+      operator:  (rowObj.operator || "").trim(),
+
+      // 初期同期フェーズでは status はシートと無関係なローカル専用。
+      // デフォルトは空文字（"normal"は使わない）。
+      status:    (rowObj.status   || "").trim(),
+
+      checked:   !!rowObj.checked,           // ほぼ常に false からスタート
+      last_inspected_at: (rowObj.last_inspected_at || "").trim(),
+
+      index:     Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0,
+      ui_index:  rowObj.ui_index || "",
+      ui_index_num: rowObj.ui_index_num || 0
     };
   }
 
-  async function fetchJSONWithRetry(url, retry=2){
-    let lastErr = null;
-    for(let i=0;i<=retry;i++){
-      try{
-        const ctl = new AbortController();
-        const t = setTimeout(()=>ctl.abort(), TIMEOUT_MS);
-        const res = await fetch(url, { method:'GET', cache:'no-store', redirect:'follow', signal: ctl.signal });
-        clearTimeout(t);
-        const raw = await res.text();
-        // try parse JSON (strip BOM)
-        const text = raw.replace(/^\ufeff/, '');
-        let json = null;
-        try{ json = JSON.parse(text); }
-        catch(e){ 
-          if(DEBUG_ERRORS) console.warn('JSON parse fail, first 200 chars:', text.slice(0,200));
-          throw new Error('parse-fail');
-        }
-        return json;
-      }catch(e){
-        lastErr = e;
-        await sleep(400*(i+1));
-      }
-    }
-    throw lastErr || new Error('fetch-fail');
-  }
-
-  function saveCity(city, arr){
-    localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
-  }
-  function readCity(city){
-    try{ const s = localStorage.getItem(LS_KEY(city)); if(!s) return []; const a = JSON.parse(s); return Array.isArray(a)? a:[]; }catch(_){ return []; }
-  }
-
-  function applyUIIndex(city, arr){
-    const p = PREFIX[city] || '';
-    for(let i=0;i<arr.length;i++){
-      arr[i].ui_index_num = i+1;
-      arr[i].ui_index = p + (i+1);
-    }
-  }
-
-  function countCity(arr){
-    const c = {done:0, stop:0, skip:0, total:arr.length};
-    for(const it of arr){
-      if(it.status==='stop') c.stop++;
-      else if(it.status==='skip') c.skip++;
-      if(it.checked || it.status==='done') c.done++;
+  // ===== カウンタ =====
+  function countCity(arr) {
+    const c = { done: 0, stop: 0, skip: 0, total: arr.length };
+    for (const it of arr) {
+      if (it.status === "stop") c.stop++;
+      else if (it.status === "skip") c.skip++;
+      if (it.checked) c.done++;
     }
     return c;
   }
 
-  function repaintCounters(){
+  function repaintCounters() {
     const map = {
-      "大和市":    {done:'#yamato-done', stop:'#yamato-stop', skip:'#yamato-skip', total:'#yamato-total', rem:'#yamato-rem'},
-      "海老名市":  {done:'#ebina-done',  stop:'#ebina-stop',  skip:'#ebina-skip',  total:'#ebina-total', rem:'#ebina-rem'},
-      "調布市":    {done:'#chofu-done',  stop:'#chofu-stop',  skip:'#chofu-skip',  total:'#chofu-total', rem:'#chofu-rem'},
+      "大和市":   { done: "#yamato-done", stop: "#yamato-stop", skip: "#yamato-skip", total: "#yamato-total", rem: "#yamato-rem" },
+      "海老名市": { done: "#ebina-done",  stop: "#ebina-stop",  skip: "#ebina-skip",  total: "#ebina-total",  rem: "#ebina-rem" },
+      "調布市":   { done: "#chofu-done",  stop: "#chofu-stop",  skip: "#chofu-skip",  total: "#chofu-total",  rem: "#chofu-rem" }
     };
+
     let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
-    for(const city of CITIES){
+
+    for (const city of CITIES) {
       const arr = readCity(city);
       const cnt = countCity(arr);
       overallTotal += cnt.total;
       overallDone += cnt.done;
       overallStop += cnt.stop;
       overallSkip += cnt.skip;
+
       const m = map[city];
-      for(const k of ['done','stop','skip','total']){
-        const el = document.querySelector(m[k]); if(el) el.textContent = cnt[k];
+      for (const k of ["done", "stop", "skip", "total"]) {
+        const el = document.querySelector(m[k]);
+        if (el) el.textContent = cnt[k];
       }
       const remCount = cnt.total - cnt.done - cnt.skip;
       const remEl = document.querySelector(m.rem);
-      if(remEl) remEl.textContent = remCount;
+      if (remEl) remEl.textContent = remCount;
     }
-    const allDoneEl  = document.querySelector('#all-done');
-    const allStopEl  = document.querySelector('#all-stop');
-    const allSkipEl  = document.querySelector('#all-skip');
-    const allTotalEl = document.querySelector('#all-total');
-    const allRemEl   = document.querySelector('#all-rem');
-    if(allDoneEl)  allDoneEl.textContent  = overallDone;
-    if(allStopEl)  allStopEl.textContent  = overallStop;
-    if(allSkipEl)  allSkipEl.textContent  = overallSkip;
-    if(allTotalEl) allTotalEl.textContent = overallTotal;
-    if(allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
-    const hint = document.getElementById('overallHint');
-    if(hint) hint.textContent = overallTotal>0 ? `総件数：${overallTotal}` : 'まだ同期されていません';
+
+    const allDoneEl  = document.querySelector("#all-done");
+    const allStopEl  = document.querySelector("#all-stop");
+    const allSkipEl  = document.querySelector("#all-skip");
+    const allTotalEl = document.querySelector("#all-total");
+    const allRemEl   = document.querySelector("#all-rem");
+
+    if (allDoneEl)  allDoneEl.textContent  = overallDone;
+    if (allStopEl)  allStopEl.textContent  = overallStop;
+    if (allSkipEl)  allSkipEl.textContent  = overallSkip;
+    if (allTotalEl) allTotalEl.textContent = overallTotal;
+    if (allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
+
+    const hint = document.getElementById("overallHint");
+    if (hint) {
+      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "まだ同期されていません";
+    }
   }
 
-  // ====== public init for index ======
-  async function initIndex(){
+  // ===== index.html 用：初期同期のみ =====
+  async function initIndex() {
     repaintCounters();
-    const btn = document.getElementById('syncBtn');
-    if(!btn) return;
-    btn.addEventListener('click', async()=>{
-      try{
+
+    const btn = document.getElementById("syncBtn");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      try {
         showProgress(true, 5);
-        status('開始…');
-        const u = `${GAS_URL}?action=pull&_=${Date.now()}`;
-        status('GASへ問い合わせ中…');
-        showProgress(true, 35);
-        const json = await fetchJSONWithRetry(u, 2);
-        showProgress(true, 55);
-        // json.rows / json.data / json.values / ルート配列のいずれかが配列ならOK
-        if(
-          !json ||
-          (
-            !Array.isArray(json.rows) &&
-            !Array.isArray(json.data) &&
-            !Array.isArray(json.values) &&
-            !Array.isArray(json)
-          )
-        ){
-          throw new Error('bad-shape');
+        statusText("開始…");
+
+        const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
+        statusText("GASへ問い合わせ中…");
+        showProgress(true, 30);
+
+        const json = await fetchJSONWithRetry(url, 2);
+        showProgress(true, 60);
+
+        if (!json || !Array.isArray(json.rows)) {
+          throw new Error("bad-shape");
         }
 
-        const buckets = { "大和市":[], "海老名市":[], "調布市":[] };
+        // cityごとにバケツ分け
+        const buckets = { "大和市": [], "海老名市": [], "調布市": [] };
 
-        let arr = Array.isArray(json.rows)
-          ? json.rows
-          : (Array.isArray(json.data)
-             ? json.data
-             : (Array.isArray(json.values) ? json.values : []));
-        if(!Array.isArray(arr)) arr = [];
-        if(arr.length === 0 && Array.isArray(json) && Array.isArray(json[0])){
-          arr = json;
-        }
+        for (const r of json.rows) {
+          if (!r || typeof r !== "object") continue;
 
-        for(const r of arr){
-          let rowObj;
-          if(Array.isArray(r)){
-            // 配列形式: [city, station, model, plate, status]
-            rowObj = {
-              city:    r[0] || '',
-              station: r[1] || '',
-              model:   r[2] || '',
-              plate:   r[3] || '',
-              status:  (r[4] || 'normal')
-            };
-          }else if(r && typeof r === 'object'){
-            rowObj = r;
-          }else{
-            continue;
-          }
+          // 期待するキー：area, city, address, station, model, plate, note, operator
+          const norm = normalizeRow(r);
+          const cityName = norm.city;
+          if (!buckets[cityName]) continue;
 
-          const cityName = (rowObj.city || '').trim();
-          if(!buckets[cityName]) continue;
-          const rec = normalize(rowObj);
-          buckets[cityName].push(rec);
+          buckets[cityName].push(norm);
         }
 
         let wrote = 0;
-        for(const city of CITIES){
-          if(buckets[city].length>0){
-            applyUIIndex(city, buckets[city]);
-            saveCity(city, buckets[city]);
+        for (const city of CITIES) {
+          const arr = buckets[city];
+          if (arr.length > 0) {
+            applyUIIndex(city, arr);
+            saveCity(city, arr);
             wrote++;
           }
         }
 
-        if(wrote===0){ status('同期失敗：データが空でした（既存データは保持）'); showProgress(false); return; }
+        if (wrote === 0) {
+          statusText("同期失敗：データが空でした（既存データは保持）");
+          showProgress(false);
+          return;
+        }
 
         repaintCounters();
         showProgress(true, 100);
-        status(`同期完了：大和${buckets['大和市'].length||0} / 海老名${buckets['海老名市'].length||0} / 調布${buckets['調布市'].length||0}`);
-      }catch(e){
-        console.error('sync error', e);
-        status('同期失敗：通信または解析エラー（既存データは保持）');
-      }finally{ setTimeout(()=>showProgress(false), 350); }
+        statusText(
+          `同期完了：大和${buckets["大和市"].length || 0} / ` +
+          `海老名${buckets["海老名市"].length || 0} / ` +
+          `調布${buckets["調布市"].length || 0}`
+        );
+      } catch (e) {
+        console.error("sync error", e);
+        statusText("同期失敗：通信または解析エラー（既存データは保持）");
+      } finally {
+        setTimeout(() => showProgress(false), 400);
+      }
     });
-
-    const pushBtn = document.getElementById('pushLogBtn');
-    if (pushBtn) {
-      pushBtn.addEventListener('click', async () => {
-        try {
-          const all = [];
-          for (const c of CITIES) {
-            const arrCity = readCity(c);
-            if (Array.isArray(arrCity)) all.push(...arrCity);
-          }
-          status('シート更新中…');
-          const json = JSON.stringify(all);
-          const params = new URLSearchParams();
-          params.append('action', 'push');
-          params.append('data', json);
-          const url = `${GAS_URL}`;
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-          });
-          let result = null;
-          try {
-            result = await res.json();
-          } catch(_){ result = null; }
-          if (result && result.ok) {
-            status('シート更新完了！');
-          } else {
-            status('更新に失敗しました');
-          }
-        } catch(err){
-          console.error('push error', err);
-          status('更新エラー');
-        }
-      });
-    }
   }
 
-  // ===== City page =====
-  function within7d(last){
-    if(!last) return false;
+  // ===== city ページ =====
+  function within7d(last) {
+    if (!last) return false;
     const t = Date.parse(last);
-    if(!Number.isFinite(t)) return false;
-    return (Date.now() - t) < (7*24*60*60*1000);
-  }
-  function rowBg(rec){
-    if(rec.checked) return 'bg-pink';
-    if(rec.status==='stop') return 'bg-gray';
-    if(rec.status==='skip') return 'bg-yellow';
-    if(within7d(rec.last_inspected_at)) return 'bg-blue';
-    return 'bg-green';
+    if (!Number.isFinite(t)) return false;
+    const diff = Date.now() - t;
+    return diff < 7 * 24 * 60 * 60 * 1000;
   }
 
-  function mountCity(city){
-    const list = document.getElementById('list');
-    const hint = document.getElementById('hint');
-    list.innerHTML = '';
+  function rowBg(rec) {
+    if (rec.checked) return "bg-pink";
+    if (rec.status === "stop") return "bg-gray";
+    if (rec.status === "skip") return "bg-yellow";
+    if (within7d(rec.last_inspected_at)) return "bg-blue";
+    return "bg-green";
+  }
+
+  function persistCityRec(city, rec) {
     const arr = readCity(city);
-    if(arr.length===0){ hint.textContent='まだ同期されていません（インデックスの同期を押してください）'; return; }
+    if (!Array.isArray(arr) || !arr.length) return;
+
+    const idx = arr.findIndex(r => r.ui_index === rec.ui_index);
+    if (idx === -1) return;
+
+    arr[idx] = rec;
+    saveCity(city, arr);
+    repaintCounters();
+  }
+
+  function initCity(city) {
+    const list = document.getElementById("list");
+    const hint = document.getElementById("hint");
+    if (!list || !hint) return;
+
+    const arr = readCity(city);
+    list.innerHTML = "";
+
+    if (arr.length === 0) {
+      hint.textContent = "まだ同期されていません（インデックスの同期を押してください）";
+      return;
+    }
+
     hint.textContent = `件数：${arr.length}`;
 
-    for(const rec of arr){
-      const row = document.createElement('div');
+    for (const rec of arr) {
+      const row = document.createElement("div");
       row.className = `row ${rowBg(rec)}`;
 
-      const left = document.createElement('div');
-      left.className = 'leftcol';
-      const idxDiv = document.createElement('div');
-      idxDiv.className = 'idx';
-      idxDiv.textContent = rec.ui_index || '';
-      const chk = document.createElement('input');
-      chk.type = 'checkbox';
+      // 左カラム（インデックス＆チェック）
+      const left = document.createElement("div");
+      left.className = "leftcol";
+
+      const topLeft = document.createElement("div");
+      topLeft.className = "left-top";
+
+      const idxDiv = document.createElement("div");
+      idxDiv.className = "idx";
+      idxDiv.textContent = rec.ui_index || "";
+
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.className = "chk";
       chk.checked = !!rec.checked;
-      chk.className = 'chk';
-      const topLeft = document.createElement('div');
-      topLeft.className = 'left-top';
+
       topLeft.appendChild(idxDiv);
       topLeft.appendChild(chk);
-      const dtDiv = document.createElement('div');
-      dtDiv.className = 'datetime';
-      function updateDateTime(){
-        if(rec.last_inspected_at){
+
+      const dtDiv = document.createElement("div");
+      dtDiv.className = "datetime";
+
+      function updateDateTime() {
+        if (rec.last_inspected_at) {
           const d = new Date(rec.last_inspected_at);
-          if(Number.isFinite(d.getTime())){
-            const mm = String(d.getMonth()+1).padStart(2,'0');
-            const dd = String(d.getDate()).padStart(2,'0');
-            const hh = String(d.getHours()).padStart(2,'0');
-            const mi = String(d.getMinutes()).padStart(2,'0');
+          if (Number.isFinite(d.getTime())) {
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mi = String(d.getMinutes()).padStart(2, "0");
             dtDiv.innerHTML = `${mm}/${dd}<br>${hh}:${mi}`;
-            dtDiv.style.display = '';
+            dtDiv.style.display = "";
             return;
           }
         }
-        dtDiv.innerHTML = '';
-        dtDiv.style.display = 'none';
+        dtDiv.innerHTML = "";
+        dtDiv.style.display = "none";
       }
       updateDateTime();
+
       left.appendChild(topLeft);
       left.appendChild(dtDiv);
-      chk.addEventListener('change', () => {
-        const message = chk.checked ? 'チェックを付けます。よろしいですか？' : 'チェックを外します。よろしいですか？';
-        if (!confirm(message)) {
+
+      chk.addEventListener("change", () => {
+        const msg = chk.checked
+          ? "チェックを付けます。よろしいですか？"
+          : "チェックを外します。よろしいですか？";
+        if (!confirm(msg)) {
           chk.checked = !chk.checked;
           return;
         }
-        const nowISO = new Date().toISOString();
-        rec.checked = chk.checked;
-        if(chk.checked){
-          rec.last_inspected_at = nowISO;
+        if (chk.checked) {
+          rec.checked = true;
+          rec.last_inspected_at = new Date().toISOString();
         } else {
-          rec.last_inspected_at = '';
+          rec.checked = false;
+          rec.last_inspected_at = "";
         }
         updateDateTime();
-        persistCityRec(city, rec);
         row.className = `row ${rowBg(rec)}`;
+        persistCityRec(city, rec);
       });
 
-      const mid = document.createElement('div');
-      mid.className = 'mid';
-      const title = document.createElement('div');
-      title.className = 'title';
-      title.textContent = rec.station || '';
-      const sub = document.createElement('div');
-      sub.className = 'sub';
-      sub.innerHTML = `${rec.model || ''}<br>${rec.plate || ''}`;
+      // 中央（ステーション名／車種・ナンバー）
+      const mid = document.createElement("div");
+      mid.className = "mid";
+
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = rec.station || "";
+
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.innerHTML = `${rec.model || ""}<br>${rec.plate || ""}`;
+
       mid.appendChild(title);
       mid.appendChild(sub);
 
-      const right = document.createElement('div');
-      right.className = 'rightcol';
+      // 右カラム（ステータス＆タイヤボタン）
+      const right = document.createElement("div");
+      right.className = "rightcol";
 
-      const sel = document.createElement('select');
-      sel.className = 'state';
-      [['normal', '通常'], ['stop', '停止'], ['skip', '不要']].forEach(([v, lab]) => {
-        const o = document.createElement('option');
-        o.value = v;
-        o.textContent = lab;
-        if (rec.status === v) o.selected = true;
+      const sel = document.createElement("select");
+      sel.className = "state";
+
+      const statusOptions = [
+        ["",       "通常"],
+        ["stop",   "停止"],
+        ["skip",   "不要"]
+      ];
+
+      const current = rec.status || "";
+      for (const [value, label] of statusOptions) {
+        const o = document.createElement("option");
+        o.value = value;
+        o.textContent = label;
+        if (current === value) o.selected = true;
         sel.appendChild(o);
-      });
-      sel.addEventListener('change', () => {
+      }
+
+      sel.addEventListener("change", () => {
         rec.status = sel.value;
-        persistCityRec(city, rec);
         row.className = `row ${rowBg(rec)}`;
+        persistCityRec(city, rec);
       });
-      const btn = document.createElement('button');
-      btn.className = 'btn tiny';
-      btn.textContent = '点検';
-      btn.addEventListener('click', () => {
-        const q = new URLSearchParams({
-          station: rec.station || '',
-          model: rec.model || '',
-          plate_full: rec.plate || '',
+
+      const tireBtn = document.createElement("button");
+      tireBtn.className = "tire-btn";
+      tireBtn.textContent = "点検";
+      tireBtn.addEventListener("click", () => {
+        const params = new URLSearchParams({
+          station: rec.station || "",
+          model: rec.model || "",
+          plate: rec.plate || ""
         });
-        location.href = `${TIRE_APP_URL}?${q.toString()}`;
+        const url = `${TIRE_APP_URL}?${params.toString()}`;
+        window.open(url, "_blank");
       });
+
       right.appendChild(sel);
-      right.appendChild(btn);
+      right.appendChild(tireBtn);
 
       row.appendChild(left);
       row.appendChild(mid);
       row.appendChild(right);
+
       list.appendChild(row);
     }
   }
 
-  function persistCityRec(city, rec){
-    const arr = readCity(city);
-    let i = -1;
-    if(rec.ui_index){
-      i = arr.findIndex(x => (x.ui_index || '') === (rec.ui_index || ''));
-    }
-    if(i < 0){
-      i = arr.findIndex(x => (x.plate || '') === (rec.plate || ''));
-    }
-    if(i >= 0){
-      arr[i] = rec;
-    } else {
-      arr.push(rec);
-    }
-    saveCity(city, arr);
-  }
-
+  // 公開API
   return {
-    initIndex: initIndex,
-    initCity: mountCity,
+    initIndex,
+    initCity
   };
+
 })();
