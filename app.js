@@ -262,6 +262,79 @@ const Junkai = (() => {
     return "bg-green";
   }
 
+  /**
+   * 巡回状況に応じて inspectionlog へ送るステータス文字列を決定する。
+   * 5種類の状態に対応させる。
+   * - rec.checked === true           -> "checked"
+   * - rec.status === "stop"         -> "stopped"
+   * - rec.status === "skip"         -> "Unnecessary"
+   * - within7d(rec.last_inspected_at) -> "7days_rule"
+   * - 上記以外                       -> "standby"
+   * @param {object} rec レコードオブジェクト
+   * @returns {string} inspectionlog用のステータス
+   */
+  function mapStatusForLog(rec) {
+    try {
+      if (rec.checked) return "checked";
+      if (rec.status === "stop") return "stopped";
+      if (rec.status === "skip") return "Unnecessary";
+      if (within7d(rec.last_inspected_at)) return "7days_rule";
+      return "standby";
+    } catch (_) {
+      return "standby";
+    }
+  }
+
+  /**
+   * yyyy-mm-dd 形式の日付文字列を inspectionlog 用の yyyy/mm/dd に変換する。
+   * 空文字列や不正な値の場合は空文字列を返す。
+   * @param {string} s
+   * @returns {string}
+   */
+  function formatCheckedAt(s) {
+    if (!s) return "";
+    const parts = s.split("-");
+    if (parts.length !== 3) return "";
+    const [y, m, d] = parts;
+    if (!y || !m || !d) return "";
+    return `${y}/${m}/${d}`;
+  }
+
+  /**
+   * inspectionlog 用に全レコードデータをGASへ送信する。
+   * 送信方式は POST (application/json) とし、
+   * action=pushInspectionAll にてGAS側で受け取る。
+   * @param {string} city 対象の市名
+   */
+  async function pushInspectionAll(city) {
+    try {
+      const arr = readCity(city);
+      if (!Array.isArray(arr)) return;
+      const data = arr.map((r) => {
+        return {
+          city: r.city || city,
+          station: r.station || "",
+          model: r.model || "",
+          plate: r.plate || "",
+          ui_index: r.ui_index || "",
+          status: mapStatusForLog(r),
+          checked_at: r.checked ? formatCheckedAt(r.last_inspected_at) : ""
+        };
+      });
+      // action パラメータをクエリに含め、body にはデータのみを含める
+      const url = `${GAS_URL}?action=pushInspectionAll`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: data })
+      }).catch((e) => {
+        console.error("pushInspectionAll error", e);
+      });
+    } catch (e) {
+      console.error("pushInspectionAll error", e);
+    }
+  }
+
   function persistCityRec(city, rec) {
     const arr = readCity(city);
     if (!Array.isArray(arr) || !arr.length) return;
@@ -356,6 +429,15 @@ const Junkai = (() => {
         updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
+        // チェック変更後、該当市の全件データを送信
+        try {
+          const _p = pushInspectionAll(city);
+          if (_p && typeof _p.catch === "function") {
+            _p.catch((e) => console.error(e));
+          }
+        } catch (e) {
+          console.error(e);
+        }
       });
 
       // 中央（ステーション名／車種・ナンバー）
@@ -399,6 +481,15 @@ const Junkai = (() => {
         rec.status = sel.value;
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
+        // ステータス変更後、該当市の全件データを送信
+        try {
+          const _p = pushInspectionAll(city);
+          if (_p && typeof _p.catch === "function") {
+            _p.catch((e) => console.error(e));
+          }
+        } catch (e) {
+          console.error(e);
+        }
       });
 
       const tireBtn = document.createElement("button");
