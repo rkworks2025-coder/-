@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s1i（初期同期専用／inspectionlog連携なし）
+// version: s1j（初期同期専用／inspectionlog連携なし）
 // 前提ヘッダー（全体管理タブの英語表記）
 // A: area, B: city, C: address, D: station, E: model,
 // F: plate, G: note, H: operator
@@ -175,7 +175,7 @@ const Junkai = (() => {
     if (!btn) return;
 
     btn.addEventListener("click", async () => {
-      // ★ 追加：確認ダイアログ＋リセット
+      // 確認ダイアログ＋リセット
       const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
       if (!ok) return;
 
@@ -317,13 +317,14 @@ const Junkai = (() => {
 
       function updateDateTime() {
         if (rec.last_inspected_at) {
-          const d = new Date(rec.last_inspected_at);
+          // last_inspected_at は原則 "yyyy-mm-dd"
+          // 旧データ（フルISO）も new Date() で解釈できるようにしておく
+          let d = new Date(rec.last_inspected_at);
           if (Number.isFinite(d.getTime())) {
+            const yyyy = String(d.getFullYear());
             const mm = String(d.getMonth() + 1).padStart(2, "0");
             const dd = String(d.getDate()).padStart(2, "0");
-            const hh = String(d.getHours()).padStart(2, "0");
-            const mi = String(d.getMinutes()).padStart(2, "0");
-            dtDiv.innerHTML = `${mm}/${dd}<br>${hh}:${mi}`;
+            dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
             dtDiv.style.display = "";
             return;
           }
@@ -346,7 +347,8 @@ const Junkai = (() => {
         }
         if (chk.checked) {
           rec.checked = true;
-          rec.last_inspected_at = new Date().toISOString();
+          // 時刻は廃止し、日付のみ（yyyy-mm-dd）を保存
+          rec.last_inspected_at = new Date().toISOString().slice(0, 10);
         } else {
           rec.checked = false;
           rec.last_inspected_at = "";
