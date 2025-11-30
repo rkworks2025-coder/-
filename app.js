@@ -1,5 +1,4 @@
-// 巡回アプリ s1c 対応版 app.js（元 v6w ブラック版）
-
+// 巡回アプリ s1e 対応版 app.js（元 v6w ブラック版）
 
 // ====== 設定 ======
 const Junkai = (()=>{
@@ -31,7 +30,7 @@ const Junkai = (()=>{
       city: (r.city||'').trim(),
       station: (r.station||'').trim(),
       model: (r.model||'').trim(),
-      number: (r.number||'').trim(),
+      plate: (r.plate||'').trim(),
       status: (r.status||'normal').trim(),
       checked: !!r.checked,
       index: (Number.isFinite(+r.index) && +r.index>0)? parseInt(r.index,10) : 0,
@@ -147,13 +146,27 @@ const Junkai = (()=>{
         showProgress(true, 35);
         const json = await fetchJSONWithRetry(u, 2);
         showProgress(true, 55);
-        // accept json.data or json.values as array; do not require json.ok===true to support more GAS deployments
-        if(!json || (!Array.isArray(json.data) && !Array.isArray(json.values))) throw new Error('bad-shape');
+        // s1e: json.rows / json.data / json.values / ルート配列のいずれかが配列ならOK
+        if(
+          !json ||
+          (
+            !Array.isArray(json.rows) &&
+            !Array.isArray(json.data) &&
+            !Array.isArray(json.values) &&
+            !Array.isArray(json)
+          )
+        ){
+          throw new Error('bad-shape');
+        }
 
         // prepare buckets for each supported city
         const buckets = { "大和市":[], "海老名市":[], "調布市":[] };
-        // some GAS deployments return data under 'data', others under 'values'
-        let arr = Array.isArray(json.data) ? json.data : (Array.isArray(json.values) ? json.values : []);
+        // rows / data / values のいずれかから配列を取得
+        let arr = Array.isArray(json.rows)
+          ? json.rows
+          : (Array.isArray(json.data)
+             ? json.data
+             : (Array.isArray(json.values) ? json.values : []));
         // if there is no array, bail out
         if(!Array.isArray(arr)) arr = [];
         // fallback: if arr is empty and json itself is an array of arrays (root-level list)
@@ -174,7 +187,7 @@ const Junkai = (()=>{
               if(col.includes('city')) headerMap.city = i;
               else if(col.includes('station')) headerMap.station = i;
               else if(col.includes('model')) headerMap.model = i;
-              else if(col.includes('plate') || col.includes('number')) headerMap.number = i;
+              else if(col.includes('plate')) headerMap.plate = i;
               else if(col.includes('status')) headerMap.status = i;
             }
             // remove header row from array
@@ -190,9 +203,9 @@ const Junkai = (()=>{
               const city = r[headerMap.city ?? 0] || '';
               const station = r[headerMap.station ?? 1] || '';
               const model = r[headerMap.model ?? 2] || '';
-              const number = r[headerMap.number ?? 3] || '';
+              const plate = r[headerMap.plate ?? 3] || '';
               const status = (headerMap.status !== undefined ? (r[headerMap.status] || '') : 'normal');
-              rowObj = { city, station, model, number, status: status || 'normal', checked:false, index:'', last_inspected_at:'' };
+              rowObj = { city, station, model, plate, status: status || 'normal', checked:false, index:'', last_inspected_at:'' };
             }else{
               // skip header rows that explicitly contain 'city' in the second column
               if(r.length >= 2 && typeof r[1] === 'string' && r[1].trim().toLowerCase() === 'city'){
@@ -203,9 +216,9 @@ const Junkai = (()=>{
                 const city = r[1] || '';
                 const station = r[3] || '';
                 const model = r[4] || '';
-                const number = r[5] || '';
+                const plate = r[5] || '';
                 const status = r[6] || 'normal';
-                rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
+                rowObj = { city, station, model, plate, status, checked:false, index:'', last_inspected_at:'' };
               }else{
                 // fallback heuristics
                 if(r.length >= 6){
@@ -213,17 +226,17 @@ const Junkai = (()=>{
                   const city = r[1] || r[0] || '';
                   const station = r[3] || r[1] || '';
                   const model = r[4] || r[2] || '';
-                  const number = r[5] || r[3] || '';
+                  const plate = r[5] || r[3] || '';
                   const status = r[6] || 'normal';
-                  rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
+                  rowObj = { city, station, model, plate, status, checked:false, index:'', last_inspected_at:'' };
                 }else{
-                  // simple case: 0=city,1=station,2=model,3=number,4=status
+                  // simple case: 0=city,1=station,2=model,3=plate,4=status
                   const city = r[0] || '';
                   const station = r[1] || '';
                   const model = r[2] || '';
-                  const number = r[3] || '';
+                  const plate = r[3] || '';
                   const status = r[4] || 'normal';
-                  rowObj = { city, station, model, number, status, checked:false, index:'', last_inspected_at:'' };
+                  rowObj = { city, station, model, plate, status, checked:false, index:'', last_inspected_at:'' };
                 }
               }
             }
@@ -272,7 +285,7 @@ const Junkai = (()=>{
           }
           status('シート更新中…');
           const json = JSON.stringify(all);
-          // prepare POST body. Send as URL‑encoded to avoid URL length limits
+          // prepare POST body. Send as URL-encoded to avoid URL length limits
           const params = new URLSearchParams();
           params.append('action', 'push');
           params.append('data', json);
@@ -398,7 +411,7 @@ const Junkai = (()=>{
       sub.className = 'sub';
       // display model and plate on separate lines to prevent overlap with right column
       // Use innerHTML with a <br> so the two values wrap naturally
-      sub.innerHTML = `${rec.model || ''}<br>${rec.number || ''}`;
+      sub.innerHTML = `${rec.model || ''}<br>${rec.plate || ''}`;
       // append title and sub into mid (stacked)
       mid.appendChild(title);
       mid.appendChild(sub);
@@ -408,7 +421,6 @@ const Junkai = (()=>{
       // right column: holds status select and the inspection button
       const right = document.createElement('div');
       right.className = 'rightcol';
-
 
       const sel = document.createElement('select');
       sel.className = 'state';
@@ -430,11 +442,11 @@ const Junkai = (()=>{
       btn.addEventListener('click', () => {
         // Build query parameters for the tire app.  The tire app expects
         // `station`, `model` and `plate_full` as query keys.  See the
-        // tire-app's index.html: it reads `plate_full` for the full plate number.
+        // tire-app's index.html: it reads `plate_full` for the full plate value.
         const q = new URLSearchParams({
           station: rec.station || '',
           model: rec.model || '',
-          plate_full: rec.number || '',
+          plate_full: rec.plate || '',
         });
         location.href = `${TIRE_APP_URL}?${q.toString()}`;
       });
@@ -452,17 +464,17 @@ const Junkai = (()=>{
 
   function persistCityRec(city, rec){
     // Update the record in localStorage by matching on the UI index when available.
-    // Using ui_index ensures we update the exact row instead of matching solely on number,
-    // which can be blank or duplicated across entries. Fallback to number for older records.
+    // Using ui_index ensures we update the exact row instead of matching solely on plate,
+    // which can be blank or duplicated across entries.
     const arr = readCity(city);
     // find by ui_index if defined
     let i = -1;
     if(rec.ui_index){
       i = arr.findIndex(x => (x.ui_index || '') === (rec.ui_index || ''));
     }
-    // fallback to matching by number if no ui_index match
+    // fallback to matching by plate if no ui_index match
     if(i < 0){
-      i = arr.findIndex(x => (x.number || '') === (rec.number || ''));
+      i = arr.findIndex(x => (x.plate || '') === (rec.plate || ''));
     }
     if(i >= 0){
       arr[i] = rec;
