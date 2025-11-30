@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s1j（初期同期専用／inspectionlog連携なし）
+// version: s1k（初期同期専用／inspectionlog連携なし）
 // 前提ヘッダー（全体管理タブの英語表記）
 // A: area, B: city, C: address, D: station, E: model,
 // F: plate, G: note, H: operator
@@ -406,9 +406,9 @@ const Junkai = (() => {
       tireBtn.textContent = "点検";
       tireBtn.addEventListener("click", () => {
         const params = new URLSearchParams({
-          station: rec.station || "",
-          model: rec.model || "",
-          plate: rec.plate || ""
+          station:    rec.station || "",
+          model:      rec.model   || "",
+          plate_full: rec.plate   || ""   // ★ ここだけ plate_full に変更
         });
         const url = `${TIRE_APP_URL}?${params.toString()}`;
         window.open(url, "_blank");
