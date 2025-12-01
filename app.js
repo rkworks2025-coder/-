@@ -316,6 +316,7 @@ const Junkai = (() => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: rows })
       });
+      console.log("PUSH_DONE", city, rows.length);
     } catch (e) {
       // アプリの動作を止めないため、ここではログ出力のみ
       console.error("pushInspectionAll error", e);
