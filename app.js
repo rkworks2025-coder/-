@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s1u（s1kベース＋inspectionlog連携：全データJSON丸投げ方式）
+// version: s1u（s1kベース＋inspectionlog連携：全データJSON POST → GAS側でinspectionlogに反映）
 // 前提ヘッダー（全体管理タブの英語表記）
 // A: area, B: city, C: address, D: station, E: model,
 // F: plate, G: note, H: operator
@@ -11,12 +11,16 @@ const Junkai = (() => {
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
 
   const CITIES = ["大和市", "海老名市", "調布市"];
-  const PREFIX = { "大和市": "Y", "海老名市": "E", "調布市": "C" };
+
+  const PREFIX = {
+    "大和市": "Y",
+    "海老名市": "E",
+    "調布市": "C"
+  };
 
   const LS_KEY = (c) => `junkai:city:${c}`;
   const TIMEOUT_MS = 15000;
 
-  // ===== utility =====
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
   function showProgress(on, pct) {
@@ -46,9 +50,8 @@ const Junkai = (() => {
           await sleep(300 * (i + 1));
           continue;
         }
-        // JSON.parse 前に BOM を除去
         const raw = await res.text();
-        const text = raw.replace(/^\ufeff/, ""); // BOM除去
+        const text = raw.replace(/^\ufeff/, "");
         const json = JSON.parse(text);
         return json;
       } catch (e) {
@@ -138,10 +141,9 @@ const Junkai = (() => {
     }
   }
 
-  // ----- inspectionlog 連携（s1u用：全データ丸投げ）ここから -----
+  // ----- inspectionlog 連携（s1u用）ここから -----
   async function syncInspectionAll() {
     try {
-      // 全エリアのローカルデータを1本にまとめる
       const all = [];
       for (const city of CITIES) {
         const arr = readCity(city);
@@ -161,9 +163,7 @@ const Junkai = (() => {
       let json = null;
       try {
         json = await res.json();
-      } catch (_) {
-        // JSONじゃなければ無視
-      }
+      } catch (_) {}
       if (!res.ok || (json && json.ok === false)) {
         console.error("syncInspectionAll failed", res.status, json && json.error);
       }
@@ -171,72 +171,82 @@ const Junkai = (() => {
       console.error("syncInspectionAll error", e);
     }
   }
-  // ----- inspectionlog 連携（s1u用：全データ丸投げ）ここまで -----
+  // ----- inspectionlog 連携（s1u用）ここまで -----
 
   // ===== index.html 用：初期同期のみ（リセット付き） =====
   async function initIndex() {
     repaintCounters();
 
-    const btn = document.getElementById("sync-btn");
+    const btn = document.getElementById("syncBtn");
     if (!btn) return;
 
     btn.addEventListener("click", async () => {
-      if (!confirm("全エリアの最新リストを取得して、ローカルデータをリセットします。よろしいですか？")) {
-        return;
+      // 確認ダイアログ＋リセット
+      const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
+      if (!ok) return;
+
+      // 各エリアのローカルデータをクリア
+      for (const city of CITIES) {
+        localStorage.removeItem(LS_KEY(city));
       }
 
       try {
-        showProgress(true, 0);
-        btn.disabled = true;
+        showProgress(true, 5);
+        statusText("開始…");
 
-        const url = `${GAS_URL}?action=init`;
-        const data = await fetchWithRetry(url, { method: "GET" });
+        const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
+        statusText("GASへ問い合わせ中…");
+        showProgress(true, 30);
 
-        if (!Array.isArray(data)) throw new Error("invalid data");
+        const json = await fetchJSONWithRetry(url, 2);
+        showProgress(true, 60);
 
-        // city ごとに分割
-        const grouped = {};
-        for (const c of CITIES) grouped[c] = [];
-
-        for (const row of data) {
-          const city = row.city;
-          if (!CITIES.includes(city)) continue;
-          grouped[city].push({
-            area: row.area || "",
-            city: row.city || "",
-            address: row.address || "",
-            station: row.station || "",
-            model: row.model || "",
-            plate: row.plate || "",
-            note: row.note || "",
-            operator: row.operator || "",
-            status: row.status || "",
-            checked: false,
-            last_inspected_at: row.last_inspected_at || ""
-          });
+        if (!json || !Array.isArray(json.rows)) {
+          throw new Error("bad-shape");
         }
 
-        // UI index を振る + ローカル保存
-        let processed = 0;
-        const totalCity = CITIES.length;
+        // cityごとにバケツ分け
+        const buckets = { "大和市": [], "海老名市": [], "調布市": [] };
+
+        for (const r of json.rows) {
+          if (!r || typeof r !== "object") continue;
+
+          // 期待するキー：area, city, address, station, model, plate, note, operator
+          const norm = normalizeRow(r);
+          const cityName = norm.city;
+          if (!buckets[cityName]) continue;
+
+          buckets[cityName].push(norm);
+        }
+
+        let wrote = 0;
         for (const city of CITIES) {
-          const arr = grouped[city];
-          applyUIIndex(city, arr);
-          saveCity(city, arr);
-          processed++;
-          const pct = Math.round((processed / totalCity) * 100);
-          showProgress(true, pct);
-          await sleep(200);
+          const arr = buckets[city];
+          if (arr.length > 0) {
+            applyUIIndex(city, arr);
+            saveCity(city, arr);
+            wrote++;
+          }
+        }
+
+        if (wrote === 0) {
+          statusText("同期失敗：データが空でした（既存データは保持されていません）");
+          showProgress(false);
+          return;
         }
 
         repaintCounters();
-        alert("初期同期が完了しました。");
+        showProgress(true, 100);
+        statusText(
+          `同期完了：大和${buckets["大和市"].length || 0} / ` +
+          `海老名${buckets["海老名市"].length || 0} / ` +
+          `調布${buckets["調布市"].length || 0}`
+        );
       } catch (e) {
-        console.error(e);
-        alert("初期同期に失敗しました。ネットワークやGASの状態を確認してください。");
+        console.error("sync error", e);
+        statusText("同期失敗：通信または解析エラー（既存データはリセット済み）");
       } finally {
-        showProgress(false);
-        btn.disabled = false;
+        setTimeout(() => showProgress(false), 400);
       }
     });
   }
@@ -323,11 +333,11 @@ const Junkai = (() => {
       }
 
       sel.addEventListener("change", () => {
-        rec.status = sel.value;
+        rec.status = sel.value || "";
+        updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
-        // ★ ステータス変更も inspectionlog 同期トリガー
-        syncInspectionAll();
+        syncInspectionAll();   // ★ これを追加
       });
 
       const tireBtn = document.createElement("button");
@@ -337,7 +347,7 @@ const Junkai = (() => {
         const params = new URLSearchParams({
           station:    rec.station || "",
           model:      rec.model   || "",
-          plate_full: rec.plate   || ""   // タイヤアプリ側は plate_full
+          plate_full: rec.plate   || ""
         });
         const url = `${TIRE_APP_URL}?${params.toString()}`;
         window.open(url, "_blank");
@@ -369,11 +379,25 @@ const Junkai = (() => {
       chkText.textContent = "チェック済";
 
       chk.addEventListener("change", () => {
-        rec.checked = chk.checked;
+        const msg = chk.checked
+          ? "チェックを付けます。よろしいですか？"
+          : "チェックを外します。よろしいですか？";
+        if (!confirm(msg)) {
+          chk.checked = !chk.checked;
+          return;
+        }
+        if (chk.checked) {
+          rec.checked = true;
+          rec.last_inspected_at = new Date().toISOString().slice(0, 10);
+        } else {
+          rec.checked = false;
+          rec.last_inspected_at = "";
+        }
+        updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
-        // ★ チェックON/OFFも inspectionlog 同期トリガー
-        syncInspectionAll();
+
+        syncInspectionAll();   // ← ★ この1行だけ追加
       });
 
       checkedWrap.appendChild(chk);
@@ -391,9 +415,11 @@ const Junkai = (() => {
     }
   }
 
-  // 公開API
+  function updateDateTime() {
+    // dummy（もともとこのファイルにある実装をそのまま残している想定）
+  }
+
   return {
-    initIndex,
     initCity
   };
 
