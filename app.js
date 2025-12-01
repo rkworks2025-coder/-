@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s1o（inspectionlog 全件送信・全件POST対応版）
+// version: s1q（s1kベース＋inspectionlog連携：チェックON/OFF時に該当city全件を送信）
 // 前提ヘッダー（全体管理タブの英語表記）
 // A: area, B: city, C: address, D: station, E: model,
 // F: plate, G: note, H: operator
@@ -7,7 +7,7 @@
 const Junkai = (() => {
 
   // ===== 設定 =====
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbP...7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
 
   const CITIES = ["大和市", "海老名市", "調布市"];
@@ -19,23 +19,9 @@ const Junkai = (() => {
   // ===== utility =====
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  /**
-   * 直近 7 日以内なら true を返す
-   * @param {string} isoDate yyyy-mm-dd 形式
-   */
-  function within7d(isoDate) {
-    if (!isoDate) return false;
-    const d = new Date(isoDate);
-    if (Number.isNaN(d.getTime())) return false;
-    const now = new Date();
-    const diff = now.getTime() - d.getTime();
-    const seven = 7 * 24 * 60 * 60 * 1000;
-    return diff >= 0 && diff <= seven;
-  }
-
-  function showModal(on, pct) {
-    const m = document.getElementById("modal");
-    const bar = document.getElementById("modalBarInner");
+  function showProgress(on, pct) {
+    const m = document.getElementById("progressModal");
+    const bar = document.getElementById("progressBar");
     if (!m) return;
     if (on) m.classList.add("show");
     else m.classList.remove("show");
@@ -54,47 +40,218 @@ const Junkai = (() => {
     let lastErr = null;
     for (let i = 0; i <= retry; i++) {
       try {
-        const ctrl = new AbortController();
-        const id = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-        const res = await fetch(url, { signal: ctrl.signal });
-        clearTimeout(id);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+        const res = await fetch(url, {
+          method: "GET",
+          cache: "no-store",
+          redirect: "follow",
+          signal: ctl.signal
+        });
+        clearTimeout(t);
+
+        const raw = await res.text();
+        const text = raw.replace(/^\ufeff/, ""); // BOM除去
+        const json = JSON.parse(text);
+        return json;
       } catch (e) {
         lastErr = e;
-        if (i === retry) break;
-        await sleep(500);
+        await sleep(400 * (i + 1));
       }
     }
-    throw lastErr;
+    throw lastErr || new Error("fetch-fail");
   }
 
-  function saveCity(city, rows) {
-    try {
-      localStorage.setItem(LS_KEY(city), JSON.stringify(rows || []));
-    } catch (_) {
-      // ignore
-    }
+  // ===== ローカル保存 =====
+  function saveCity(city, arr) {
+    localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
   }
 
   function readCity(city) {
     try {
       const s = localStorage.getItem(LS_KEY(city));
       if (!s) return [];
-      const v = JSON.parse(s);
-      return Array.isArray(v) ? v : [];
+      const a = JSON.parse(s);
+      return Array.isArray(a) ? a : [];
     } catch (_) {
       return [];
     }
   }
 
-  function clearAllCities() {
-    for (const c of CITIES) {
-      try {
-        localStorage.removeItem(LS_KEY(c));
-      } catch (_) {
-      }
+  function applyUIIndex(city, arr) {
+    const p = PREFIX[city] || "";
+    for (let i = 0; i < arr.length; i++) {
+      arr[i].ui_index_num = i + 1;
+      arr[i].ui_index = p + (i + 1);
     }
+  }
+
+  // シート1行 → 内部形式
+  function normalizeRow(rowObj) {
+    return {
+      area:      (rowObj.area     || "").trim(),
+      city:      (rowObj.city     || "").trim(),
+      address:   (rowObj.address  || "").trim(),
+      station:   (rowObj.station  || "").trim(),
+      model:     (rowObj.model    || "").trim(),
+      plate:     (rowObj.plate    || "").trim(),
+      note:      (rowObj.note     || "").trim(),
+      operator:  (rowObj.operator || "").trim(),
+
+      // 初期同期フェーズでは status はシートと無関係なローカル専用。
+      // デフォルトは空文字（"normal"は使わない）。
+      status:    (rowObj.status   || "").trim(),
+
+      checked:   !!rowObj.checked,
+      last_inspected_at: (rowObj.last_inspected_at || "").trim(),
+
+      index:     Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0,
+      ui_index:  rowObj.ui_index || "",
+      ui_index_num: rowObj.ui_index_num || 0
+    };
+  }
+
+  // ===== カウンタ =====
+  function countCity(arr) {
+    const c = { done: 0, stop: 0, skip: 0, total: arr.length };
+    for (const it of arr) {
+      if (it.status === "stop") c.stop++;
+      else if (it.status === "skip") c.skip++;
+      if (it.checked) c.done++;
+    }
+    return c;
+  }
+
+  function repaintCounters() {
+    const map = {
+      "大和市":   { done: "#yamato-done", stop: "#yamato-stop", skip: "#yamato-skip", total: "#yamato-total", rem: "#yamato-rem" },
+      "海老名市": { done: "#ebina-done",  stop: "#ebina-stop",  skip: "#ebina-skip",  total: "#ebina-total",  rem: "#ebina-rem" },
+      "調布市":   { done: "#chofu-done",  stop: "#chofu-stop",  skip: "#chofu-skip",  total: "#chofu-total",  rem: "#chofu-rem" }
+    };
+
+    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
+
+    for (const city of CITIES) {
+      const arr = readCity(city);
+      const cnt = countCity(arr);
+      overallTotal += cnt.total;
+      overallDone += cnt.done;
+      overallStop += cnt.stop;
+      overallSkip += cnt.skip;
+
+      const m = map[city];
+      for (const k of ["done", "stop", "skip", "total"]) {
+        const el = document.querySelector(m[k]);
+        if (el) el.textContent = cnt[k];
+      }
+      const remCount = cnt.total - cnt.done - cnt.skip;
+      const remEl = document.querySelector(m.rem);
+      if (remEl) remEl.textContent = remCount;
+    }
+
+    const allDoneEl  = document.querySelector("#all-done");
+    const allStopEl  = document.querySelector("#all-stop");
+    const allSkipEl  = document.querySelector("#all-skip");
+    const allTotalEl = document.querySelector("#all-total");
+    const allRemEl   = document.querySelector("#all-rem");
+
+    if (allDoneEl)  allDoneEl.textContent  = overallDone;
+    if (allStopEl)  allStopEl.textContent  = overallStop;
+    if (allSkipEl)  allSkipEl.textContent  = overallSkip;
+    if (allTotalEl) allTotalEl.textContent = overallTotal;
+    if (allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
+
+    const hint = document.getElementById("overallHint");
+    if (hint) {
+      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "まだ同期されていません";
+    }
+  }
+
+  // ===== index.html 用：初期同期のみ（リセット付き） =====
+  async function initIndex() {
+    repaintCounters();
+
+    const btn = document.getElementById("syncBtn");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      // 確認ダイアログ＋リセット
+      const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
+      if (!ok) return;
+
+      // 各エリアのローカルデータをクリア
+      for (const city of CITIES) {
+        localStorage.removeItem(LS_KEY(city));
+      }
+
+      try {
+        showProgress(true, 5);
+        statusText("開始…");
+
+        const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
+        statusText("GASへ問い合わせ中…");
+        showProgress(true, 30);
+
+        const json = await fetchJSONWithRetry(url, 2);
+        showProgress(true, 60);
+
+        if (!json || !Array.isArray(json.rows)) {
+          throw new Error("bad-shape");
+        }
+
+        // cityごとにバケツ分け
+        const buckets = { "大和市": [], "海老名市": [], "調布市": [] };
+
+        for (const r of json.rows) {
+          if (!r || typeof r !== "object") continue;
+
+          // 期待するキー：area, city, address, station, model, plate, note, operator
+          const norm = normalizeRow(r);
+          const cityName = norm.city;
+          if (!buckets[cityName]) continue;
+
+          buckets[cityName].push(norm);
+        }
+
+        let wrote = 0;
+        for (const city of CITIES) {
+          const arr = buckets[city];
+          if (arr.length > 0) {
+            applyUIIndex(city, arr);
+            saveCity(city, arr);
+            wrote++;
+          }
+        }
+
+        if (wrote === 0) {
+          statusText("同期失敗：データが空でした（既存データは保持されていません）");
+          showProgress(false);
+          return;
+        }
+
+        repaintCounters();
+        showProgress(true, 100);
+        statusText(
+          `同期完了：大和${buckets["大和市"].length || 0} / ` +
+          `海老名${buckets["海老名市"].length || 0} / ` +
+          `調布${buckets["調布市"].length || 0}`
+        );
+      } catch (e) {
+        console.error("sync error", e);
+        statusText("同期失敗：通信または解析エラー（既存データはリセット済み）");
+      } finally {
+        setTimeout(() => showProgress(false), 400);
+      }
+    });
+  }
+
+  // ===== city ページ =====
+  function within7d(last) {
+    if (!last) return false;
+    const t = Date.parse(last);
+    if (!Number.isFinite(t)) return false;
+    const diff = Date.now() - t;
+    return diff < 7 * 24 * 60 * 60 * 1000;
   }
 
   function rowBg(rec) {
@@ -105,17 +262,10 @@ const Junkai = (() => {
     return "bg-green";
   }
 
-  /**
-   * 巡回状況に応じて inspectionlog へ送るステータス文字列を決定する。
-   * 5種類の状態に対応させる。
-   * - rec.checked === true           -> "checked"
-   * - rec.status === "stop"         -> "stopped"
-   * - rec.status === "skip"         -> "Unnecessary"
-   * - within7d(rec.last_inspected_at) -> "7days_rule"
-   * - 上記以外                       -> "standby"
-   * @param {object} rec レコードオブジェクト
-   * @returns {string} inspectionlog用のステータス
-   */
+  // ----- inspectionlog 連携用：ステータス変換と送信 -----
+
+  // app 内部の状態から inspectionlog 用 status を決定する
+  // standby / checked / stopped / Unnecessary / 7days_rule
   function mapStatusForLog(rec) {
     try {
       if (rec.checked) return "checked";
@@ -123,38 +273,30 @@ const Junkai = (() => {
       if (rec.status === "skip") return "Unnecessary";
       if (within7d(rec.last_inspected_at)) return "7days_rule";
       return "standby";
-    } catch (_) {
+    } catch (e) {
       return "standby";
     }
   }
 
-  /**
-   * yyyy-mm-dd 形式の日付文字列を inspectionlog 用の yyyy/mm/dd に変換する。
-   * 空文字列や不正な値の場合は空文字列を返す。
-   * @param {string} s
-   * @returns {string}
-   */
-  function formatCheckedAt(s) {
-    if (!s) return "";
-    const parts = s.split("-");
+  // yyyy-mm-dd → yyyy/mm/dd 変換（不正・空なら ""）
+  function formatCheckedAt(dateStr) {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
     if (parts.length !== 3) return "";
     const [y, m, d] = parts;
     if (!y || !m || !d) return "";
     return `${y}/${m}/${d}`;
   }
 
-  /**
-   * inspectionlog 用に、指定された city の全件データを GAS へ送信する。
-   * 送信方式は POST (application/json) とし、URL パラメータ action=pushInspectionAll
-   * で GAS 側の doPost(e) が処理する。
-   * @param {string} city
-   */
+  // 指定 city の全件を inspectionlog 用データにして GAS へ送信する
+  // inspectionlog ヘッダー：
+  // city, station, model, plate, ui_index, status, checked_at
   async function pushInspectionAll(city) {
     try {
       const arr = readCity(city);
-      if (!Array.isArray(arr) || arr.length === 0) return;
+      if (!Array.isArray(arr) || !arr.length) return;
 
-      const data = arr.map((rec) => {
+      const rows = arr.map((rec) => {
         const status = mapStatusForLog(rec);
         const checkedAt = rec.checked ? formatCheckedAt(rec.last_inspected_at) : "";
         return {
@@ -172,12 +314,10 @@ const Junkai = (() => {
       await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data })
-      }).catch((e) => {
-        // エラーはコンソールに出すだけでアプリの操作には影響させない
-        console.error("pushInspectionAll error", e);
+        body: JSON.stringify({ data: rows })
       });
     } catch (e) {
+      // アプリの動作を止めないため、ここではログ出力のみ
       console.error("pushInspectionAll error", e);
     }
   }
@@ -186,177 +326,76 @@ const Junkai = (() => {
     const arr = readCity(city);
     if (!Array.isArray(arr) || !arr.length) return;
 
-    const idx = arr.findIndex(r => String(r.ui_index) === String(rec.ui_index));
-    if (idx >= 0) {
-      arr[idx] = rec;
-    }
+    const idx = arr.findIndex(r => r.ui_index === rec.ui_index);
+    if (idx === -1) return;
+
+    arr[idx] = rec;
     saveCity(city, arr);
+    repaintCounters();
   }
 
-  // ===== index.html 用 =====
-  async function initIndex() {
-    const btn = document.getElementById("syncBtn");
-    if (!btn) return;
+  function initCity(city) {
+    const list = document.getElementById("list");
+    const hint = document.getElementById("hint");
+    if (!list || !hint) return;
 
-    btn.addEventListener("click", async () => {
-      if (!confirm("シートから最新データを同期します。よろしいですか？")) return;
+    const arr = readCity(city);
+    list.innerHTML = "";
 
-      statusText("同期中…");
-      showModal(true, 0);
-
-      try {
-        clearAllCities();
-
-        const url = `${GAS_URL}?action=pull`;
-        const json = await fetchJSONWithRetry(url, 2);
-        if (!json || !Array.isArray(json.rows)) {
-          throw new Error("invalid response");
-        }
-
-        const rows = json.rows;
-
-        const cityMap = {};
-        for (const c of CITIES) cityMap[c] = [];
-
-        for (const row of rows) {
-          const city = row.city || "";
-          if (!cityMap[city]) continue;
-
-          cityMap[city].push({
-            area: row.area || "",
-            city: row.city || "",
-            address: row.address || "",
-            station: row.station || "",
-            model: row.model || "",
-            plate: row.plate || "",
-            note: row.note || "",
-            ui_index: row.ui_index || "",
-            checked: false,
-            last_inspected_at: "",
-            status: ""
-          });
-        }
-
-        for (const c of CITIES) {
-          saveCity(c, cityMap[c] || []);
-        }
-
-        showModal(false);
-        statusText("同期完了");
-        alert("同期が完了しました。各エリアページを開き直してください。");
-      } catch (e) {
-        console.error(e);
-        showModal(false);
-        statusText("同期失敗");
-        alert("同期に失敗しました。時間をおいて再度お試しください。");
-      }
-    });
-
-    const yLink = document.getElementById("y-link");
-    const eLink = document.getElementById("e-link");
-    const cLink = document.getElementById("c-link");
-
-    if (yLink) {
-      yLink.addEventListener("click", () => {
-        window.location.href = "yamato.html";
-      });
-    }
-    if (eLink) {
-      eLink.addEventListener("click", () => {
-        window.location.href = "ebina.html";
-      });
-    }
-    if (cLink) {
-      cLink.addEventListener("click", () => {
-        window.location.href = "chofu.html";
-      });
-    }
-  }
-
-  // ===== city ページ用 =====
-  async function initCity(city) {
-    const list = document.getElementById("carList");
-    const headerCity = document.getElementById("headerCity");
-    const backBtn = document.getElementById("backBtn");
-    const progressText = document.getElementById("progressText");
-
-    if (headerCity) headerCity.textContent = city;
-    if (backBtn) {
-      backBtn.addEventListener("click", () => {
-        window.location.href = "index.html";
-      });
-    }
-
-    const rows = readCity(city);
-    if (!Array.isArray(rows) || !rows.length) {
-      if (list) list.innerHTML = "<p>同期データがありません。index から同期してください。</p>";
+    if (arr.length === 0) {
+      hint.textContent = "まだ同期されていません（インデックスの同期を押してください）";
       return;
     }
 
-    if (list) list.innerHTML = "";
+    hint.textContent = `件数：${arr.length}`;
 
-    function updateProgress() {
-      const total = rows.length;
-      const done = rows.filter(r => r.checked).length;
-      if (progressText) {
-        progressText.textContent = `${done} / ${total}`;
-      }
-    }
-
-    updateProgress();
-
-    rows.sort((a, b) => {
-      const pa = String(a.plate || "");
-      const pb = String(b.plate || "");
-      return pa.localeCompare(pb, "ja");
-    });
-
-    saveCity(city, rows);
-
-    for (const rec of rows) {
+    for (const rec of arr) {
       const row = document.createElement("div");
       row.className = `row ${rowBg(rec)}`;
 
+      // 左カラム（インデックス＆チェック）
       const left = document.createElement("div");
-      left.className = "left";
+      left.className = "leftcol";
 
       const topLeft = document.createElement("div");
-      topLeft.className = "top-left";
+      topLeft.className = "left-top";
 
-      const idSpan = document.createElement("span");
-      idSpan.className = "id";
-      idSpan.textContent = (rec.ui_index || "").toString();
-
-      const chkLabel = document.createElement("label");
-      chkLabel.className = "chk-label";
+      const idxDiv = document.createElement("div");
+      idxDiv.className = "idx";
+      idxDiv.textContent = rec.ui_index || "";
 
       const chk = document.createElement("input");
       chk.type = "checkbox";
+      chk.className = "chk";
       chk.checked = !!rec.checked;
 
-      const chkMark = document.createElement("span");
-      chkMark.className = "chk-mark";
-
-      chkLabel.appendChild(chk);
-      chkLabel.appendChild(chkMark);
-
-      topLeft.appendChild(idSpan);
-      topLeft.appendChild(chkLabel);
+      topLeft.appendChild(idxDiv);
+      topLeft.appendChild(chk);
 
       const dtDiv = document.createElement("div");
       dtDiv.className = "datetime";
 
-      const updateDateTime = () => {
+      function updateDateTime() {
         if (rec.last_inspected_at) {
-          const ymd = rec.last_inspected_at;
-          dtDiv.textContent = ymd;
-          dtDiv.style.display = "block";
-        } else {
-          dtDiv.innerHTML = "";
-          dtDiv.style.display = "none";
+          // last_inspected_at は原則 "yyyy-mm-dd"
+          // 旧データ（フルISO）も new Date() で解釈できるようにしておく
+          let d = new Date(rec.last_inspected_at);
+          if (Number.isFinite(d.getTime())) {
+            const yyyy = String(d.getFullYear());
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
+            dtDiv.style.display = "";
+            return;
+          }
         }
-      };
+        dtDiv.innerHTML = "";
+        dtDiv.style.display = "none";
+      }
       updateDateTime();
+
+      left.appendChild(topLeft);
+      left.appendChild(dtDiv);
 
       chk.addEventListener("change", () => {
         const msg = chk.checked
@@ -377,21 +416,18 @@ const Junkai = (() => {
         updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
-        // チェックON/OFFに応じて、検査対象 city の全件を inspectionlog へ送信
+        // チェックON/OFF時に、このcityの全件を inspectionlog へ送信
         try {
-          const _p = pushInspectionAll(city);
-          if (_p && typeof _p.catch === "function") {
-            _p.catch((e) => console.error(e));
+          const p = pushInspectionAll(city);
+          if (p && typeof p.catch === "function") {
+            p.catch(err => console.error("pushInspectionAll error", err));
           }
         } catch (e) {
-          console.error(e);
+          console.error("pushInspectionAll error", e);
         }
-        updateProgress();
       });
 
-      left.appendChild(topLeft);
-      left.appendChild(dtDiv);
-
+      // 中央（ステーション名／車種・ナンバー）
       const mid = document.createElement("div");
       mid.className = "mid";
 
@@ -406,15 +442,15 @@ const Junkai = (() => {
       mid.appendChild(title);
       mid.appendChild(sub);
 
+      // 右カラム（ステータス＆タイヤボタン）
       const right = document.createElement("div");
-      right.className = "right";
+      right.className = "rightcol";
 
       const sel = document.createElement("select");
-      sel.className = "status-select";
+      sel.className = "state";
 
       const statusOptions = [
         ["",       "通常"],
-        ["7days",  "7日ルール"],
         ["stop",   "停止"],
         ["skip",   "不要"]
       ];
