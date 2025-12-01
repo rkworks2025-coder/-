@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s1q（s1kベース＋inspectionlog連携：チェックON/OFF時に該当city全件を送信）
+// version: s1t（s1kベース＋inspectionlog連携：city単位 push+pull／チェック＆ステータス変更トリガー）
 // 前提ヘッダー（全体管理タブの英語表記）
 // A: area, B: city, C: address, D: station, E: model,
 // F: plate, G: note, H: operator
@@ -60,6 +60,36 @@ const Junkai = (() => {
       }
     }
     throw lastErr || new Error("fetch-fail");
+  }
+
+  // ===== JSON POST（inspectionlog用：city単位 push+pull） =====
+  async function postJSONWithTimeout(action, bodyObj, retry = 1) {
+    const url = `${GAS_URL}?action=${encodeURIComponent(action)}&_=${Date.now()}`;
+    let lastErr = null;
+    for (let i = 0; i <= retry; i++) {
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+        const res = await fetch(url, {
+          method: "POST",
+          cache: "no-store",
+          redirect: "follow",
+          signal: ctl.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyObj || {})
+        });
+        clearTimeout(t);
+
+        const raw = await res.text();
+        const text = raw.replace(/^\ufeff/, "");
+        const json = JSON.parse(text);
+        return json;
+      } catch (e) {
+        lastErr = e;
+        await sleep(400 * (i + 1));
+      }
+    }
+    throw lastErr || new Error("post-fail");
   }
 
   // ===== ローカル保存 =====
@@ -245,7 +275,7 @@ const Junkai = (() => {
     });
   }
 
-  // ===== city ページ =====
+  // ===== city ページ：7日判定 =====
   function within7d(last) {
     if (!last) return false;
     const t = Date.parse(last);
@@ -262,67 +292,6 @@ const Junkai = (() => {
     return "bg-green";
   }
 
-  // ----- inspectionlog 連携用：ステータス変換と送信 -----
-
-  // app 内部の状態から inspectionlog 用 status を決定する
-  // standby / checked / stopped / Unnecessary / 7days_rule
-  function mapStatusForLog(rec) {
-    try {
-      if (rec.checked) return "checked";
-      if (rec.status === "stop") return "stopped";
-      if (rec.status === "skip") return "Unnecessary";
-      if (within7d(rec.last_inspected_at)) return "7days_rule";
-      return "standby";
-    } catch (e) {
-      return "standby";
-    }
-  }
-
-  // yyyy-mm-dd → yyyy/mm/dd 変換（不正・空なら ""）
-  function formatCheckedAt(dateStr) {
-    if (!dateStr) return "";
-    const parts = dateStr.split("-");
-    if (parts.length !== 3) return "";
-    const [y, m, d] = parts;
-    if (!y || !m || !d) return "";
-    return `${y}/${m}/${d}`;
-  }
-
-  // 指定 city の全件を inspectionlog 用データにして GAS へ送信する
-  // inspectionlog ヘッダー：
-  // city, station, model, plate, ui_index, status, checked_at
-  async function pushInspectionAll(city) {
-    try {
-      const arr = readCity(city);
-      if (!Array.isArray(arr) || !arr.length) return;
-
-      const rows = arr.map((rec) => {
-        const status = mapStatusForLog(rec);
-        const checkedAt = rec.checked ? formatCheckedAt(rec.last_inspected_at) : "";
-        return {
-          city: rec.city || city || "",
-          station: rec.station || "",
-          model: rec.model || "",
-          plate: rec.plate || "",
-          ui_index: rec.ui_index || "",
-          status: status,
-          checked_at: checkedAt
-        };
-      });
-
-      const url = `${GAS_URL}?action=pushInspectionAll`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: rows })
-      });
-      console.log("PUSH_DONE", city, rows.length);
-    } catch (e) {
-      // アプリの動作を止めないため、ここではログ出力のみ
-      console.error("pushInspectionAll error", e);
-    }
-  }
-
   function persistCityRec(city, rec) {
     const arr = readCity(city);
     if (!Array.isArray(arr) || !arr.length) return;
@@ -335,6 +304,54 @@ const Junkai = (() => {
     repaintCounters();
   }
 
+  // ===== inspectionlog 連携（v8k型：city単位 push + pull） =====
+  async function syncInspectionForCity(city) {
+    try {
+      const arr = readCity(city);
+      if (!Array.isArray(arr) || arr.length === 0) return;
+
+      // アプリ側の内部データをそのまま送って、GAS側で inspectionlog 更新＋7日判定などを行い、
+      // 最新状態（同じ構造の rows 配列）を返してもらう想定。
+      const payload = {
+        city,
+        rows: arr
+      };
+
+      const json = await postJSONWithTimeout("syncInspection", payload, 1);
+
+      // 期待レスポンス形：{ ok: true, rows: [...] }
+      if (!json || json.ok === false || !Array.isArray(json.rows)) {
+        console.error("syncInspectionForCity: bad response", json);
+        return;
+      }
+
+      const nextArr = [];
+      for (const r of json.rows) {
+        if (!r || typeof r !== "object") continue;
+        nextArr.push(normalizeRow(r));
+      }
+
+      if (nextArr.length === 0) {
+        console.warn("syncInspectionForCity: empty rows for city", city);
+        return;
+      }
+
+      applyUIIndex(city, nextArr);
+      saveCity(city, nextArr);
+      repaintCounters();
+
+      // cityページ表示中ならリストを再描画
+      const list = document.getElementById("list");
+      if (list) {
+        // initCity は再呼び出しで list を組み立て直す
+        initCity(city);
+      }
+    } catch (e) {
+      console.error("syncInspectionForCity error", e);
+    }
+  }
+
+  // ===== city ページ =====
   function initCity(city) {
     const list = document.getElementById("list");
     const hint = document.getElementById("hint");
@@ -417,15 +434,8 @@ const Junkai = (() => {
         updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
-        // チェックON/OFF時に、このcityの全件を inspectionlog へ送信
-        try {
-          const p = pushInspectionAll(city);
-          if (p && typeof p.catch === "function") {
-            p.catch(err => console.error("pushInspectionAll error", err));
-          }
-        } catch (e) {
-          console.error("pushInspectionAll error", e);
-        }
+        // ★ チェックON/OFFをトリガーに inspectionlog と同期
+        syncInspectionForCity(city);
       });
 
       // 中央（ステーション名／車種・ナンバー）
@@ -469,6 +479,8 @@ const Junkai = (() => {
         rec.status = sel.value;
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
+        // ★ ステータス変更も inspectionlog 同期のトリガーにする
+        syncInspectionForCity(city);
       });
 
       const tireBtn = document.createElement("button");
