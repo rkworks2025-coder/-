@@ -55,7 +55,8 @@ const Junkai = (() => {
         const json = JSON.parse(text);
         return json;
       } catch (e) {
-        lastErr = e;
+              (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
+lastErr = e;
         await sleep(400 * (i + 1));
       }
     }
@@ -237,7 +238,8 @@ try {
           `調布${buckets["調布市"].length || 0}`
         );
       } catch (e) {
-        console.error("sync error", e);
+              (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
+console.error("sync error", e);
         statusText("同期失敗：通信または解析エラー（既存データはリセット済み）");
       } finally {
         setTimeout(() => showProgress(false), 400);
@@ -263,8 +265,10 @@ try {
         body: JSON.stringify({ data: all })
       });
       await res.json();
-    } catch (e) {
-      console.error("syncInspectionAll error", e);
+          (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信成功";setTimeout(()=>h.textContent=o,1000);}})();
+} catch (e) {
+            (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
+console.error("syncInspectionAll error", e);
     }
   }
 
