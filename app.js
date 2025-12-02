@@ -255,7 +255,7 @@ try {
       const arr = readCity(city);
       for (const rec of arr) all.push(rec);
     }
-    (()=>{const d=document.createElement("div");d.textContent=`送信:${all.length}`;d.style.position="fixed";d.style.top="5px";d.style.right="5px";d.style.background="rgba(0,0,0,0.6)";d.style.color="#fff";d.style.padding="3px 6px";d.style.fontSize="12px";d.style.borderRadius="4px";document.body.appendChild(d);setTimeout(()=>d.remove(),1000);})();
+    (()=>{const el=document.getElementById("statusText");if(el){const old=el.textContent;el.textContent=`送信:${all.length}`;setTimeout(()=>el.textContent=old,1000);}})();
 try {
       const res = await fetch(`${GAS_URL}?action=syncInspection`, {
         method: "POST",
