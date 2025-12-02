@@ -156,22 +156,7 @@ const Junkai = (() => {
   }
 
   // ===== index.html 用：初期同期のみ（リセット付き） =====
-  async function initIndex() {
-    repaintCounters();
-
-    const btn = document.getElementById("syncBtn");
-    if (!btn) return;
-
-    btn.addEventListener("click", async () => {
-      // 確認ダイアログ＋リセット
-      const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
-      if (!ok) return;
-
-      // 各エリアのローカルデータをクリア
-      for (const city of CITIES) {
-        localStorage.removeItem(LS_KEY(city));
-      }
-
+  
       try {
         showProgress(true, 5);
         statusText("開始…");
