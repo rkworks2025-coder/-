@@ -261,7 +261,7 @@ console.error("sync error", e);
 try {
       const res = await fetch(`${GAS_URL}?action=syncInspection`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        
         body: JSON.stringify({ data: all })
       });
       await res.json();
