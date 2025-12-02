@@ -1,22 +1,12 @@
-// 巡回アプリ app.js
-// version: s1u（s1kベース＋inspectionlog連携：全データJSON POST → GAS側でinspectionlogに反映）
-// 前提ヘッダー（全体管理タブの英語表記）
-// A: area, B: city, C: address, D: station, E: model,
-// F: plate, G: note, H: operator
 
+// repaired app.js (s2n)
 const Junkai = (() => {
 
-  // ===== 設定 =====
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
 
   const CITIES = ["大和市", "海老名市", "調布市"];
-
-  const PREFIX = {
-    "大和市": "Y",
-    "海老名市": "E",
-    "調布市": "C"
-  };
+  const PREFIX = { "大和市": "Y", "海老名市": "E", "調布市": "C" };
 
   const LS_KEY = (c) => `junkai:city:${c}`;
   const TIMEOUT_MS = 15000;
@@ -29,27 +19,31 @@ const Junkai = (() => {
     if (!m) return;
     if (on) m.classList.add("show");
     else m.classList.remove("show");
-
     if (bar && typeof pct === "number") {
       const v = Math.max(0, Math.min(100, pct));
-      bar.style.width = `${v}%`;
-      bar.textContent = `${v}%`;
+      bar.style.width = v + "%";
     }
   }
 
-  async function fetchWithRetry(url, options = {}, retry = 3) {
+  function statusText(msg) {
+    const el = document.getElementById("statusText");
+    if (el) el.textContent = msg;
+  }
+
+  async function fetchJSONWithRetry(url, retry = 2) {
     let lastErr = null;
-    for (let i = 0; i < retry; i++) {
+    for (let i = 0; i <= retry; i++) {
       try {
-        const controller = new AbortController();
-        const to = setTimeout(() => controller.abort(), TIMEOUT_MS);
-        const res = await fetch(url, { ...options, signal: controller.signal });
-        clearTimeout(to);
-        if (!res.ok) {
-          lastErr = new Error(`HTTP ${res.status}`);
-          await sleep(300 * (i + 1));
-          continue;
-        }
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+        const res = await fetch(url, {
+          method: "GET",
+          cache: "no-store",
+          redirect: "follow",
+          signal: ctl.signal
+        });
+        clearTimeout(t);
+
         const raw = await res.text();
         const text = raw.replace(/^\ufeff/, "");
         const json = JSON.parse(text);
@@ -62,7 +56,6 @@ const Junkai = (() => {
     throw lastErr || new Error("fetch-fail");
   }
 
-  // ===== ローカル保存 =====
   function saveCity(city, arr) {
     localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
   }
@@ -81,11 +74,30 @@ const Junkai = (() => {
   function applyUIIndex(city, arr) {
     const p = PREFIX[city] || "";
     for (let i = 0; i < arr.length; i++) {
-      arr[i].ui_index = `${p}${String(i + 1).padStart(3, "0")}`;
+      arr[i].ui_index_num = i + 1;
+      arr[i].ui_index = p + (i + 1);
     }
   }
 
-  // ===== カウンタ =====
+  function normalizeRow(rowObj) {
+    return {
+      area:      (rowObj.area     || "").trim(),
+      city:      (rowObj.city     || "").trim(),
+      address:   (rowObj.address  || "").trim(),
+      station:   (rowObj.station  || "").trim(),
+      model:     (rowObj.model    || "").trim(),
+      plate:     (rowObj.plate    || "").trim(),
+      note:      (rowObj.note     || "").trim(),
+      operator:  (rowObj.operator || "").trim(),
+      status:    (rowObj.status   || "").trim(),
+      checked:   !!rowObj.checked,
+      last_inspected_at: (rowObj.last_inspected_at || "").trim(),
+      index:     Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0,
+      ui_index:  rowObj.ui_index || "",
+      ui_index_num: rowObj.ui_index_num || 0
+    };
+  }
+
   function countCity(arr) {
     const c = { done: 0, stop: 0, skip: 0, total: arr.length };
     for (const it of arr) {
@@ -116,18 +128,18 @@ const Junkai = (() => {
       const m = map[city];
       for (const k of ["done", "stop", "skip", "total"]) {
         const el = document.querySelector(m[k]);
-        if (!el) continue;
-        el.textContent = String(cnt[k]);
+        if (el) el.textContent = cnt[k];
       }
+      const remCount = cnt.total - cnt.done - cnt.skip;
       const remEl = document.querySelector(m.rem);
-      if (remEl) remEl.textContent = String(cnt.total - cnt.done - cnt.skip);
+      if (remEl) remEl.textContent = remCount;
     }
 
-    const allDoneEl  = document.getElementById("all-done");
-    const allStopEl  = document.getElementById("all-stop");
-    const allSkipEl  = document.getElementById("all-skip");
-    const allTotalEl = document.getElementById("all-total");
-    const allRemEl   = document.getElementById("all-rem");
+    const allDoneEl  = document.querySelector("#all-done");
+    const allStopEl  = document.querySelector("#all-stop");
+    const allSkipEl  = document.querySelector("#all-skip");
+    const allTotalEl = document.querySelector("#all-total");
+    const allRemEl   = document.querySelector("#all-rem");
 
     if (allDoneEl)  allDoneEl.textContent  = overallDone;
     if (allStopEl)  allStopEl.textContent  = overallStop;
@@ -141,86 +153,77 @@ const Junkai = (() => {
     }
   }
 
-  // ----- inspectionlog 連携（s1u用）ここから -----
-  async function syncInspectionAll() {
-    try {
-      const all = [];
-      for (const city of CITIES) {
-        const arr = readCity(city);
-        if (!Array.isArray(arr) || !arr.length) continue;
-        for (const rec of arr) {
-          all.push(rec);
-        }
-      }
-      if (!all.length) return;
-
-      const res = await fetch(`${GAS_URL}?action=syncInspection`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: all })
-      });
-
-      let json = null;
-      try {
-        json = await res.json();
-      } catch (_) {}
-      if (!res.ok || (json && json.ok === false)) {
-        console.error("syncInspectionAll failed", res.status, json && json.error);
-      }
-    } catch (e) {
-      console.error("syncInspectionAll error", e);
-    }
-  }
-  // ----- inspectionlog 連携（s1u用）ここまで -----
-
-  // ===== index.html 用：初期同期のみ（リセット付き） =====
   async function initIndex() {
-  repaintCounters();
+    repaintCounters();
 
-  const btn = document.getElementById("syncBtn");
-  if (!btn) return;
+    const btn = document.getElementById("syncBtn");
+    if (!btn) return;
 
-  btn.addEventListener("click", async () => {
-    if (!confirm("全件を最新状態にリセットして同期します。よろしいですか？")) return;
+    btn.addEventListener("click", async () => {
+      const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
+      if (!ok) return;
 
-    try {
-      showProgress(true, 5);
-      statusText("同期開始…（1/4）");
+      for (const city of CITIES) {
+        localStorage.removeItem(LS_KEY(city));
+      }
 
-      // 1) 初期化リクエスト
-      const url = `${GAS_URL}?action=init&_=${Date.now()}`;
-      const data = await fetchWithRetry(url, { method: "GET" });
+      try {
+        showProgress(true, 5);
+        statusText("開始…");
 
-      showProgress(true, 50);
-      statusText("同期中…（2/4）");
+        const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
+        statusText("GASへ問い合わせ中…");
+        showProgress(true, 30);
 
-      // 2) レスポンス検証
-      if (!Array.isArray(data)) throw new Error("データ形式エラー");
+        const json = await fetchJSONWithRetry(url, 2);
+        showProgress(true, 60);
 
-      showProgress(true, 70);
-      statusText("同期中…（3/4）");
+        if (!json || !Array.isArray(json.rows)) {
+          throw new Error("bad-shape");
+        }
 
-      // 3) ローカルへ保存
-      localStorage.setItem("cityData", JSON.stringify(data));
+        const buckets = { "大和市": [], "海老名市": [], "調布市": [] };
 
-      showProgress(true, 90);
-      statusText("同期中…（4/4）");
+        for (const r of json.rows) {
+          if (!r || typeof r !== "object") continue;
+          const norm = normalizeRow(r);
+          const cityName = norm.city;
+          if (!buckets[cityName]) continue;
+          buckets[cityName].push(norm);
+        }
 
-      // 4) UI 反映
-      applyUIIndex(data);
+        let wrote = 0;
+        for (const city of CITIES) {
+          const arr = buckets[city];
+          if (arr.length > 0) {
+            applyUIIndex(city, arr);
+            saveCity(city, arr);
+            wrote++;
+          }
+        }
 
-      alert("初期同期が完了しました");
-    } catch (e) {
-      console.error("sync error", e);
-      statusText("同期失敗：通信または解析エラー（既存データはリセット済み）");
-    } finally {
-      setTimeout(() => showProgress(false), 400);
-    }
-  });
-}
+        if (wrote === 0) {
+          statusText("同期失敗：データが空でした（既存データは保持されていません）");
+          showProgress(false);
+          return;
+        }
 
+        repaintCounters();
+        showProgress(true, 100);
+        statusText(
+          `同期完了：大和${buckets["大和市"].length || 0} / ` +
+          `海老名${buckets["海老名市"].length || 0} / ` +
+          `調布${buckets["調布市"].length || 0}`
+        );
+      } catch (e) {
+        console.error("sync error", e);
+        statusText("同期失敗：通信または解析エラー（既存データはリセット済み）");
+      } finally {
+        setTimeout(() => showProgress(false), 400);
+      }
+    });
+  }
 
-  // ===== city ページ =====
   function within7d(last) {
     if (!last) return false;
     const t = Date.parse(last);
@@ -306,7 +309,7 @@ const Junkai = (() => {
         updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
-        syncInspectionAll();   // ★ これを追加
+        if (typeof syncInspectionAll === "function") syncInspectionAll();
       });
 
       const tireBtn = document.createElement("button");
@@ -365,8 +368,7 @@ const Junkai = (() => {
         updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
-
-        syncInspectionAll();   // ← ★ この1行だけ追加
+        if (typeof syncInspectionAll === "function") syncInspectionAll();
       });
 
       checkedWrap.appendChild(chk);
@@ -384,9 +386,7 @@ const Junkai = (() => {
     }
   }
 
-  function updateDateTime() {
-    // dummy（もともとこのファイルにある実装をそのまま残している想定）
-  }
+  function updateDateTime() {}
 
   return {
     initIndex,
@@ -394,3 +394,4 @@ const Junkai = (() => {
   };
 
 })();
+
