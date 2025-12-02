@@ -389,6 +389,7 @@ const Junkai = (() => {
   }
 
   return {
+    initIndex,
     initCity
   };
 
