@@ -42,7 +42,8 @@ const Junkai = (() => {
       try {
         const ctl = new AbortController();
         const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
-        const res = await fetch(url, {
+        console.log("sending to GAS", all);
+      const res = await fetch(url, {
           method: "GET",
           cache: "no-store",
           redirect: "follow",
@@ -249,18 +250,22 @@ const Junkai = (() => {
   
   // ===== inspectionlog sync =====
   async function syncInspectionAll() {
+    console.log("syncInspectionAll called");
+
     const all = [];
     for (const city of CITIES) {
       const arr = readCity(city);
       for (const rec of arr) all.push(rec);
     }
     try {
+      console.log("sending to GAS", all);
       const res = await fetch(`${GAS_URL}?action=syncInspection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: all })
       });
-      await res.json();
+      const json = await res.json();
+      console.log("GAS response", json);
     } catch (e) {
       console.error("syncInspectionAll error", e);
     }
@@ -376,7 +381,6 @@ const Junkai = (() => {
         updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
-        syncInspectionAll();
         syncInspectionAll();
       });
 
