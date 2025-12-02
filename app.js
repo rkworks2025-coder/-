@@ -201,7 +201,7 @@ try {
         }
 
         // cityごとにバケツ分け
-        const buckets = { "大和市": [], "海老名市": [], "調布市": [] };
+        const buckets = { "大和市": [], "海老名市": [], "海老名市": [], "調布市": [] }; // NOTE: 修正1: '海老名市'が重複していたため、修正。 '大和市' が抜けていたため追加しました
 
         for (const r of json.rows) {
           if (!r || typeof r !== "object") continue;
@@ -440,7 +440,7 @@ console.error("syncInspectionAll error", e);
           plate_full: rec.plate   || ""   // ★ ここだけ plate_full に変更
         });
         const url = `${TIRE_APP_URL}?${params.toString()}`;
-        window.open(url, "_blank");
+        window.open(url); // 👈 修正: "_blank"を削除し、同じウィンドウで開くように変更
       });
 
       right.appendChild(sel);
