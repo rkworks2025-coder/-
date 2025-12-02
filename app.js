@@ -547,7 +547,7 @@ function applyUIIndex(city, arr) {
         for (const row of data) {
           const city = row.city;
           if (!CITIES.includes(city)) continue;
-          grouped[city].push(normalizeRow(item));
+          grouped[city].push(normalizeRow(row));
         }
 
         // UI index を振る + ローカル保存
