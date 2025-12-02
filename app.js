@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s1k（初期同期専用／inspectionlog連携なし）
+// version: s2q（初期同期専用／inspectionlog連携なし）
 // 前提ヘッダー（全体管理タブの英語表記）
 // A: area, B: city, C: address, D: station, E: model,
 // F: plate, G: note, H: operator
@@ -246,6 +246,26 @@ const Junkai = (() => {
   }
 
   // ===== city ページ =====
+  
+  // ===== inspectionlog sync =====
+  async function syncInspectionAll() {
+    const all = [];
+    for (const city of CITIES) {
+      const arr = readCity(city);
+      for (const rec of arr) all.push(rec);
+    }
+    try {
+      const res = await fetch(`${GAS_URL}?action=syncInspection`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: all })
+      });
+      await res.json();
+    } catch (e) {
+      console.error("syncInspectionAll error", e);
+    }
+  }
+
   function within7d(last) {
     if (!last) return false;
     const t = Date.parse(last);
@@ -356,6 +376,8 @@ const Junkai = (() => {
         updateDateTime();
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
+        syncInspectionAll();
+        syncInspectionAll();
       });
 
       // 中央（ステーション名／車種・ナンバー）
@@ -399,6 +421,7 @@ const Junkai = (() => {
         rec.status = sel.value;
         row.className = `row ${rowBg(rec)}`;
         persistCityRec(city, rec);
+        syncInspectionAll();
       });
 
       const tireBtn = document.createElement("button");
