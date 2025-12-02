@@ -547,7 +547,7 @@ function applyUIIndex(city, arr) {
         for (const row of data) {
           const city = row.city;
           if (!CITIES.includes(city)) continue;
-          grouped[city].push(normalizeRow(row));
+          grouped[city].push(normalizeRow(item));
         }
 
         // UI index を振る + ローカル保存
@@ -564,7 +564,7 @@ function applyUIIndex(city, arr) {
         }
 
         repaintCounters();
-        alert("初期同期が完了しました。");
+        alert("初期同期が完了しました");
       } catch (e) {
         console.error(e);
         alert("初期同期に失敗しました。ネットワークやGASの状態を確認してください。");
