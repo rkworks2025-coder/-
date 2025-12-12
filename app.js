@@ -1,8 +1,6 @@
-// 巡回アプリ app.js
-// version: s2q（初期同期専用／inspectionlog連携なし）
-// 前提ヘッダー（全体管理タブの英語表記）
-// A: area, B: city, C: address, D: station, E: model,
-// F: plate, G: note, H: operator
+// 巡回アプリ app.js (Refactored for Server-Side Logic)
+// version: s2q_refactored
+// 前提ヘッダー: A:area, B:city, C:address, D:station, E:model, F:plate, G:note, H:operator
 
 const Junkai = (() => {
 
@@ -50,14 +48,13 @@ const Junkai = (() => {
           signal: ctl.signal
         });
         clearTimeout(t);
-
         const raw = await res.text();
-        const text = raw.replace(/^\ufeff/, ""); // BOM除去
+        const text = raw.replace(/^\ufeff/, "");
         const json = JSON.parse(text);
         return json;
       } catch (e) {
-              (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
-lastErr = e;
+        (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
+        lastErr = e;
         await sleep(400 * (i + 1));
       }
     }
@@ -99,10 +96,9 @@ lastErr = e;
       plate:     (rowObj.plate    || "").trim(),
       note:      (rowObj.note     || "").trim(),
       operator:  (rowObj.operator || "").trim(),
-
-      // 初期同期フェーズでは status はシートと無関係なローカル専用。
-      // デフォルトは空文字（"normal"は使わない）。
-      status:    (rowObj.status   || "").trim(),
+      
+      // ★修正: GASから送られてきたステータス(7days_rule等)をそのまま受け入れる
+      status:    (rowObj.status   || "").trim(), 
 
       checked:   !!rowObj.checked,
       last_inspected_at: (rowObj.last_inspected_at || "").trim(),
@@ -169,24 +165,21 @@ lastErr = e;
     }
   }
 
-  // ===== index.html 用：初期同期のみ（リセット付き） =====
+  // ===== index.html 用：初期同期 =====
   async function initIndex() {
     repaintCounters();
-
     const btn = document.getElementById("syncBtn");
     if (!btn) return;
 
     btn.addEventListener("click", async () => {
-      // 確認ダイアログ＋リセット
       const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
       if (!ok) return;
 
-      // 各エリアのローカルデータをクリア
       for (const city of CITIES) {
         localStorage.removeItem(LS_KEY(city));
       }
 
-try {
+      try {
         showProgress(true, 5);
         statusText("開始…");
 
@@ -201,17 +194,13 @@ try {
           throw new Error("bad-shape");
         }
 
-        // cityごとにバケツ分け
-        const buckets = { "大和市": [], "海老名市": [], "調布市": [] }; // 👈 修正済み
+        const buckets = { "大和市": [], "海老名市": [], "調布市": [] };
 
         for (const r of json.rows) {
           if (!r || typeof r !== "object") continue;
-
-          // 期待するキー：area, city, address, station, model, plate, note, operator
           const norm = normalizeRow(r);
           const cityName = norm.city;
           if (!buckets[cityName]) continue;
-
           buckets[cityName].push(norm);
         }
 
@@ -226,76 +215,59 @@ try {
         }
 
         if (wrote === 0) {
-          statusText("同期失敗：データが空でした（既存データは保持されていません）");
+          statusText("同期失敗：データが空でした");
           showProgress(false);
           return;
         }
 
         repaintCounters();
         showProgress(true, 100);
-        statusText(
-          `同期完了：大和${buckets["大和市"].length || 0} / ` +
-          `海老名${buckets["海老名市"].length || 0} / ` +
-          `調布${buckets["調布市"].length || 0}`
-        );
+        statusText(`同期完了`);
       } catch (e) {
-              (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
-console.error("sync error", e);
-        statusText("同期失敗：通信または解析エラー（既存データはリセット済み）");
+        (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
+        console.error("sync error", e);
+        statusText("同期失敗：通信エラー");
       } finally {
         setTimeout(() => showProgress(false), 400);
       }
     });
   }
 
-  // ===== city ページ =====
-  
   // ===== inspectionlog sync =====
   async function syncInspectionAll() {
     const all = [];
-    
     for (const city of CITIES) {
       const arr = readCity(city);
       for (const rec of arr) all.push(rec);
     }
     (()=>{const el=document.getElementById("hint");if(el){const old=el.textContent;el.textContent=`送信:${all.length}`;setTimeout(()=>el.textContent=old,1000);}})();
-try {
+    try {
       const res = await fetch(`${GAS_URL}?action=syncInspection`, {
         method: "POST",
-
         body: JSON.stringify({ data: all })
       });
       await res.json();
-          (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信成功";setTimeout(()=>h.textContent=o,1000);}})();
-} catch (e) {
-            (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
-console.error("syncInspectionAll error", e);
+      (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信成功";setTimeout(()=>h.textContent=o,1000);}})();
+    } catch (e) {
+      (()=>{const h=document.getElementById("hint");if(h){const o=h.textContent;h.textContent="送信失敗";setTimeout(()=>h.textContent=o,1000);}})();
+      console.error("syncInspectionAll error", e);
     }
   }
 
-  function within7d(last) {
-    if (!last) return false;
-    const t = Date.parse(last);
-    if (!Number.isFinite(t)) return false;
-    const diff = Date.now() - t;
-    return diff < 7 * 24 * 60 * 60 * 1000;
-  }
-
+  // ★修正: 日付計算(within7d)を削除し、GASから来たstatusで色を決定
   function rowBg(rec) {
     if (rec.checked) return "bg-pink";
     if (rec.status === "stop") return "bg-gray";
     if (rec.status === "skip") return "bg-yellow";
-    if (within7d(rec.last_inspected_at)) return "bg-blue";
+    if (rec.status === "7days_rule") return "bg-blue"; // ★ここが変更点
     return "bg-green";
   }
 
   function persistCityRec(city, rec) {
     const arr = readCity(city);
     if (!Array.isArray(arr) || !arr.length) return;
-
     const idx = arr.findIndex(r => r.ui_index === rec.ui_index);
     if (idx === -1) return;
-
     arr[idx] = rec;
     saveCity(city, arr);
     repaintCounters();
@@ -310,7 +282,7 @@ console.error("syncInspectionAll error", e);
     list.innerHTML = "";
 
     if (arr.length === 0) {
-      hint.textContent = "まだ同期されていません（インデックスの同期を押してください）";
+      hint.textContent = "まだ同期されていません";
       return;
     }
 
@@ -320,32 +292,25 @@ console.error("syncInspectionAll error", e);
       const row = document.createElement("div");
       row.className = `row ${rowBg(rec)}`;
 
-      // 左カラム（インデックス＆チェック）
+      // 左カラム
       const left = document.createElement("div");
       left.className = "leftcol";
-
       const topLeft = document.createElement("div");
       topLeft.className = "left-top";
-
       const idxDiv = document.createElement("div");
       idxDiv.className = "idx";
       idxDiv.textContent = rec.ui_index || "";
-
       const chk = document.createElement("input");
       chk.type = "checkbox";
       chk.className = "chk";
       chk.checked = !!rec.checked;
-
       topLeft.appendChild(idxDiv);
       topLeft.appendChild(chk);
 
       const dtDiv = document.createElement("div");
       dtDiv.className = "datetime";
-
       function updateDateTime() {
         if (rec.last_inspected_at) {
-          // last_inspected_at は原則 "yyyy-mm-dd"
-          // 旧データ（フルISO）も new Date() で解釈できるようにしておく
           let d = new Date(rec.last_inspected_at);
           if (Number.isFinite(d.getTime())) {
             const yyyy = String(d.getFullYear());
@@ -360,7 +325,6 @@ console.error("syncInspectionAll error", e);
         dtDiv.style.display = "none";
       }
       updateDateTime();
-
       left.appendChild(topLeft);
       left.appendChild(dtDiv);
 
@@ -374,8 +338,10 @@ console.error("syncInspectionAll error", e);
         }
         if (chk.checked) {
           rec.checked = true;
-          // 時刻は廃止し、日付のみ（yyyy-mm-dd）を保存
           rec.last_inspected_at = new Date().toISOString().slice(0, 10);
+          // チェックしたら青や緑から外れるのでstatusはリセットする運用が一般的ですが
+          // アプリ側では勝手に書き換えず、送信してGASの判断に任せるならそのままでも可。
+          // ここでは「チェック＝最強」なので色はbg-pinkになります。
         } else {
           rec.checked = false;
           rec.last_inspected_at = "";
@@ -387,35 +353,31 @@ console.error("syncInspectionAll error", e);
         syncInspectionAll();
       });
 
-      // 中央（ステーション名／車種・ナンバー）
+      // 中央
       const mid = document.createElement("div");
       mid.className = "mid";
-
       const title = document.createElement("div");
       title.className = "title";
       title.textContent = rec.station || "";
-
       const sub = document.createElement("div");
       sub.className = "sub";
       sub.innerHTML = `${rec.model || ""}<br>${rec.plate || ""}`;
-
       mid.appendChild(title);
       mid.appendChild(sub);
 
-      // 右カラム（ステータス＆タイヤボタン）
+      // 右カラム
       const right = document.createElement("div");
       right.className = "rightcol";
-
       const sel = document.createElement("select");
       sel.className = "state";
-
       const statusOptions = [
         ["",       "通常"],
         ["stop",   "停止"],
         ["skip",   "不要"]
+        // 7days_ruleは自動付与なので選択肢には入れない
       ];
-
-      const current = rec.status || "";
+      const current = rec.status === "7days_rule" ? "" : (rec.status || "");
+      
       for (const [value, label] of statusOptions) {
         const o = document.createElement("option");
         o.value = value;
@@ -423,7 +385,6 @@ console.error("syncInspectionAll error", e);
         if (current === value) o.selected = true;
         sel.appendChild(o);
       }
-
       sel.addEventListener("change", () => {
         rec.status = sel.value;
         row.className = `row ${rowBg(rec)}`;
@@ -438,28 +399,20 @@ console.error("syncInspectionAll error", e);
         const params = new URLSearchParams({
           station:    rec.station || "",
           model:      rec.model   || "",
-          plate_full: rec.plate   || ""   // ★ ここだけ plate_full に変更
+          plate_full: rec.plate   || ""
         });
         const url = `${TIRE_APP_URL}?${params.toString()}`;
-        // 現在のウィンドウでページを置き換える
-        location.href = url; // 👈 最終修正
+        location.href = url;
       });
 
       right.appendChild(sel);
       right.appendChild(tireBtn);
-
       row.appendChild(left);
       row.appendChild(mid);
       row.appendChild(right);
-
       list.appendChild(row);
     }
   }
 
-  // 公開API
-  return {
-    initIndex,
-    initCity
-  };
-
+  return { initIndex, initCity };
 })();
