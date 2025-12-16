@@ -342,16 +342,14 @@ console.error("syncInspectionAll error", e);
       const dtDiv = document.createElement("div");
       dtDiv.className = "datetime";
 
-      // ▼▼▼ 追加機能：日付修正用の隠しInput ▼▼▼
+      // ▼▼▼ 追加機能：日付修正用の隠しInput（iOS対応強化版） ▼▼▼
       const dateInput = document.createElement("input");
       dateInput.type = "date";
-      // 見た目には表示させない設定
-      dateInput.style.cssText = "position:absolute;opacity:0;pointer-events:none;height:0;width:0;";
+      // 修正: iOSで認識させるため 0x0 ではなく 1px サイズを確保。操作無効(pointer-events:none)も削除。
+      dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
 
       function updateDateTime() {
         if (rec.last_inspected_at) {
-          // last_inspected_at は原則 "yyyy-mm-dd"
-          // 旧データ（フルISO）も new Date() で解釈できるようにしておく
           let d = new Date(rec.last_inspected_at);
           if (Number.isFinite(d.getTime())) {
             const yyyy = String(d.getFullYear());
@@ -359,7 +357,6 @@ console.error("syncInspectionAll error", e);
             const dd = String(d.getDate()).padStart(2, "0");
             dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
             dtDiv.style.display = "";
-            // カレンダー用Inputにも値を同期
             dateInput.value = `${yyyy}-${mm}-${dd}`;
             return;
           }
@@ -373,24 +370,37 @@ console.error("syncInspectionAll error", e);
       // 日付部分タップでカレンダー起動
       dtDiv.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (rec.checked && typeof dateInput.showPicker === "function") {
-          dateInput.showPicker();
+        if (!rec.checked) return;
+
+        // iOS/Android互換性のための二段構え起動
+        try {
+            // まずフォーカスを当ててみる
+            dateInput.focus();
+            
+            // 最新の起動メソッドを試行
+            if (typeof dateInput.showPicker === "function") {
+                dateInput.showPicker();
+            } else {
+                // 古いiOS/Webviewなどはこっち
+                dateInput.click();
+            }
+        } catch (err) {
+            // セキュリティ制限などで失敗したらclickにフォールバック
+            dateInput.click();
         }
       });
 
       // カレンダーで日付が変更された時の処理
       dateInput.addEventListener("change", () => {
-        if (!dateInput.value) return; // 値が空なら何もしない
+        if (!dateInput.value) return; 
 
-        // 確認アラート
         if (confirm("日付を変更します。よろしいですか？")) {
           rec.last_inspected_at = dateInput.value;
           updateDateTime();
           persistCityRec(city, rec);
-          syncInspectionAll(); // GASへ送信
+          syncInspectionAll(); 
         } else {
-          // キャンセル時は元の値に戻す
-          updateDateTime();
+          updateDateTime(); // キャンセル時は戻す
         }
       });
       // ▲▲▲ 追加機能終了 ▲▲▲
@@ -409,7 +419,6 @@ console.error("syncInspectionAll error", e);
         }
         if (chk.checked) {
           rec.checked = true;
-          // 時刻は廃止し、日付のみ（yyyy-mm-dd）を保存
           rec.last_inspected_at = new Date().toISOString().slice(0, 10);
         } else {
           rec.checked = false;
