@@ -443,3 +443,207 @@ const Junkai = (() => {
       });
       await res.json();
       if(h) {
+        h.textContent="送信成功";
+        setTimeout(()=>h.textContent=`件数：${all.length}`, 1500);
+      }
+    } catch (e) {
+      const h=document.getElementById("hint");
+      if(h) h.textContent="送信失敗";
+    }
+  }
+
+  function within7d(last) {
+    if (!last) return false;
+    const t = Date.parse(last);
+    if (!Number.isFinite(t)) return false;
+    const diff = Date.now() - t;
+    return diff < 7 * 24 * 60 * 60 * 1000;
+  }
+
+  function rowBg(rec) {
+    if (rec.checked) return "bg-pink";
+    if (rec.status === "stop") return "bg-gray";
+    if (rec.status === "skip") return "bg-yellow";
+    if (within7d(rec.last_inspected_at)) return "bg-blue";
+    return "bg-green";
+  }
+
+  function persistCityRec(city, rec) {
+    const arr = readCity(city);
+    if (!Array.isArray(arr) || !arr.length) return;
+    const idx = arr.findIndex(r => r.ui_index === rec.ui_index);
+    if (idx === -1) return;
+    arr[idx] = rec;
+    saveCity(city, arr);
+    repaintCounters();
+  }
+
+  async function initCity(cityKey) {
+    // ★高速化：キャッシュのみを使用（通信しない）
+    await loadConfig(false); 
+
+    let cityName = cityKey;
+    let targetCfg = appConfig.find(c => c.name === cityKey);
+    if (!targetCfg) {
+       targetCfg = appConfig.find(c => c.slug === cityKey);
+       if(targetCfg) cityName = targetCfg.name;
+    }
+
+    if (!targetCfg) {
+      const h = document.getElementById("hint");
+      if(h) h.textContent = "設定エラー：Config未ロード";
+      return;
+    }
+
+    const list = document.getElementById("list");
+    const hint = document.getElementById("hint");
+    if (!list || !hint) return;
+
+    const arr = readCity(cityName);
+    list.innerHTML = "";
+
+    if (arr.length === 0) {
+      hint.textContent = "データなし";
+      return;
+    }
+
+    hint.textContent = `件数：${arr.length}`;
+
+    for (const rec of arr) {
+      const row = document.createElement("div");
+      row.className = `row ${rowBg(rec)}`;
+
+      // 左カラム
+      const left = document.createElement("div");
+      left.className = "leftcol";
+      const topLeft = document.createElement("div");
+      topLeft.className = "left-top";
+      const idxDiv = document.createElement("div");
+      idxDiv.className = "idx";
+      idxDiv.textContent = rec.ui_index || "";
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.className = "chk";
+      chk.checked = !!rec.checked;
+      topLeft.appendChild(idxDiv);
+      topLeft.appendChild(chk);
+
+      const dtDiv = document.createElement("div");
+      dtDiv.className = "datetime";
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
+
+      function updateDateTime() {
+        if (rec.last_inspected_at) {
+          let d = new Date(rec.last_inspected_at);
+          if (Number.isFinite(d.getTime())) {
+            const yyyy = String(d.getFullYear());
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
+            dtDiv.style.display = "";
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+            return;
+          }
+        }
+        dtDiv.innerHTML = "";
+        dtDiv.style.display = "none";
+        dateInput.value = "";
+      }
+      updateDateTime();
+
+      dtDiv.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!rec.checked) return;
+        try { dateInput.focus(); dateInput.showPicker(); } catch (err) { dateInput.click(); }
+      });
+      dateInput.addEventListener("change", () => {
+        if (!dateInput.value) return; 
+        if (confirm("日付を変更しますか？")) {
+          rec.last_inspected_at = dateInput.value;
+          updateDateTime();
+          persistCityRec(cityName, rec);
+          syncInspectionAll(); 
+        }
+      });
+
+      left.appendChild(topLeft);
+      left.appendChild(dtDiv);
+      left.appendChild(dateInput);
+
+      chk.addEventListener("change", () => {
+        if (!confirm(chk.checked ? "チェックしますか？" : "外しますか？")) {
+          chk.checked = !chk.checked;
+          return;
+        }
+        if (chk.checked) {
+          rec.checked = true;
+          rec.last_inspected_at = new Date().toISOString().slice(0, 10);
+        } else {
+          rec.checked = false;
+          rec.last_inspected_at = "";
+        }
+        updateDateTime();
+        row.className = `row ${rowBg(rec)}`;
+        persistCityRec(cityName, rec);
+        syncInspectionAll();
+      });
+
+      // 中央
+      const mid = document.createElement("div");
+      mid.className = "mid";
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = rec.station || "";
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.innerHTML = `${rec.model || ""}<br>${rec.plate || ""}`;
+      mid.appendChild(title);
+      mid.appendChild(sub);
+
+      // 右カラム
+      const right = document.createElement("div");
+      right.className = "rightcol";
+      const sel = document.createElement("select");
+      sel.className = "state";
+      const statusOptions = [["", "通常"], ["stop", "停止"], ["skip", "不要"]];
+      for (const [value, label] of statusOptions) {
+        const o = document.createElement("option");
+        o.value = value;
+        o.textContent = label;
+        if ((rec.status || "") === value) o.selected = true;
+        sel.appendChild(o);
+      }
+      sel.addEventListener("change", () => {
+        rec.status = sel.value;
+        row.className = `row ${rowBg(rec)}`;
+        persistCityRec(cityName, rec);
+        syncInspectionAll();
+      });
+
+      const tireBtn = document.createElement("button");
+      tireBtn.className = "tire-btn";
+      tireBtn.textContent = "点検";
+      tireBtn.addEventListener("click", () => {
+        const params = new URLSearchParams({
+          station:    rec.station || "",
+          model:      rec.model   || "",
+          plate_full: rec.plate   || ""
+        });
+        location.href = `${TIRE_APP_URL}?${params.toString()}`;
+      });
+
+      right.appendChild(sel);
+      right.appendChild(tireBtn);
+
+      row.appendChild(left);
+      row.appendChild(mid);
+      row.appendChild(right);
+      list.appendChild(row);
+    }
+  }
+
+  return { initIndex, initCity };
+
+})();
