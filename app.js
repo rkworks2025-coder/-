@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s3f_final (起動時通信ゼロ・同期時のみ設定更新)
+// version: s4a (JST強制・削除反映・Status色判定修正)
 
 var Junkai = (() => {
 
@@ -14,6 +14,11 @@ var Junkai = (() => {
   // ===== utility =====
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const LS_KEY = (c) => `junkai:city:${c}`; 
+
+  // ★修正: JSTでの日付文字列(YYYY-MM-DD)を取得する
+  function getTodayJST() {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
+  }
 
   function showProgress(on, pct) {
     const m = document.getElementById("progressModal");
@@ -227,7 +232,7 @@ var Junkai = (() => {
 
   // ===== Pull (ログ取込) 機能 =====
   async function execPullLog() {
-    const ok = confirm("【Pull】inspectionlogの内容をアプリに強制反映しますか？\n（追加、状態変更、削除キャンセル等が反映されます）");
+    const ok = confirm("【Pull】inspectionlogの内容をアプリに反映しますか？\n（追加・更新・削除・状態変更が反映されます）");
     if (!ok) return;
 
     try {
@@ -247,13 +252,28 @@ var Junkai = (() => {
       const logRows = json.rows;
       let updatedCount = 0;
       let addedCount = 0;
+      let deletedCount = 0; // 削除数カウント用
 
       for (const cfg of appConfig) {
         let cityData = readCity(cfg.name);
         let isCityModified = false;
 
         const cityLogs = logRows.filter(r => r.city === cfg.name);
+        
+        // ★修正: 削除処理 (ログにない車両を削除)
+        // ログに含まれる plate のリストを作成
+        const validPlates = cityLogs.map(r => r.plate);
+        const preCount = cityData.length;
+        // ログに存在しない plate の行を除外
+        cityData = cityData.filter(localRow => validPlates.includes(localRow.plate));
+        const postCount = cityData.length;
+        
+        if (preCount !== postCount) {
+           deletedCount += (preCount - postCount);
+           isCityModified = true;
+        }
 
+        // 更新・追加処理
         cityLogs.forEach(logRow => {
           const targetRow = cityData.find(r => r.plate === logRow.plate);
 
@@ -274,10 +294,9 @@ var Junkai = (() => {
 
           let newDate = "";
           if (logRow.date) {
-            const d = new Date(logRow.date);
-            if (!isNaN(d.getTime())) {
-               newDate = d.toISOString().slice(0, 10);
-            }
+            // GASから来る日付(YYYY-MM-DD)をそのまま使う、もしくは整形
+            // ここでは文字列としてそのまま扱う（GAS側でJST整形済みを想定）
+            newDate = logRow.date.slice(0, 10);
           }
 
           if (targetRow) {
@@ -318,8 +337,8 @@ var Junkai = (() => {
 
       repaintCounters();
       showProgress(true, 100);
-      statusText(`Pull完了 (更新:${updatedCount}件, 追加:${addedCount}件)`);
-      setTimeout(() => showProgress(false), 1500);
+      statusText(`Pull完了 (更新:${updatedCount}, 追加:${addedCount}, 削除:${deletedCount})`);
+      setTimeout(() => showProgress(false), 2000);
 
     } catch(e) {
       console.error(e);
@@ -339,7 +358,7 @@ var Junkai = (() => {
        renderIndexButtons();
        repaintCounters();
     }
-    statusText(""); // 読み込みメッセージ等は出さない
+    statusText(""); 
 
     // 2. 初期同期ボタンの処理
     const btn = document.getElementById("syncBtn");
@@ -352,7 +371,7 @@ var Junkai = (() => {
           showProgress(true, 5);
           statusText("設定ファイル更新中…");
 
-          // ★ここで初めてGASからConfigを取得する
+          // ★GASからConfigを取得
           await fetchRemoteConfig();
           
           // 設定更新後に古いデータをクリア
@@ -457,6 +476,9 @@ var Junkai = (() => {
 
   function rowBg(rec) {
     if (rec.checked) return "bg-pink";
+    // ★修正: status が 7days_rule の場合も青色にする
+    if (rec.status === "7days_rule") return "bg-blue"; 
+    
     if (rec.status === "stop") return "bg-gray";
     if (rec.status === "skip") return "bg-yellow";
     if (within7d(rec.last_inspected_at)) return "bg-blue";
@@ -474,7 +496,7 @@ var Junkai = (() => {
   }
 
   async function initCity(cityKey) {
-    // 起動時：キャッシュのみを使用（通信なし）
+    // 起動時：キャッシュのみを使用
     loadLocalConfig(); 
 
     let cityName = cityKey;
@@ -574,7 +596,8 @@ var Junkai = (() => {
         }
         if (chk.checked) {
           rec.checked = true;
-          rec.last_inspected_at = new Date().toISOString().slice(0, 10);
+          // ★修正: JSTの日付文字列を取得
+          rec.last_inspected_at = getTodayJST();
         } else {
           rec.checked = false;
           rec.last_inspected_at = "";
