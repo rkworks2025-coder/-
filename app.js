@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s4a (JST強制・削除反映・Status色判定修正)
+// version: s4b (ホワイトリスト方式に変更)
 
 var Junkai = (() => {
 
@@ -102,7 +102,10 @@ var Junkai = (() => {
     container.innerHTML = "";
 
     appConfig.forEach(cfg => {
-      if (cfg.status === 'stop') return;
+      // ★修正: ホワイトリスト方式 (s4b)
+      // statusが「空欄」または「help」以外はすべて非表示にする
+      const s = (cfg.status || "").trim();
+      if (s !== "" && s !== "help") return;
 
       const slug = cfg.slug;  
       const name = cfg.name;  
@@ -111,12 +114,12 @@ var Junkai = (() => {
       a.className = "cardlink";
       a.href = `${slug}.html`; 
       
-      if (cfg.status === 'help') {
+      if (s === 'help') {
         a.style.borderColor = "#fb7185"; 
       }
 
       const h2 = document.createElement("h2");
-      h2.textContent = name + (cfg.status === 'help' ? " (Help)" : "");
+      h2.textContent = name + (s === 'help' ? " (Help)" : "");
 
       const meta = document.createElement("div");
       meta.className = "meta";
@@ -252,7 +255,7 @@ var Junkai = (() => {
       const logRows = json.rows;
       let updatedCount = 0;
       let addedCount = 0;
-      let deletedCount = 0; // 削除数カウント用
+      let deletedCount = 0; 
 
       for (const cfg of appConfig) {
         let cityData = readCity(cfg.name);
@@ -260,11 +263,9 @@ var Junkai = (() => {
 
         const cityLogs = logRows.filter(r => r.city === cfg.name);
         
-        // ★修正: 削除処理 (ログにない車両を削除)
-        // ログに含まれる plate のリストを作成
+        // ★修正: 削除処理 (s4aで追加)
         const validPlates = cityLogs.map(r => r.plate);
         const preCount = cityData.length;
-        // ログに存在しない plate の行を除外
         cityData = cityData.filter(localRow => validPlates.includes(localRow.plate));
         const postCount = cityData.length;
         
@@ -294,8 +295,6 @@ var Junkai = (() => {
 
           let newDate = "";
           if (logRow.date) {
-            // GASから来る日付(YYYY-MM-DD)をそのまま使う、もしくは整形
-            // ここでは文字列としてそのまま扱う（GAS側でJST整形済みを想定）
             newDate = logRow.date.slice(0, 10);
           }
 
@@ -476,7 +475,7 @@ var Junkai = (() => {
 
   function rowBg(rec) {
     if (rec.checked) return "bg-pink";
-    // ★修正: status が 7days_rule の場合も青色にする
+    // ★修正: status が 7days_rule の場合も青色にする (s4aで追加)
     if (rec.status === "7days_rule") return "bg-blue"; 
     
     if (rec.status === "stop") return "bg-gray";
@@ -596,7 +595,7 @@ var Junkai = (() => {
         }
         if (chk.checked) {
           rec.checked = true;
-          // ★修正: JSTの日付文字列を取得
+          // ★修正: JSTの日付文字列を取得 (s4aで追加)
           rec.last_inspected_at = getTodayJST();
         } else {
           rec.checked = false;
