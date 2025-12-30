@@ -13,40 +13,56 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s4c"; /* UI圧縮版 */
+  --app-version:"s4d"; /* 数値拡大版 */
 }
 
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;}
 
-/* App Bar (高さを縮小 12px->8px) */
+/* App Bar */
 .appbar{position:sticky;top:0;z-index:20;background:#020617;border-bottom:1px solid #111827;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;}
 .appbar .title{font-weight:800;letter-spacing:.02em;font-size:20px;}
 .btn{appearance:none;border:1px solid var(--line);background:#020617;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;color:var(--fg);}
 .btn.primary{background:#0f172a;border-color:#1d4ed8;color:#bfdbfe;}
 
-/* iPhone12対応：全体マージン圧縮 (margin 16px -> 8px) */
+/* iPhone対応：全体マージン */
 .wrap{max-width:940px;margin:8px auto;padding:0 8px 60px;}
 
-/* Hint圧縮 */
+/* Hint */
 .hint{color:var(--muted);font-size:12px;margin:4px 2px;}
 
-/* Grid Gap圧縮 (gap 10px -> 6px) */
+/* Grid Gap */
 .cards{display:grid;grid-template-columns:1fr;gap:6px;}
 
-/* カードリンク圧縮 (padding 12px -> 8px) */
+/* カードリンク */
 .cardlink{display:block;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;}
 .cardlink:hover{background:#020617;border-color:#334155;}
 
-/* カード内テキスト圧縮 (h2の余白ゼロ化) */
+/* カード内タイトル */
 .cardlink h2 { margin: 0; font-size: 16px; line-height: 1.3; }
 
-/* メタ情報圧縮 (margin-top 8px -> 4px) */
-.meta{display:flex;gap:4px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:4px;}
+/* メタ情報（チップコンテナ） */
+.meta{display:flex;gap:4px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:6px;}
 
-/* チップ圧縮 */
-.chip{display:inline-flex;align-items:center;gap:3px;background:#111827;border:1px solid var(--line);border-radius:999px;padding:1px 5px;color:var(--muted);font-size:10px;height:20px;}
-.chip span{font-weight:700;color:#e5e7eb;}
+/* ★修正: チップと数値のサイズアップ */
+.chip {
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  background:#111827;
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:2px 6px;      /* 少し余裕を持たせる */
+  color:var(--muted);
+  font-size:11px;       /* ラベル(済/停など)を少し大きく */
+  height:24px;          /* 高さ確保 */
+}
+.chip span {
+  font-weight:700;
+  color:#f3f4f6;        /* より明るい白に */
+  font-size:13px;       /* 数値を明確に大きく */
+  letter-spacing: -0.5px; /* 数字が間延びしないように */
+}
 
 .empty{color:var(--muted);font-size:14px;margin-top:10px;}
 
@@ -57,7 +73,7 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 .barwrap{height:8px;background:#020617;border-radius:999px;overflow:hidden;margin-top:10px;border:1px solid #1f2937;}
 .bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399);}
 
-/* リスト (gap圧縮 10px -> 8px) */
+/* リスト */
 .list{display:flex;flex-direction:column;gap:8px;}
 .row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:8px;position:relative;overflow:hidden;}
 .row::before{content:"";position:absolute;top:0;bottom:0;left:0;width:4px;background:transparent;border-radius:14px 0 0 14px;}
