@@ -1,53 +1,53 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=s3c_fix" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>巡回システム s3g</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="appbar">
-    <div class="title">巡回リスト</div>
-    <div class="btns">
-      <button id="syncBtn" class="btn primary">同期</button>
-      <button id="pushLogBtn" class="btn primary">Pull</button>
-    </div>
+<div id="app">
+  <header class="app-header">
+    <h1>巡回システム <span style="font-size:0.6em;opacity:0.7;">s3g</span></h1>
+    <div id="statusIndicator" class="status-indicator">Wait...</div>
   </header>
 
-  <main class="wrap">
-    <p id="statusText" class="hint">GAS設定を読み込み中...</p>
-
-    <section class="cards" id="city-list-container">
-    </section>
-
-    <section class="cards" style="margin-top:12px;">
-      <div class="cardlink">
-        <h2>全エリア</h2>
-        <div class="meta">
-          <span class="chip">済 <span id="all-done">0</span></span>
-          <span class="chip">停 <span id="all-stop">0</span></span>
-          <span class="chip">不要 <span id="all-skip">0</span></span>
-          <span class="chip">総 <span id="all-total">0</span></span>
-          <span class="chip">残 <span id="all-rem">0</span></span>
-        </div>
+  <div id="viewConfig" class="view-section active">
+    <div class="card">
+      <h2>エリア選択</h2>
+      <div id="configList" class="config-list">Loading...</div>
+      <div class="refresh-area">
+         <button onclick="app.loadConfig()" class="btn secondary">設定再読み込み</button>
       </div>
-    </section>
-
-    <p id="overallHint" class="empty"></p>
-  </main>
-
-  <div id="progressModal" class="modal" aria-hidden="true">
-    <div class="dialog">
-      <h3 id="progressTitle">同期中…</h3>
-      <div class="barwrap"><div id="progressBar" class="bar"></div></div>
     </div>
   </div>
 
-  <script src="app.js?v=s3c_fix"></script>
-  <script>
-    Junkai.initIndex();
-  </script>
-  <div class="version-label"></div>
+  <div id="viewList" class="view-section" style="display:none;">
+    <div class="toolbar">
+      <button onclick="app.showConfig()" class="btn secondary">← 戻る</button>
+      <span id="currentAreaName" class="area-title"></span>
+      <button onclick="app.pullData()" class="btn action">Pull (受信)</button>
+    </div>
+    
+    <div class="filter-bar">
+       <input type="text" id="searchBox" placeholder="車番/ステーション検索..." oninput="app.renderList()">
+    </div>
+
+    <div id="vehicleList" class="vehicle-list"></div>
+
+    <div class="floating-footer">
+      <button onclick="app.pushData()" class="btn primary big-btn">Push (送信)</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// GAS Web App URL
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbx_Lg4E91jNlRj3gJvX5vM-rQ5K4LzC9Q9vWzX9X9X9X9X9/exec"; // ※実際のURLに書き換えてください
+</script>
+<script src="app.js?v=s3g"></script>
 </body>
 </html>
