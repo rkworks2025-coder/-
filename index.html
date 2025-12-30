@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=s3b" />
+  <link rel="stylesheet" href="style.css?v=s3c_fix" />
 </head>
 <body>
   <header class="appbar">
     <div class="title">巡回リスト</div>
     <div class="btns">
       <button id="syncBtn" class="btn primary">同期</button>
-      <button id="pushLogBtn" class="btn primary">ログ送信</button>
+      <button id="pushLogBtn" class="btn primary">Pull</button>
     </div>
   </header>
 
@@ -44,9 +44,8 @@
     </div>
   </div>
 
-  <script src="app.js?v=s3b"></script>
+  <script src="app.js?v=s3c_fix"></script>
   <script>
-    // インデックスページ初期化（設定読込→ボタン生成→同期準備）
     Junkai.initIndex();
   </script>
   <div class="version-label"></div>
