@@ -1,7 +1,7 @@
 // 巡回アプリ app.js
-// version: s3d_fast (高速化・Pullロジック完全修正)
+// version: s3f_final (起動時通信ゼロ・同期時のみ設定更新)
 
-const Junkai = (() => {
+var Junkai = (() => {
 
   // ===== 設定 =====
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
@@ -57,36 +57,37 @@ const Junkai = (() => {
     throw lastErr || new Error("fetch-fail");
   }
 
-  // ===== 設定ロード処理（高速化対応） =====
-  // forceReload=true の時だけGASへ問い合わせる。それ以外はキャッシュ優先。
-  async function loadConfig(forceReload = false) {
-    // 1. まずローカルキャッシュを確認
+  // ===== 設定処理 =====
+
+  // 1. ローカルキャッシュのみ読み込む（起動用・通信なし）
+  function loadLocalConfig() {
     const cached = localStorage.getItem(LS_CONFIG_KEY);
     if (cached) {
-      try { appConfig = JSON.parse(cached); } catch(e) { appConfig = []; }
-    }
-
-    // キャッシュがあり、かつ強制更新でなければ、ここで終了（通信しない＝爆速）
-    if (appConfig.length > 0 && !forceReload) {
-      if(document.getElementById("statusText")) {
-         // すぐ消す、または何も表示しない
-         statusText("");
+      try {
+        const parsed = JSON.parse(cached);
+        appConfig = Array.isArray(parsed) ? parsed : [];
+      } catch(e) {
+        appConfig = [];
       }
-      return; 
+    } else {
+      appConfig = [];
     }
+  }
 
-    // キャッシュがない、または強制更新の場合はGASへ問い合わせ
+  // 2. GASから設定を強制更新する（初期同期ボタン用）
+  async function fetchRemoteConfig() {
     try {
-      if(document.getElementById("statusText")) statusText("設定更新中...");
-      
       const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`);
       if (json && Array.isArray(json.config)) {
         appConfig = json.config;
         localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(appConfig));
+        return true;
       }
     } catch(e) {
-      console.warn("Config fetch failed, using cache if avail", e);
+      console.warn("Config fetch failed", e);
+      throw new Error("設定の取得に失敗しました");
     }
+    return false;
   }
 
   // ===== インデックス画面構築 =====
@@ -220,11 +221,11 @@ const Junkai = (() => {
 
     const hint = document.getElementById("overallHint");
     if (hint) {
-      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "同期待機中";
+      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "同期してください";
     }
   }
 
-  // ===== Pull (ログ取込) 機能（修正版） =====
+  // ===== Pull (ログ取込) 機能 =====
   async function execPullLog() {
     const ok = confirm("【Pull】inspectionlogの内容をアプリに強制反映しますか？\n（追加、状態変更、削除キャンセル等が反映されます）");
     if (!ok) return;
@@ -270,9 +271,7 @@ const Junkai = (() => {
           } else if (s === "7days_rule") {
              newStatus = "7days_rule"; 
           }
-          // ※上記以外(standbyや空文字)なら newStatus="" (通常) になる
 
-          // 日付
           let newDate = "";
           if (logRow.date) {
             const d = new Date(logRow.date);
@@ -282,11 +281,7 @@ const Junkai = (() => {
           }
 
           if (targetRow) {
-            // ■既存更新 (Scenario 2)
-            // ★修正：ログにある以上、空データ(standby)であっても強制的に上書きする
-            // 以前の if (newChecked || ...) のガードを撤廃
-            
-            // 変更があるか確認
+            // ■既存更新
             if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) {
                 targetRow.checked = newChecked;
                 targetRow.status = newStatus;
@@ -295,7 +290,7 @@ const Junkai = (() => {
                 updatedCount++;
             }
           } else {
-            // ■新規追加 (Scenario 1)
+            // ■新規追加
             const newRec = {
               city:    cfg.name,
               station: logRow.station,
@@ -336,38 +331,38 @@ const Junkai = (() => {
 
   // ===== index.html 用：初期同期 =====
   async function initIndex() {
-    // 高速化：まずはキャッシュで即時表示
-    await loadConfig(false); 
+    // 1. まずローカル設定だけで即時表示（通信ゼロ）
+    loadLocalConfig(); 
     
     // 画面構築
     if(document.getElementById("city-list-container")) {
        renderIndexButtons();
        repaintCounters();
     }
-    statusText("準備完了"); // 即時表示
+    statusText(""); // 読み込みメッセージ等は出さない
 
-    // 初期同期ボタン
+    // 2. 初期同期ボタンの処理
     const btn = document.getElementById("syncBtn");
     if (btn) {
       btn.addEventListener("click", async () => {
         const ok = confirm("【注意】初期同期を実行します。\n現在のアプリ内のデータは全てリセットされます。\nよろしいですか？");
         if (!ok) return;
 
-        // ★同期のタイミングで設定も最新にする
-        try {
-          await loadConfig(true); 
-        } catch(e) { console.warn("config refresh failed"); }
-
-        appConfig.forEach(cfg => {
-          localStorage.removeItem(LS_KEY(cfg.name));
-        });
-
         try {
           showProgress(true, 5);
-          statusText("開始…");
+          statusText("設定ファイル更新中…");
 
+          // ★ここで初めてGASからConfigを取得する
+          await fetchRemoteConfig();
+          
+          // 設定更新後に古いデータをクリア
+          appConfig.forEach(cfg => {
+             localStorage.removeItem(LS_KEY(cfg.name));
+          });
+
+          // 続いて車両データを取得
+          statusText("車両データ取得中…");
           const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
-          statusText("GASへ問い合わせ中…");
           showProgress(true, 30);
 
           const json = await fetchJSONWithRetry(url, 2);
@@ -411,7 +406,7 @@ const Junkai = (() => {
           statusText("同期完了");
         } catch (e) {
           console.error("sync error", e);
-          statusText("同期失敗：通信エラー");
+          statusText("同期失敗：" + e.message);
         } finally {
           setTimeout(() => showProgress(false), 400);
         }
@@ -479,8 +474,8 @@ const Junkai = (() => {
   }
 
   async function initCity(cityKey) {
-    // ★高速化：キャッシュのみを使用（通信しない）
-    await loadConfig(false); 
+    // 起動時：キャッシュのみを使用（通信なし）
+    loadLocalConfig(); 
 
     let cityName = cityKey;
     let targetCfg = appConfig.find(c => c.name === cityKey);
