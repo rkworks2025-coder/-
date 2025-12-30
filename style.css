@@ -13,7 +13,7 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s3c_fix"; /* バージョン管理用 */
+  --app-version:"s4a"; /* バージョン管理用 */
 }
 
 *{box-sizing:border-box;}
@@ -89,3 +89,5 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 .version-label{position:fixed;right:8px;bottom:8px;font-size:11px;color:var(--muted);opacity:.8;pointer-events:none;z-index:9999;}
 .version-label::before{content:"ver ";}
 .version-label::after{content:var(--app-version);}
+
+}
