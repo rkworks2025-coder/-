@@ -1,21 +1,19 @@
 // 巡回アプリ app.js
-// version: s3b（マスタ設定連動型）
+// version: s3c_fix（Pull機能完全実装・UI調整）
 
 const Junkai = (() => {
 
   // ===== 設定 =====
-  // 以前の固定リスト(CITIES/PREFIX)は廃止し、GASからロードします
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/r.k.w-/";
   const LS_CONFIG_KEY = "junkai:config";
   const TIMEOUT_MS = 15000;
 
-  // 実行時にGASから取得した設定を保持する変数
   let appConfig = []; 
 
   // ===== utility =====
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  const LS_KEY = (c) => `junkai:city:${c}`; // キーは日本語名のまま維持(互換性のため)
+  const LS_KEY = (c) => `junkai:city:${c}`; 
 
   function showProgress(on, pct) {
     const m = document.getElementById("progressModal");
@@ -61,28 +59,22 @@ const Junkai = (() => {
 
   // ===== 設定ロード処理 =====
   async function loadConfig() {
-    // まずローカルキャッシュを確認
     const cached = localStorage.getItem(LS_CONFIG_KEY);
     if (cached) {
-      try {
-        appConfig = JSON.parse(cached);
-      } catch(e) { appConfig = []; }
+      try { appConfig = JSON.parse(cached); } catch(e) { appConfig = []; }
     }
 
-    // 画面更新(キャッシュ分で先行表示)
     if(appConfig.length > 0 && document.getElementById("city-list-container")) {
        renderIndexButtons();
        repaintCounters();
     }
 
-    // GASから最新設定を取得
     try {
       if(document.getElementById("statusText")) statusText("設定を確認中...");
       const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`);
       if (json && Array.isArray(json.config)) {
         appConfig = json.config;
         localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(appConfig));
-        // 更新があれば再描画
         if(document.getElementById("city-list-container")) renderIndexButtons();
         repaintCounters();
       }
@@ -98,20 +90,17 @@ const Junkai = (() => {
     container.innerHTML = "";
 
     appConfig.forEach(cfg => {
-      // stopステータスなら表示しない
       if (cfg.status === 'stop') return;
 
-      const slug = cfg.slug;  // yamato
-      const name = cfg.name;  // 大和市
+      const slug = cfg.slug;  
+      const name = cfg.name;  
       
-      // カード生成
       const a = document.createElement("a");
       a.className = "cardlink";
-      a.href = `${slug}.html`; // リンク先: slug.html
+      a.href = `${slug}.html`; 
       
-      // ヘルプ担当等の場合、色を変えるなどのクラス付与も可能
       if (cfg.status === 'help') {
-        a.style.borderColor = "#fb7185"; // ピンク枠などで区別(任意)
+        a.style.borderColor = "#fb7185"; 
       }
 
       const h2 = document.createElement("h2");
@@ -120,7 +109,6 @@ const Junkai = (() => {
       const meta = document.createElement("div");
       meta.className = "meta";
       
-      // カウンターID: slug-done, slug-stop...
       meta.innerHTML = `
         <span class="chip">済 <span id="${slug}-done">0</span></span>
         <span class="chip">停 <span id="${slug}-stop">0</span></span>
@@ -149,9 +137,7 @@ const Junkai = (() => {
     } catch (_) { return []; }
   }
 
-  // UI Indexの割当 (設定からPrefixを取得)
   function applyUIIndex(city, arr) {
-    // 設定からPrefixを探す
     const target = appConfig.find(c => c.name === city);
     const p = target ? target.prefix : "?";
     
@@ -194,10 +180,9 @@ const Junkai = (() => {
   function repaintCounters() {
     let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
 
-    // Configにある都市のみ集計
     appConfig.forEach(cfg => {
-      const city = cfg.name; // 大和市
-      const slug = cfg.slug; // yamato
+      const city = cfg.name; 
+      const slug = cfg.slug; 
 
       const arr = readCity(city);
       const cnt = countCity(arr);
@@ -206,7 +191,6 @@ const Junkai = (() => {
       overallStop += cnt.stop;
       overallSkip += cnt.skip;
 
-      // ID: slug-done
       if(document.getElementById(`${slug}-done`)) {
         document.getElementById(`${slug}-done`).textContent = cnt.done;
         document.getElementById(`${slug}-stop`).textContent = cnt.stop;
@@ -234,81 +218,192 @@ const Junkai = (() => {
     }
   }
 
+  // ===== Pull (ログ取込) 機能 =====
+  async function execPullLog() {
+    const ok = confirm("【Pull】inspectionlogからデータを読み込み、\nアプリの状態を最新にしますか？\n（新しい車両は追加されます）");
+    if (!ok) return;
+
+    try {
+      showProgress(true, 10);
+      statusText("ログを取得中...");
+      
+      // GASのログ取得アクションを呼び出す
+      const url = `${GAS_URL}?action=pullLog&_=${Date.now()}`;
+      const json = await fetchJSONWithRetry(url, 2);
+      
+      showProgress(true, 50);
+      
+      if (!json || !json.ok || !Array.isArray(json.rows)) {
+        throw new Error("ログ取得失敗");
+      }
+
+      statusText("データ反映中...");
+      const logRows = json.rows;
+      let updatedCount = 0;
+      let addedCount = 0;
+
+      // 都市ごとにデータをロードし、更新してから保存する
+      for (const cfg of appConfig) {
+        let cityData = readCity(cfg.name);
+        let isCityModified = false;
+
+        // この都市に該当するログデータのみ抽出
+        const cityLogs = logRows.filter(r => r.city === cfg.name);
+
+        cityLogs.forEach(logRow => {
+          // マッチング：車番(plate)で行う
+          const targetRow = cityData.find(r => r.plate === logRow.plate);
+
+          // ステータス変換
+          let newChecked = false;
+          let newStatus = "";
+          const s = (logRow.status || "").toLowerCase();
+
+          if (s === "checked" || s === "完了" || s === "済") {
+             newChecked = true;
+          } else if (s === "stop" || s === "stopped" || s === "停止") {
+             newStatus = "stop";
+          } else if (s === "skip" || s === "unnecessary" || s === "不要") {
+             newStatus = "skip";
+          } else if (s === "7days_rule") {
+             newStatus = "7days_rule"; 
+          }
+
+          // 日付
+          let newDate = "";
+          if (logRow.date) {
+            const d = new Date(logRow.date);
+            if (!isNaN(d.getTime())) {
+               newDate = d.toISOString().slice(0, 10);
+            }
+          }
+
+          if (targetRow) {
+            // ■既存更新 (Scenario 2)
+            if (newChecked || newStatus || newDate) {
+              if (targetRow.checked !== newChecked || targetRow.status !== newStatus || (newDate && targetRow.last_inspected_at !== newDate)) {
+                 targetRow.checked = newChecked;
+                 targetRow.status = newStatus;
+                 if (newDate) targetRow.last_inspected_at = newDate;
+                 isCityModified = true;
+                 updatedCount++;
+              }
+            }
+          } else {
+            // ■新規追加 (Scenario 1)
+            const newRec = {
+              city:    cfg.name,
+              station: logRow.station,
+              model:   logRow.model,
+              plate:   logRow.plate,
+              note:    "", 
+              operator:"",
+              status:  newStatus,
+              checked: newChecked,
+              last_inspected_at: newDate,
+              ui_index: logRow.ui_index || "",
+              ui_index_num: 999 
+            };
+            cityData.push(normalizeRow(newRec));
+            isCityModified = true;
+            addedCount++;
+          }
+        });
+
+        if (isCityModified) {
+          applyUIIndex(cfg.name, cityData);
+          saveCity(cfg.name, cityData);
+        }
+      }
+
+      repaintCounters();
+      showProgress(true, 100);
+      statusText(`Pull完了 (更新:${updatedCount}件, 追加:${addedCount}件)`);
+      setTimeout(() => showProgress(false), 1500);
+
+    } catch(e) {
+      console.error(e);
+      statusText("Pull失敗：" + e.message);
+      showProgress(false);
+    }
+  }
+
+
   // ===== index.html 用：初期同期 =====
   async function initIndex() {
-    // 1. 設定ロード & ボタン描画
     await loadConfig();
-    statusText("設定完了。同期可能です。");
+    statusText("設定完了。");
 
+    // 初期同期ボタン
     const btn = document.getElementById("syncBtn");
-    if (!btn) return;
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        const ok = confirm("【注意】初期同期を実行します。\n現在のアプリ内のデータは全てリセットされます。\nよろしいですか？");
+        if (!ok) return;
 
-    btn.addEventListener("click", async () => {
-      const ok = confirm("初期同期を実行します。現在の巡回データはリセットされます。よろしいですか？");
-      if (!ok) return;
+        appConfig.forEach(cfg => {
+          localStorage.removeItem(LS_KEY(cfg.name));
+        });
 
-      // Configにある都市のデータのみクリア
-      appConfig.forEach(cfg => {
-        localStorage.removeItem(LS_KEY(cfg.name));
+        try {
+          showProgress(true, 5);
+          statusText("開始…");
+
+          const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
+          statusText("GASへ問い合わせ中…");
+          showProgress(true, 30);
+
+          const json = await fetchJSONWithRetry(url, 2);
+          showProgress(true, 60);
+
+          if (!json || !Array.isArray(json.rows)) throw new Error("bad-shape");
+
+          const buckets = {};
+          appConfig.forEach(cfg => buckets[cfg.name] = []);
+
+          for (const r of json.rows) {
+            if (!r || typeof r !== "object") continue;
+            const norm = normalizeRow(r);
+            const cityName = norm.city;
+            if (buckets[cityName]) {
+              buckets[cityName].push(norm);
+            }
+          }
+
+          let wrote = 0;
+          for (const cfg of appConfig) {
+            const arr = buckets[cfg.name];
+            if (arr && arr.length > 0) {
+              applyUIIndex(cfg.name, arr);
+              saveCity(cfg.name, arr);
+              wrote++;
+            }
+          }
+
+          if (wrote === 0) {
+            statusText("同期失敗：有効なデータがありませんでした");
+            showProgress(false);
+            return;
+          }
+
+          repaintCounters();
+          showProgress(true, 100);
+          statusText("同期完了");
+        } catch (e) {
+          console.error("sync error", e);
+          statusText("同期失敗：通信エラー");
+        } finally {
+          setTimeout(() => showProgress(false), 400);
+        }
       });
+    }
 
-      try {
-        showProgress(true, 5);
-        statusText("開始…");
-
-        const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
-        statusText("GASへ問い合わせ中…");
-        showProgress(true, 30);
-
-        const json = await fetchJSONWithRetry(url, 2);
-        showProgress(true, 60);
-
-        if (!json || !Array.isArray(json.rows)) throw new Error("bad-shape");
-
-        // バケツ分け
-        const buckets = {};
-        // Configにある都市名のバケツを用意
-        appConfig.forEach(cfg => buckets[cfg.name] = []);
-
-        for (const r of json.rows) {
-          if (!r || typeof r !== "object") continue;
-          const norm = normalizeRow(r);
-          const cityName = norm.city;
-          
-          if (buckets[cityName]) {
-            buckets[cityName].push(norm);
-          } else {
-            // Configにない都市がGASから来た場合（無視するか、あるいは保存するか。今回は無視）
-            // console.warn("Unknown city:", cityName);
-          }
-        }
-
-        let wrote = 0;
-        for (const cfg of appConfig) {
-          const arr = buckets[cfg.name];
-          if (arr && arr.length > 0) {
-            applyUIIndex(cfg.name, arr);
-            saveCity(cfg.name, arr);
-            wrote++;
-          }
-        }
-
-        if (wrote === 0) {
-          statusText("同期失敗：有効なデータがありませんでした");
-          showProgress(false);
-          return;
-        }
-
-        repaintCounters();
-        showProgress(true, 100);
-        statusText("同期完了");
-      } catch (e) {
-        console.error("sync error", e);
-        statusText("同期失敗：通信エラー");
-      } finally {
-        setTimeout(() => showProgress(false), 400);
-      }
-    });
+    // ★ログ取込(Pull)ボタンの設定
+    const pullBtn = document.getElementById("pushLogBtn");
+    if (pullBtn) {
+      pullBtn.textContent = "Pull"; // ボタン名を変更
+      pullBtn.addEventListener("click", execPullLog);
+    }
   }
 
   // ===== city ページ =====
@@ -363,16 +458,12 @@ const Junkai = (() => {
     repaintCounters();
   }
 
-  // ★変更：initCityは都市名(日本語)ではなく、ConfigのSlugを受け取れるようにする
-  // しかし既存HTMLとの互換性のため、第1引数が日本語ならそのまま、英字なら変換するロジックを入れる
   async function initCity(cityKey) {
-    await loadConfig(); // 設定がないと始まらない
+    await loadConfig(); 
 
-    // cityKeyが "yamato" (slug) か "大和市" (name) か判定して name に統一
     let cityName = cityKey;
     let targetCfg = appConfig.find(c => c.name === cityKey);
     if (!targetCfg) {
-       // Slugで検索
        targetCfg = appConfig.find(c => c.slug === cityKey);
        if(targetCfg) cityName = targetCfg.name;
     }
