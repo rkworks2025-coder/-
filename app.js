@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s3c_fix（Pull機能完全実装・UI調整）
+// version: s3d_fast (高速化・Pullロジック完全修正)
 
 const Junkai = (() => {
 
@@ -57,29 +57,35 @@ const Junkai = (() => {
     throw lastErr || new Error("fetch-fail");
   }
 
-  // ===== 設定ロード処理 =====
-  async function loadConfig() {
+  // ===== 設定ロード処理（高速化対応） =====
+  // forceReload=true の時だけGASへ問い合わせる。それ以外はキャッシュ優先。
+  async function loadConfig(forceReload = false) {
+    // 1. まずローカルキャッシュを確認
     const cached = localStorage.getItem(LS_CONFIG_KEY);
     if (cached) {
       try { appConfig = JSON.parse(cached); } catch(e) { appConfig = []; }
     }
 
-    if(appConfig.length > 0 && document.getElementById("city-list-container")) {
-       renderIndexButtons();
-       repaintCounters();
+    // キャッシュがあり、かつ強制更新でなければ、ここで終了（通信しない＝爆速）
+    if (appConfig.length > 0 && !forceReload) {
+      if(document.getElementById("statusText")) {
+         // すぐ消す、または何も表示しない
+         statusText("");
+      }
+      return; 
     }
 
+    // キャッシュがない、または強制更新の場合はGASへ問い合わせ
     try {
-      if(document.getElementById("statusText")) statusText("設定を確認中...");
+      if(document.getElementById("statusText")) statusText("設定更新中...");
+      
       const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`);
       if (json && Array.isArray(json.config)) {
         appConfig = json.config;
         localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(appConfig));
-        if(document.getElementById("city-list-container")) renderIndexButtons();
-        repaintCounters();
       }
     } catch(e) {
-      console.warn("Config fetch failed, using cache", e);
+      console.warn("Config fetch failed, using cache if avail", e);
     }
   }
 
@@ -214,20 +220,19 @@ const Junkai = (() => {
 
     const hint = document.getElementById("overallHint");
     if (hint) {
-      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "まだ同期されていません";
+      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "同期待機中";
     }
   }
 
-  // ===== Pull (ログ取込) 機能 =====
+  // ===== Pull (ログ取込) 機能（修正版） =====
   async function execPullLog() {
-    const ok = confirm("【Pull】inspectionlogからデータを読み込み、\nアプリの状態を最新にしますか？\n（新しい車両は追加されます）");
+    const ok = confirm("【Pull】inspectionlogの内容をアプリに強制反映しますか？\n（追加、状態変更、削除キャンセル等が反映されます）");
     if (!ok) return;
 
     try {
       showProgress(true, 10);
       statusText("ログを取得中...");
       
-      // GASのログ取得アクションを呼び出す
       const url = `${GAS_URL}?action=pullLog&_=${Date.now()}`;
       const json = await fetchJSONWithRetry(url, 2);
       
@@ -242,21 +247,18 @@ const Junkai = (() => {
       let updatedCount = 0;
       let addedCount = 0;
 
-      // 都市ごとにデータをロードし、更新してから保存する
       for (const cfg of appConfig) {
         let cityData = readCity(cfg.name);
         let isCityModified = false;
 
-        // この都市に該当するログデータのみ抽出
         const cityLogs = logRows.filter(r => r.city === cfg.name);
 
         cityLogs.forEach(logRow => {
-          // マッチング：車番(plate)で行う
           const targetRow = cityData.find(r => r.plate === logRow.plate);
 
-          // ステータス変換
+          // ステータス判定
           let newChecked = false;
-          let newStatus = "";
+          let newStatus = ""; // デフォルトは通常(standby)
           const s = (logRow.status || "").toLowerCase();
 
           if (s === "checked" || s === "完了" || s === "済") {
@@ -268,6 +270,7 @@ const Junkai = (() => {
           } else if (s === "7days_rule") {
              newStatus = "7days_rule"; 
           }
+          // ※上記以外(standbyや空文字)なら newStatus="" (通常) になる
 
           // 日付
           let newDate = "";
@@ -280,14 +283,16 @@ const Junkai = (() => {
 
           if (targetRow) {
             // ■既存更新 (Scenario 2)
-            if (newChecked || newStatus || newDate) {
-              if (targetRow.checked !== newChecked || targetRow.status !== newStatus || (newDate && targetRow.last_inspected_at !== newDate)) {
-                 targetRow.checked = newChecked;
-                 targetRow.status = newStatus;
-                 if (newDate) targetRow.last_inspected_at = newDate;
-                 isCityModified = true;
-                 updatedCount++;
-              }
+            // ★修正：ログにある以上、空データ(standby)であっても強制的に上書きする
+            // 以前の if (newChecked || ...) のガードを撤廃
+            
+            // 変更があるか確認
+            if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) {
+                targetRow.checked = newChecked;
+                targetRow.status = newStatus;
+                targetRow.last_inspected_at = newDate;
+                isCityModified = true;
+                updatedCount++;
             }
           } else {
             // ■新規追加 (Scenario 1)
@@ -331,8 +336,15 @@ const Junkai = (() => {
 
   // ===== index.html 用：初期同期 =====
   async function initIndex() {
-    await loadConfig();
-    statusText("設定完了。");
+    // 高速化：まずはキャッシュで即時表示
+    await loadConfig(false); 
+    
+    // 画面構築
+    if(document.getElementById("city-list-container")) {
+       renderIndexButtons();
+       repaintCounters();
+    }
+    statusText("準備完了"); // 即時表示
 
     // 初期同期ボタン
     const btn = document.getElementById("syncBtn");
@@ -340,6 +352,11 @@ const Junkai = (() => {
       btn.addEventListener("click", async () => {
         const ok = confirm("【注意】初期同期を実行します。\n現在のアプリ内のデータは全てリセットされます。\nよろしいですか？");
         if (!ok) return;
+
+        // ★同期のタイミングで設定も最新にする
+        try {
+          await loadConfig(true); 
+        } catch(e) { console.warn("config refresh failed"); }
 
         appConfig.forEach(cfg => {
           localStorage.removeItem(LS_KEY(cfg.name));
@@ -386,7 +403,10 @@ const Junkai = (() => {
             return;
           }
 
+          // 再描画
+          renderIndexButtons();
           repaintCounters();
+          
           showProgress(true, 100);
           statusText("同期完了");
         } catch (e) {
@@ -398,10 +418,10 @@ const Junkai = (() => {
       });
     }
 
-    // ★ログ取込(Pull)ボタンの設定
+    // Pullボタン
     const pullBtn = document.getElementById("pushLogBtn");
     if (pullBtn) {
-      pullBtn.textContent = "Pull"; // ボタン名を変更
+      pullBtn.textContent = "Pull"; 
       pullBtn.addEventListener("click", execPullLog);
     }
   }
@@ -423,206 +443,3 @@ const Junkai = (() => {
       });
       await res.json();
       if(h) {
-        h.textContent="送信成功";
-        setTimeout(()=>h.textContent=`件数：${all.length}`, 1500);
-      }
-    } catch (e) {
-      const h=document.getElementById("hint");
-      if(h) h.textContent="送信失敗";
-    }
-  }
-
-  function within7d(last) {
-    if (!last) return false;
-    const t = Date.parse(last);
-    if (!Number.isFinite(t)) return false;
-    const diff = Date.now() - t;
-    return diff < 7 * 24 * 60 * 60 * 1000;
-  }
-
-  function rowBg(rec) {
-    if (rec.checked) return "bg-pink";
-    if (rec.status === "stop") return "bg-gray";
-    if (rec.status === "skip") return "bg-yellow";
-    if (within7d(rec.last_inspected_at)) return "bg-blue";
-    return "bg-green";
-  }
-
-  function persistCityRec(city, rec) {
-    const arr = readCity(city);
-    if (!Array.isArray(arr) || !arr.length) return;
-    const idx = arr.findIndex(r => r.ui_index === rec.ui_index);
-    if (idx === -1) return;
-    arr[idx] = rec;
-    saveCity(city, arr);
-    repaintCounters();
-  }
-
-  async function initCity(cityKey) {
-    await loadConfig(); 
-
-    let cityName = cityKey;
-    let targetCfg = appConfig.find(c => c.name === cityKey);
-    if (!targetCfg) {
-       targetCfg = appConfig.find(c => c.slug === cityKey);
-       if(targetCfg) cityName = targetCfg.name;
-    }
-
-    if (!targetCfg) {
-      const h = document.getElementById("hint");
-      if(h) h.textContent = "設定エラー：このエリアはConfigに存在しません";
-      return;
-    }
-
-    const list = document.getElementById("list");
-    const hint = document.getElementById("hint");
-    if (!list || !hint) return;
-
-    const arr = readCity(cityName);
-    list.innerHTML = "";
-
-    if (arr.length === 0) {
-      hint.textContent = "データなし（トップページで同期してください）";
-      return;
-    }
-
-    hint.textContent = `件数：${arr.length}`;
-
-    for (const rec of arr) {
-      const row = document.createElement("div");
-      row.className = `row ${rowBg(rec)}`;
-
-      // 左カラム
-      const left = document.createElement("div");
-      left.className = "leftcol";
-      const topLeft = document.createElement("div");
-      topLeft.className = "left-top";
-      const idxDiv = document.createElement("div");
-      idxDiv.className = "idx";
-      idxDiv.textContent = rec.ui_index || "";
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.className = "chk";
-      chk.checked = !!rec.checked;
-      topLeft.appendChild(idxDiv);
-      topLeft.appendChild(chk);
-
-      const dtDiv = document.createElement("div");
-      dtDiv.className = "datetime";
-      const dateInput = document.createElement("input");
-      dateInput.type = "date";
-      dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
-
-      function updateDateTime() {
-        if (rec.last_inspected_at) {
-          let d = new Date(rec.last_inspected_at);
-          if (Number.isFinite(d.getTime())) {
-            const yyyy = String(d.getFullYear());
-            const mm = String(d.getMonth() + 1).padStart(2, "0");
-            const dd = String(d.getDate()).padStart(2, "0");
-            dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
-            dtDiv.style.display = "";
-            dateInput.value = `${yyyy}-${mm}-${dd}`;
-            return;
-          }
-        }
-        dtDiv.innerHTML = "";
-        dtDiv.style.display = "none";
-        dateInput.value = "";
-      }
-      updateDateTime();
-
-      dtDiv.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!rec.checked) return;
-        try { dateInput.focus(); dateInput.showPicker(); } catch (err) { dateInput.click(); }
-      });
-      dateInput.addEventListener("change", () => {
-        if (!dateInput.value) return; 
-        if (confirm("日付を変更しますか？")) {
-          rec.last_inspected_at = dateInput.value;
-          updateDateTime();
-          persistCityRec(cityName, rec);
-          syncInspectionAll(); 
-        }
-      });
-
-      left.appendChild(topLeft);
-      left.appendChild(dtDiv);
-      left.appendChild(dateInput);
-
-      chk.addEventListener("change", () => {
-        if (!confirm(chk.checked ? "チェックしますか？" : "外しますか？")) {
-          chk.checked = !chk.checked;
-          return;
-        }
-        if (chk.checked) {
-          rec.checked = true;
-          rec.last_inspected_at = new Date().toISOString().slice(0, 10);
-        } else {
-          rec.checked = false;
-          rec.last_inspected_at = "";
-        }
-        updateDateTime();
-        row.className = `row ${rowBg(rec)}`;
-        persistCityRec(cityName, rec);
-        syncInspectionAll();
-      });
-
-      // 中央
-      const mid = document.createElement("div");
-      mid.className = "mid";
-      const title = document.createElement("div");
-      title.className = "title";
-      title.textContent = rec.station || "";
-      const sub = document.createElement("div");
-      sub.className = "sub";
-      sub.innerHTML = `${rec.model || ""}<br>${rec.plate || ""}`;
-      mid.appendChild(title);
-      mid.appendChild(sub);
-
-      // 右カラム
-      const right = document.createElement("div");
-      right.className = "rightcol";
-      const sel = document.createElement("select");
-      sel.className = "state";
-      const statusOptions = [["", "通常"], ["stop", "停止"], ["skip", "不要"]];
-      for (const [value, label] of statusOptions) {
-        const o = document.createElement("option");
-        o.value = value;
-        o.textContent = label;
-        if ((rec.status || "") === value) o.selected = true;
-        sel.appendChild(o);
-      }
-      sel.addEventListener("change", () => {
-        rec.status = sel.value;
-        row.className = `row ${rowBg(rec)}`;
-        persistCityRec(cityName, rec);
-        syncInspectionAll();
-      });
-
-      const tireBtn = document.createElement("button");
-      tireBtn.className = "tire-btn";
-      tireBtn.textContent = "点検";
-      tireBtn.addEventListener("click", () => {
-        const params = new URLSearchParams({
-          station:    rec.station || "",
-          model:      rec.model   || "",
-          plate_full: rec.plate   || ""
-        });
-        location.href = `${TIRE_APP_URL}?${params.toString()}`;
-      });
-
-      right.appendChild(sel);
-      right.appendChild(tireBtn);
-
-      row.appendChild(left);
-      row.appendChild(mid);
-      row.appendChild(right);
-      list.appendChild(row);
-    }
-  }
-
-  return { initIndex, initCity };
-
-})();
