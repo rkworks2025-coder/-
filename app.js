@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s4d (数値拡大版)
+// version: s5a (フィルタ機能追加版)
 
 var Junkai = (() => {
 
@@ -14,6 +14,7 @@ var Junkai = (() => {
   // ===== utility =====
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const LS_KEY = (c) => `junkai:city:${c}`; 
+  const LS_FILTER_KEY = (c) => `junkai:filter:${c}`;
 
   // JSTでの日付文字列(YYYY-MM-DD)を取得する
   function getTodayJST() {
@@ -64,7 +65,7 @@ var Junkai = (() => {
 
   // ===== 設定処理 =====
 
-  // 1. ローカルキャッシュのみ読み込む（起動用・通信なし）
+  // 1. ローカルキャッシュのみ読み込む(起動用・通信なし)
   function loadLocalConfig() {
     const cached = localStorage.getItem(LS_CONFIG_KEY);
     if (cached) {
@@ -79,7 +80,7 @@ var Junkai = (() => {
     }
   }
 
-  // 2. GASから設定を強制更新する（初期同期ボタン用）
+  // 2. GASから設定を強制更新する(初期同期ボタン用)
   async function fetchRemoteConfig() {
     try {
       const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`);
@@ -93,6 +94,74 @@ var Junkai = (() => {
       throw new Error("設定の取得に失敗しました");
     }
     return false;
+  }
+
+  // ===== フィルタ機能 =====
+
+  // デフォルトフィルタ設定
+  function getDefaultFilter() {
+    return {
+      standby: true,      // 未巡回
+      stop: true,         // 停止
+      skip: false,        // 不要
+      "7days_rule": false, // 7days_rule
+      checked: false      // チェック済み
+    };
+  }
+
+  // フィルタ設定の読み込み
+  function loadFilter(city) {
+    try {
+      const saved = localStorage.getItem(LS_FILTER_KEY(city));
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch(e) {
+      console.warn("Filter load failed", e);
+    }
+    return getDefaultFilter();
+  }
+
+  // フィルタ設定の保存
+  function saveFilter(city, filter) {
+    localStorage.setItem(LS_FILTER_KEY(city), JSON.stringify(filter));
+  }
+
+  // フィルタラベル生成
+  function getFilterLabel(filter) {
+    const labels = [];
+    if (filter.standby) labels.push("未");
+    if (filter.stop) labels.push("停");
+    if (filter.skip) labels.push("不");
+    if (filter["7days_rule"]) labels.push("7");
+    if (filter.checked) labels.push("済");
+    
+    if (labels.length === 0) return "なし";
+    return labels.join("・");
+  }
+
+  // レコードがフィルタ条件に合致するか判定
+  function matchesFilter(rec, filter) {
+    // チェック済みの判定
+    if (rec.checked) {
+      return filter.checked === true;
+    }
+    
+    // ステータスによる判定
+    const status = rec.status || "";
+    
+    if (status === "stop") {
+      return filter.stop === true;
+    }
+    if (status === "skip") {
+      return filter.skip === true;
+    }
+    if (status === "7days_rule") {
+      return filter["7days_rule"] === true;
+    }
+    
+    // 通常(standby)
+    return filter.standby === true;
   }
 
   // ===== インデックス画面構築 =====
@@ -234,7 +303,7 @@ var Junkai = (() => {
 
   // ===== Pull (ログ取込) 機能 =====
   async function execPullLog() {
-    const ok = confirm("【Pull】inspectionlogの内容をアプリに反映しますか？\n（追加・更新・削除・状態変更が反映されます）");
+    const ok = confirm("【Pull】inspectionlogの内容をアプリに反映しますか？\n(追加・更新・削除・状態変更が反映されます)");
     if (!ok) return;
 
     try {
@@ -298,7 +367,7 @@ var Junkai = (() => {
           }
 
           if (targetRow) {
-            // ■既存更新
+            // ■ 既存更新
             if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) {
                 targetRow.checked = newChecked;
                 targetRow.status = newStatus;
@@ -307,7 +376,7 @@ var Junkai = (() => {
                 updatedCount++;
             }
           } else {
-            // ■新規追加
+            // ■ 新規追加
             const newRec = {
               city:    cfg.name,
               station: logRow.station,
@@ -361,7 +430,7 @@ var Junkai = (() => {
     const btn = document.getElementById("syncBtn");
     if (btn) {
       btn.addEventListener("click", async () => {
-        const ok = confirm("【注意】初期同期を実行します。\n現在のアプリ内のデータは全てリセットされます。\nよろしいですか？");
+        const ok = confirm("【注意】初期同期を実行します。\n現在のアプリ内のデータは全てリセットされます。\nよろしいですか?");
         if (!ok) return;
 
         try {
@@ -508,150 +577,221 @@ var Junkai = (() => {
     const hint = document.getElementById("hint");
     if (!list || !hint) return;
 
-    const arr = readCity(cityName);
-    list.innerHTML = "";
+    // フィルタ設定の読み込み
+    let currentFilter = loadFilter(cityName);
 
-    if (arr.length === 0) {
-      hint.textContent = "データなし";
-      return;
+    // フィルタボタンの設定
+    const filterBtn = document.getElementById("filterBtn");
+    const filterModal = document.getElementById("filterModal");
+    const filterApply = document.getElementById("filterApply");
+    const filterCancel = document.getElementById("filterCancel");
+
+    function updateFilterButton() {
+      if (filterBtn) {
+        filterBtn.textContent = `フィルタ: ${getFilterLabel(currentFilter)} ▼`;
+      }
     }
 
-    hint.textContent = `件数：${arr.length}`;
+    function renderList() {
+      const arr = readCity(cityName);
+      list.innerHTML = "";
 
-    for (const rec of arr) {
-      const row = document.createElement("div");
-      row.className = `row ${rowBg(rec)}`;
-
-      // 左カラム
-      const left = document.createElement("div");
-      left.className = "leftcol";
-      const topLeft = document.createElement("div");
-      topLeft.className = "left-top";
-      const idxDiv = document.createElement("div");
-      idxDiv.className = "idx";
-      idxDiv.textContent = rec.ui_index || "";
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.className = "chk";
-      chk.checked = !!rec.checked;
-      topLeft.appendChild(idxDiv);
-      topLeft.appendChild(chk);
-
-      const dtDiv = document.createElement("div");
-      dtDiv.className = "datetime";
-      const dateInput = document.createElement("input");
-      dateInput.type = "date";
-      dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
-
-      function updateDateTime() {
-        if (rec.last_inspected_at) {
-          let d = new Date(rec.last_inspected_at);
-          if (Number.isFinite(d.getTime())) {
-            const yyyy = String(d.getFullYear());
-            const mm = String(d.getMonth() + 1).padStart(2, "0");
-            const dd = String(d.getDate()).padStart(2, "0");
-            dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
-            dtDiv.style.display = "";
-            dateInput.value = `${yyyy}-${mm}-${dd}`;
-            return;
-          }
-        }
-        dtDiv.innerHTML = "";
-        dtDiv.style.display = "none";
-        dateInput.value = "";
+      if (arr.length === 0) {
+        hint.textContent = "データなし";
+        return;
       }
-      updateDateTime();
 
-      dtDiv.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!rec.checked) return;
-        try { dateInput.focus(); dateInput.showPicker(); } catch (err) { dateInput.click(); }
-      });
-      dateInput.addEventListener("change", () => {
-        if (!dateInput.value) return; 
-        if (confirm("日付を変更しますか？")) {
-          rec.last_inspected_at = dateInput.value;
-          updateDateTime();
-          persistCityRec(cityName, rec);
-          syncInspectionAll(); 
-        }
-      });
+      // フィルタリング適用
+      const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter));
 
-      left.appendChild(topLeft);
-      left.appendChild(dtDiv);
-      left.appendChild(dateInput);
+      hint.textContent = `件数：${filteredArr.length} / ${arr.length}`;
 
-      chk.addEventListener("change", () => {
-        if (!confirm(chk.checked ? "チェックしますか？" : "外しますか？")) {
-          chk.checked = !chk.checked;
-          return;
-        }
-        if (chk.checked) {
-          rec.checked = true;
-          // JSTの日付文字列を取得
-          rec.last_inspected_at = getTodayJST();
-        } else {
-          rec.checked = false;
-          rec.last_inspected_at = "";
+      for (const rec of filteredArr) {
+        const row = document.createElement("div");
+        row.className = `row ${rowBg(rec)}`;
+
+        // 左カラム
+        const left = document.createElement("div");
+        left.className = "leftcol";
+        const topLeft = document.createElement("div");
+        topLeft.className = "left-top";
+        const idxDiv = document.createElement("div");
+        idxDiv.className = "idx";
+        idxDiv.textContent = rec.ui_index || "";
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.className = "chk";
+        chk.checked = !!rec.checked;
+        topLeft.appendChild(idxDiv);
+        topLeft.appendChild(chk);
+
+        const dtDiv = document.createElement("div");
+        dtDiv.className = "datetime";
+        const dateInput = document.createElement("input");
+        dateInput.type = "date";
+        dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
+
+        function updateDateTime() {
+          if (rec.last_inspected_at) {
+            let d = new Date(rec.last_inspected_at);
+            if (Number.isFinite(d.getTime())) {
+              const yyyy = String(d.getFullYear());
+              const mm = String(d.getMonth() + 1).padStart(2, "0");
+              const dd = String(d.getDate()).padStart(2, "0");
+              dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
+              dtDiv.style.display = "";
+              dateInput.value = `${yyyy}-${mm}-${dd}`;
+              return;
+            }
+          }
+          dtDiv.innerHTML = "";
+          dtDiv.style.display = "none";
+          dateInput.value = "";
         }
         updateDateTime();
-        row.className = `row ${rowBg(rec)}`;
-        persistCityRec(cityName, rec);
-        syncInspectionAll();
-      });
 
-      // 中央
-      const mid = document.createElement("div");
-      mid.className = "mid";
-      const title = document.createElement("div");
-      title.className = "title";
-      title.textContent = rec.station || "";
-      const sub = document.createElement("div");
-      sub.className = "sub";
-      sub.innerHTML = `${rec.model || ""}<br>${rec.plate || ""}`;
-      mid.appendChild(title);
-      mid.appendChild(sub);
-
-      // 右カラム
-      const right = document.createElement("div");
-      right.className = "rightcol";
-      const sel = document.createElement("select");
-      sel.className = "state";
-      const statusOptions = [["", "通常"], ["stop", "停止"], ["skip", "不要"]];
-      for (const [value, label] of statusOptions) {
-        const o = document.createElement("option");
-        o.value = value;
-        o.textContent = label;
-        if ((rec.status || "") === value) o.selected = true;
-        sel.appendChild(o);
-      }
-      sel.addEventListener("change", () => {
-        rec.status = sel.value;
-        row.className = `row ${rowBg(rec)}`;
-        persistCityRec(cityName, rec);
-        syncInspectionAll();
-      });
-
-      const tireBtn = document.createElement("button");
-      tireBtn.className = "tire-btn";
-      tireBtn.textContent = "点検";
-      tireBtn.addEventListener("click", () => {
-        const params = new URLSearchParams({
-          station:    rec.station || "",
-          model:      rec.model   || "",
-          plate_full: rec.plate   || ""
+        dtDiv.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!rec.checked) return;
+          try { dateInput.focus(); dateInput.showPicker(); } catch (err) { dateInput.click(); }
         });
-        location.href = `${TIRE_APP_URL}?${params.toString()}`;
-      });
+        dateInput.addEventListener("change", () => {
+          if (!dateInput.value) return; 
+          if (confirm("日付を変更しますか?")) {
+            rec.last_inspected_at = dateInput.value;
+            updateDateTime();
+            persistCityRec(cityName, rec);
+            syncInspectionAll(); 
+          }
+        });
 
-      right.appendChild(sel);
-      right.appendChild(tireBtn);
+        left.appendChild(topLeft);
+        left.appendChild(dtDiv);
+        left.appendChild(dateInput);
 
-      row.appendChild(left);
-      row.appendChild(mid);
-      row.appendChild(right);
-      list.appendChild(row);
+        chk.addEventListener("change", () => {
+          if (!confirm(chk.checked ? "チェックしますか?" : "外しますか?")) {
+            chk.checked = !chk.checked;
+            return;
+          }
+          if (chk.checked) {
+            rec.checked = true;
+            // JSTの日付文字列を取得
+            rec.last_inspected_at = getTodayJST();
+          } else {
+            rec.checked = false;
+            rec.last_inspected_at = "";
+          }
+          updateDateTime();
+          row.className = `row ${rowBg(rec)}`;
+          persistCityRec(cityName, rec);
+          syncInspectionAll();
+          renderList(); // フィルタ再適用のため再描画
+        });
+
+        // 中央
+        const mid = document.createElement("div");
+        mid.className = "mid";
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = rec.station || "";
+        const sub = document.createElement("div");
+        sub.className = "sub";
+        sub.innerHTML = `${rec.model || ""}<br>${rec.plate || ""}`;
+        mid.appendChild(title);
+        mid.appendChild(sub);
+
+        // 右カラム
+        const right = document.createElement("div");
+        right.className = "rightcol";
+        const sel = document.createElement("select");
+        sel.className = "state";
+        const statusOptions = [["", "通常"], ["stop", "停止"], ["skip", "不要"]];
+        for (const [value, label] of statusOptions) {
+          const o = document.createElement("option");
+          o.value = value;
+          o.textContent = label;
+          if ((rec.status || "") === value) o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener("change", () => {
+          rec.status = sel.value;
+          row.className = `row ${rowBg(rec)}`;
+          persistCityRec(cityName, rec);
+          syncInspectionAll();
+          renderList(); // フィルタ再適用のため再描画
+        });
+
+        const tireBtn = document.createElement("button");
+        tireBtn.className = "tire-btn";
+        tireBtn.textContent = "点検";
+        tireBtn.addEventListener("click", () => {
+          const params = new URLSearchParams({
+            station:    rec.station || "",
+            model:      rec.model   || "",
+            plate_full: rec.plate   || ""
+          });
+          location.href = `${TIRE_APP_URL}?${params.toString()}`;
+        });
+
+        right.appendChild(sel);
+        right.appendChild(tireBtn);
+
+        row.appendChild(left);
+        row.appendChild(mid);
+        row.appendChild(right);
+        list.appendChild(row);
+      }
     }
+
+    // フィルタボタンクリック
+    if (filterBtn && filterModal) {
+      filterBtn.addEventListener("click", () => {
+        // チェックボックスの状態をフィルタ設定に合わせる
+        document.getElementById("filter_standby").checked = currentFilter.standby;
+        document.getElementById("filter_stop").checked = currentFilter.stop;
+        document.getElementById("filter_skip").checked = currentFilter.skip;
+        document.getElementById("filter_7days").checked = currentFilter["7days_rule"];
+        document.getElementById("filter_checked").checked = currentFilter.checked;
+        
+        filterModal.classList.add("show");
+      });
+    }
+
+    // フィルタ適用
+    if (filterApply) {
+      filterApply.addEventListener("click", () => {
+        currentFilter.standby = document.getElementById("filter_standby").checked;
+        currentFilter.stop = document.getElementById("filter_stop").checked;
+        currentFilter.skip = document.getElementById("filter_skip").checked;
+        currentFilter["7days_rule"] = document.getElementById("filter_7days").checked;
+        currentFilter.checked = document.getElementById("filter_checked").checked;
+        
+        saveFilter(cityName, currentFilter);
+        updateFilterButton();
+        filterModal.classList.remove("show");
+        renderList();
+      });
+    }
+
+    // フィルタキャンセル
+    if (filterCancel) {
+      filterCancel.addEventListener("click", () => {
+        filterModal.classList.remove("show");
+      });
+    }
+
+    // モーダル外クリックで閉じる
+    if (filterModal) {
+      filterModal.addEventListener("click", (e) => {
+        if (e.target === filterModal) {
+          filterModal.classList.remove("show");
+        }
+      });
+    }
+
+    updateFilterButton();
+    renderList();
   }
 
   return { initIndex, initCity };
