@@ -13,17 +13,19 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s4d"; /* 数値拡大版 */
+  --app-version:"s5a"; /* フィルタ機能追加版 */
 }
 
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;}
 
 /* App Bar */
-.appbar{position:sticky;top:0;z-index:20;background:#020617;border-bottom:1px solid #111827;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;}
+.appbar{position:sticky;top:0;z-index:20;background:#020617;border-bottom:1px solid #111827;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px;}
 .appbar .title{font-weight:800;letter-spacing:.02em;font-size:20px;}
-.btn{appearance:none;border:1px solid var(--line);background:#020617;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;color:var(--fg);}
+.appbar .btns{display:flex;gap:8px;}
+.btn{appearance:none;border:1px solid var(--line);background:#020617;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;color:var(--fg);cursor:pointer;white-space:nowrap;}
 .btn.primary{background:#0f172a;border-color:#1d4ed8;color:#bfdbfe;}
+.btn:hover{background:#0f172a;}
 
 /* iPhone対応：全体マージン */
 .wrap{max-width:940px;margin:8px auto;padding:0 8px 60px;}
@@ -41,10 +43,10 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 /* カード内タイトル */
 .cardlink h2 { margin: 0; font-size: 16px; line-height: 1.3; }
 
-/* メタ情報（チップコンテナ） */
+/* メタ情報(チップコンテナ) */
 .meta{display:flex;gap:4px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:6px;}
 
-/* ★修正: チップと数値のサイズアップ */
+/* チップと数値のサイズアップ */
 .chip {
   display:inline-flex;
   align-items:center;
@@ -52,16 +54,16 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
   background:#111827;
   border:1px solid var(--line);
   border-radius:999px;
-  padding:2px 6px;      /* 少し余裕を持たせる */
+  padding:2px 6px;
   color:var(--muted);
-  font-size:11px;       /* ラベル(済/停など)を少し大きく */
-  height:24px;          /* 高さ確保 */
+  font-size:11px;
+  height:24px;
 }
 .chip span {
   font-weight:700;
-  color:#f3f4f6;        /* より明るい白に */
-  font-size:13px;       /* 数値を明確に大きく */
-  letter-spacing: -0.5px; /* 数字が間延びしないように */
+  color:#f3f4f6;
+  font-size:13px;
+  letter-spacing: -0.5px;
 }
 
 .empty{color:var(--muted);font-size:14px;margin-top:10px;}
@@ -72,6 +74,16 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 .dialog{width:min(480px,90vw);background:#020617;color:#fff;border-radius:12px;padding:16px 14px;border:1px solid #111827;}
 .barwrap{height:8px;background:#020617;border-radius:999px;overflow:hidden;margin-top:10px;border:1px solid #1f2937;}
 .bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399);}
+
+/* フィルタモーダル用スタイル */
+.filter-dialog{width:min(360px,90vw);background:#020617;color:#fff;border-radius:12px;padding:20px;border:1px solid #111827;}
+.filter-dialog h3{margin:0 0 16px 0;font-size:16px;font-weight:700;}
+.filter-options{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
+.filter-option{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0f172a;border:1px solid var(--line);border-radius:8px;}
+.filter-option input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:#38bdf8;}
+.filter-option label{font-size:14px;cursor:pointer;flex:1;}
+.filter-actions{display:flex;gap:10px;justify-content:flex-end;}
+.filter-actions .btn{min-width:80px;}
 
 /* リスト */
 .list{display:flex;flex-direction:column;gap:8px;}
@@ -88,8 +100,9 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 .row .sub{color:#cbd5f5;white-space:normal;line-height:1.1;font-size:12px;}
 
 .rightcol{display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
-.state{padding:4px 6px;border:1px solid var(--line);border-radius:10px;background:#020617;color:var(--fg);font-size:13px;}
-.btn.tiny{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid var(--line);background:#020617;color:var(--fg);}
+.state{padding:4px 6px;border:1px solid var(--line);border-radius:10px;background:#020617;color:var(--fg);font-size:13px;cursor:pointer;}
+.tire-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid var(--line);background:#020617;color:var(--fg);cursor:pointer;font-weight:700;}
+.tire-btn:hover{background:#0f172a;}
 
 /* 背景色 */
 .bg-green{background:var(--card);border:1px solid var(--green);}
@@ -110,4 +123,5 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 .version-label::before{content:"ver ";}
 .version-label::after{content:var(--app-version);}
 
-}
+/* チェックボックス */
+.chk{width:18px;height:18px;cursor:pointer;accent-color:#38bdf8;}
