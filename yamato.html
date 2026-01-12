@@ -4,12 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>エリア詳細</title>
-  <link rel="stylesheet" href="style.css?v=s3b" />
+  <link rel="stylesheet" href="style.css?v=s5a" />
 </head>
 <body>
   
   <header class="appbar">
     <button class="btn" onclick="location.href='index.html'">← 戻る</button>
+    <button id="filterBtn" class="btn">フィルタ ▼</button>
     <div class="title" style="font-size:16px;">エリア詳細</div>
   </header>
 
@@ -19,9 +20,41 @@
     <div id="list" class="list"></div>
   </main>
 
-  <script src="app.js?v=s3b"></script>
+  <!-- フィルタモーダル -->
+  <div id="filterModal" class="modal" aria-hidden="true">
+    <div class="filter-dialog">
+      <h3>表示する項目</h3>
+      <div class="filter-options">
+        <div class="filter-option">
+          <input type="checkbox" id="filter_standby" />
+          <label for="filter_standby">未巡回(standby)</label>
+        </div>
+        <div class="filter-option">
+          <input type="checkbox" id="filter_stop" />
+          <label for="filter_stop">停止(stop)</label>
+        </div>
+        <div class="filter-option">
+          <input type="checkbox" id="filter_skip" />
+          <label for="filter_skip">不要(skip)</label>
+        </div>
+        <div class="filter-option">
+          <input type="checkbox" id="filter_7days" />
+          <label for="filter_7days">7days_rule</label>
+        </div>
+        <div class="filter-option">
+          <input type="checkbox" id="filter_checked" />
+          <label for="filter_checked">チェック済み</label>
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button id="filterCancel" class="btn">キャンセル</button>
+        <button id="filterApply" class="btn primary">適用</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=s5a"></script>
   <script>
-    // ▼▼▼ ここを各ファイルのSlug（yamato, ebina, tama）に書き換えてください ▼▼▼
     Junkai.initCity('yamato');
   </script>
   
