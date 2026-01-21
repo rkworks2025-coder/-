@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s5a (フィルタ機能追加版)
+// version: s5b (7days判定修正版)
 
 var Junkai = (() => {
 
@@ -149,7 +149,6 @@ var Junkai = (() => {
     
     // ステータスによる判定
     const status = rec.status || "";
-    
     if (status === "stop") {
       return filter.stop === true;
     }
@@ -199,7 +198,6 @@ var Junkai = (() => {
         <span class="chip">総 <span id="${slug}-total">0</span></span>
         <span class="chip">残 <span id="${slug}-rem">0</span></span>
       `;
-
       a.appendChild(h2);
       a.appendChild(meta);
       container.appendChild(a);
@@ -217,7 +215,8 @@ var Junkai = (() => {
       if (!s) return [];
       const a = JSON.parse(s);
       return Array.isArray(a) ? a : [];
-    } catch (_) { return []; }
+    } catch (_) { return [];
+    }
   }
 
   function applyUIIndex(city, arr) {
@@ -262,7 +261,6 @@ var Junkai = (() => {
 
   function repaintCounters() {
     let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
-
     appConfig.forEach(cfg => {
       const city = cfg.name; 
       const slug = cfg.slug; 
@@ -282,7 +280,6 @@ var Junkai = (() => {
         document.getElementById(`${slug}-rem`).textContent = (cnt.total - cnt.done - cnt.skip);
       }
     });
-
     const allDoneEl  = document.querySelector("#all-done");
     const allStopEl  = document.querySelector("#all-stop");
     const allSkipEl  = document.querySelector("#all-skip");
@@ -330,7 +327,6 @@ var Junkai = (() => {
         let isCityModified = false;
 
         const cityLogs = logRows.filter(r => r.city === cfg.name);
-        
         // 削除処理
         const validPlates = cityLogs.map(r => r.plate);
         const preCount = cityData.length;
@@ -356,7 +352,7 @@ var Junkai = (() => {
           } else if (s === "stop" || s === "stopped" || s === "停止") {
              newStatus = "stop";
           } else if (s === "skip" || s === "unnecessary" || s === "不要") {
-             newStatus = "skip";
+              newStatus = "skip";
           } else if (s === "7days_rule") {
              newStatus = "7days_rule"; 
           }
@@ -395,7 +391,6 @@ var Junkai = (() => {
             addedCount++;
           }
         });
-
         if (isCityModified) {
           applyUIIndex(cfg.name, cityData);
           saveCity(cfg.name, cityData);
@@ -417,15 +412,13 @@ var Junkai = (() => {
 
   // ===== index.html 用：初期同期 =====
   async function initIndex() {
-    loadLocalConfig(); 
-    
+    loadLocalConfig();
     // 画面構築
     if(document.getElementById("city-list-container")) {
        renderIndexButtons();
        repaintCounters();
     }
-    statusText(""); 
-
+    statusText("");
     // 初期同期ボタン
     const btn = document.getElementById("syncBtn");
     if (btn) {
@@ -509,7 +502,6 @@ var Junkai = (() => {
       const arr = readCity(cfg.name);
       for (const rec of arr) all.push(rec);
     });
-    
     try {
       const h=document.getElementById("hint");
       if(h) h.textContent="送信中...";
@@ -538,11 +530,9 @@ var Junkai = (() => {
 
   function rowBg(rec) {
     if (rec.checked) return "bg-pink";
-    if (rec.status === "7days_rule") return "bg-blue"; 
-    
+    if (rec.status === "7days_rule") return "bg-blue";
     if (rec.status === "stop") return "bg-gray";
     if (rec.status === "skip") return "bg-yellow";
-    if (within7d(rec.last_inspected_at)) return "bg-blue";
     return "bg-green";
   }
 
@@ -579,7 +569,6 @@ var Junkai = (() => {
 
     // フィルタ設定の読み込み
     let currentFilter = loadFilter(cityName);
-
     // フィルタボタンの設定
     const filterBtn = document.getElementById("filterBtn");
     const filterModal = document.getElementById("filterModal");
@@ -603,7 +592,6 @@ var Junkai = (() => {
 
       // フィルタリング適用
       const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter));
-
       hint.textContent = `件数：${filteredArr.length} / ${arr.length}`;
 
       for (const rec of filteredArr) {
@@ -630,7 +618,6 @@ var Junkai = (() => {
         const dateInput = document.createElement("input");
         dateInput.type = "date";
         dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
-
         function updateDateTime() {
           if (rec.last_inspected_at) {
             let d = new Date(rec.last_inspected_at);
@@ -649,7 +636,6 @@ var Junkai = (() => {
           dateInput.value = "";
         }
         updateDateTime();
-
         dtDiv.addEventListener("click", (e) => {
           e.stopPropagation();
           if (!rec.checked) return;
@@ -664,7 +650,6 @@ var Junkai = (() => {
             syncInspectionAll(); 
           }
         });
-
         left.appendChild(topLeft);
         left.appendChild(dtDiv);
         left.appendChild(dateInput);
@@ -688,7 +673,6 @@ var Junkai = (() => {
           syncInspectionAll();
           renderList(); // フィルタ再適用のため再描画
         });
-
         // 中央
         const mid = document.createElement("div");
         mid.className = "mid";
@@ -721,7 +705,6 @@ var Junkai = (() => {
           syncInspectionAll();
           renderList(); // フィルタ再適用のため再描画
         });
-
         const tireBtn = document.createElement("button");
         tireBtn.className = "tire-btn";
         tireBtn.textContent = "点検";
