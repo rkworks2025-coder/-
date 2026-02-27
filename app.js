@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s5b (7days判定修正版)
+// version: s6a (TMA自動入力連携追加版)
 
 var Junkai = (() => {
 
@@ -170,7 +170,7 @@ var Junkai = (() => {
     container.innerHTML = "";
 
     appConfig.forEach(cfg => {
-      // ホワイトリスト方式 (s4b仕様継承)
+      // ホワイトリスト方式
       const s = (cfg.status || "").trim();
       if (s !== "" && s !== "help") return;
 
@@ -344,7 +344,7 @@ var Junkai = (() => {
 
           // ステータス判定
           let newChecked = false;
-          let newStatus = ""; // デフォルトは通常(standby)
+          let newStatus = ""; 
           const s = (logRow.status || "").toLowerCase();
 
           if (s === "checked" || s === "完了" || s === "済") {
@@ -661,7 +661,6 @@ var Junkai = (() => {
           }
           if (chk.checked) {
             rec.checked = true;
-            // JSTの日付文字列を取得
             rec.last_inspected_at = getTodayJST();
           } else {
             rec.checked = false;
@@ -671,8 +670,9 @@ var Junkai = (() => {
           row.className = `row ${rowBg(rec)}`;
           persistCityRec(cityName, rec);
           syncInspectionAll();
-          renderList(); // フィルタ再適用のため再描画
+          renderList(); 
         });
+        
         // 中央
         const mid = document.createElement("div");
         mid.className = "mid";
@@ -703,8 +703,44 @@ var Junkai = (() => {
           row.className = `row ${rowBg(rec)}`;
           persistCityRec(cityName, rec);
           syncInspectionAll();
-          renderList(); // フィルタ再適用のため再描画
+          renderList(); 
         });
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "btn-group";
+
+        // 新設：TMAボタン
+        const tmaBtn = document.createElement("button");
+        tmaBtn.className = "tma-btn";
+        tmaBtn.textContent = "TMA";
+        tmaBtn.addEventListener("click", async () => {
+          if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？\n※タイヤのデータが未送信の場合は、先に点検アプリから送信してください。`)) return;
+          
+          try {
+            tmaBtn.disabled = true;
+            tmaBtn.textContent = "送信中";
+            
+            const res = await fetch(`${GAS_URL}?action=triggerTMA`, {
+              method: "POST",
+              body: JSON.stringify({ plate: rec.plate })
+            });
+            const json = await res.json();
+            
+            if(json.ok) {
+              alert(`【${rec.plate}】の自動入力命令を送信しました。\n結果はDiscordで確認してください。`);
+            } else {
+              alert("エラーが発生しました: " + (json.error || "自動入力命令に失敗しました"));
+            }
+          } catch(e) {
+            console.error(e);
+            alert("通信エラー: GASとの接続に失敗しました");
+          } finally {
+            tmaBtn.disabled = false;
+            tmaBtn.textContent = "TMA";
+          }
+        });
+
+        // 既存：点検ボタン
         const tireBtn = document.createElement("button");
         tireBtn.className = "tire-btn";
         tireBtn.textContent = "点検";
@@ -717,8 +753,11 @@ var Junkai = (() => {
           location.href = `${TIRE_APP_URL}?${params.toString()}`;
         });
 
+        btnGroup.appendChild(tmaBtn);
+        btnGroup.appendChild(tireBtn);
+
         right.appendChild(sel);
-        right.appendChild(tireBtn);
+        right.appendChild(btnGroup);
 
         row.appendChild(left);
         row.appendChild(mid);
@@ -730,7 +769,6 @@ var Junkai = (() => {
     // フィルタボタンクリック
     if (filterBtn && filterModal) {
       filterBtn.addEventListener("click", () => {
-        // チェックボックスの状態をフィルタ設定に合わせる
         document.getElementById("filter_standby").checked = currentFilter.standby;
         document.getElementById("filter_stop").checked = currentFilter.stop;
         document.getElementById("filter_skip").checked = currentFilter.skip;
