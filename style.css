@@ -13,7 +13,7 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s5a"; /* フィルタ機能追加版 */
+  --app-version:"s6a"; /* TMA自動入力連携追加版 */
 }
 
 *{box-sizing:border-box;}
@@ -101,8 +101,17 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 
 .rightcol{display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
 .state{padding:4px 6px;border:1px solid var(--line);border-radius:10px;background:#020617;color:var(--fg);font-size:13px;cursor:pointer;}
+
+.btn-group{display:flex;gap:4px;}
+
+/* タイヤ点検ボタン */
 .tire-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid var(--line);background:#020617;color:var(--fg);cursor:pointer;font-weight:700;}
 .tire-btn:hover{background:#0f172a;}
+
+/* TMAボタン */
+.tma-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid #1d4ed8;background:#1e3a8a;color:#bfdbfe;cursor:pointer;font-weight:700;}
+.tma-btn:hover{background:#1e40af;}
+.tma-btn:disabled{background:#374151;border-color:#4b5563;color:#9ca3af;cursor:not-allowed;}
 
 /* 背景色 */
 .bg-green{background:var(--card);border:1px solid var(--green);}
