@@ -13,7 +13,7 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s6a"; /* TMA自動入力連携追加版 */
+  --app-version:"s6b"; /* TMAボタンUI修正版 */
 }
 
 *{box-sizing:border-box;}
@@ -108,10 +108,10 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 .tire-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid var(--line);background:#020617;color:var(--fg);cursor:pointer;font-weight:700;}
 .tire-btn:hover{background:#0f172a;}
 
-/* TMAボタン */
-.tma-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid #1d4ed8;background:#1e3a8a;color:#bfdbfe;cursor:pointer;font-weight:700;}
-.tma-btn:hover{background:#1e40af;}
-.tma-btn:disabled{background:#374151;border-color:#4b5563;color:#9ca3af;cursor:not-allowed;}
+/* TMAボタン (ダークUI調和・アウトライン型) */
+.tma-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid #0d9488;background:#020617;color:#2dd4bf;cursor:pointer;font-weight:700;}
+.tma-btn:hover{background:#0f172a;border-color:#14b8a6;color:#5eead4;}
+.tma-btn:disabled{background:#020617;border-color:#374151;color:#4b5563;cursor:not-allowed;}
 
 /* 背景色 */
 .bg-green{background:var(--card);border:1px solid var(--green);}
