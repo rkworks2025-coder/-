@@ -352,7 +352,7 @@ var Junkai = (() => {
           } else if (s === "stop" || s === "stopped" || s === "停止") {
              newStatus = "stop";
           } else if (s === "skip" || s === "unnecessary" || s === "不要") {
-              newStatus = "skip";
+             newStatus = "skip";
           } else if (s === "7days_rule") {
              newStatus = "7days_rule"; 
           }
@@ -672,7 +672,6 @@ var Junkai = (() => {
           syncInspectionAll();
           renderList(); 
         });
-        
         // 中央
         const mid = document.createElement("div");
         mid.className = "mid";
@@ -705,7 +704,6 @@ var Junkai = (() => {
           syncInspectionAll();
           renderList(); 
         });
-
         const btnGroup = document.createElement("div");
         btnGroup.className = "btn-group";
 
@@ -720,10 +718,15 @@ var Junkai = (() => {
             tmaBtn.disabled = true;
             tmaBtn.textContent = "送信中";
             
+            // ▼▼▼ 修正箇所：GAS側が e.parameter.json で受け取れるように形式を変更し、"mode": "tma" を追加 ▼▼▼
+            const payload = { plate: rec.plate, mode: "tma" };
             const res = await fetch(`${GAS_URL}?action=triggerTMA`, {
               method: "POST",
-              body: JSON.stringify({ plate: rec.plate })
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: "json=" + encodeURIComponent(JSON.stringify(payload))
             });
+            // ▲▲▲
+            
             const json = await res.json();
             
             if(json.ok) {
@@ -739,7 +742,6 @@ var Junkai = (() => {
             tmaBtn.textContent = "TMA";
           }
         });
-
         // 既存：点検ボタン
         const tireBtn = document.createElement("button");
         tireBtn.className = "tire-btn";
