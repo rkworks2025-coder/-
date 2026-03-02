@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s6d (作業管理アプリ連携追加版)
+// version: s6e (作業管理アプリ連携＆自動チェック＆爆速化)
 
 var Junkai = (() => {
 
@@ -623,6 +623,10 @@ var Junkai = (() => {
         chk.type = "checkbox";
         chk.className = "chk";
         chk.checked = !!rec.checked;
+        
+        // ▼▼▼ 自動チェック機構用にナンバーをセット ▼▼▼
+        chk.dataset.plate = rec.plate; 
+        
         topLeft.appendChild(idxDiv);
         topLeft.appendChild(chk);
 
@@ -722,47 +726,34 @@ var Junkai = (() => {
         const btnGroup = document.createElement("div");
         btnGroup.className = "btn-group";
 
-        // 新設：TMAボタン
+        // ▼▼▼ 修正：TMAボタン（非同期送信＆即時遷移） ▼▼▼
         const tmaBtn = document.createElement("button");
         tmaBtn.className = "tma-btn";
         tmaBtn.textContent = "TMA";
-        tmaBtn.addEventListener("click", async () => {
+        tmaBtn.addEventListener("click", () => {
           if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？\n※タイヤのデータが未送信の場合は、先に点検アプリから送信してください。`)) return;
           
-          try {
-            tmaBtn.disabled = true;
-            tmaBtn.textContent = "送信中";
-            
-            // ▼▼▼ 修正箇所：GASの仕様に合わせて純粋なJSON文字列として送信するように変更 ▼▼▼
-            const payload = { plate: rec.plate, mode: "tma" };
-            const res = await fetch(`${GAS_URL}?action=triggerTMA`, {
-              method: "POST",
-              body: JSON.stringify(payload)
-            });
-            // ▲▲▲
-            
-            const json = await res.json();
-            
-            if(json.ok) {
-              alert(`【${rec.plate}】の自動入力命令を送信しました。\n結果はDiscordで確認してください。`);
-   
-              const params = new URLSearchParams({
-                station:    rec.station || "",
-                model:      rec.model   || "",
-                plate_full: rec.plate   || ""
-              });
-              location.href = `${WORK_APP_URL}?${params.toString()}`;
-            } else {
-              alert("エラーが発生しました: " + (json.error || "自動入力命令に失敗しました"));
-            }
-          } catch(e) {
-            console.error(e);
-            alert("通信エラー: GASとの接続に失敗しました");
-          } finally {
-            tmaBtn.disabled = false;
-            tmaBtn.textContent = "TMA";
-          }
+          tmaBtn.disabled = true;
+          tmaBtn.textContent = "遷移中";
+          
+          // 裏側で送信だけ投げる (keepaliveで画面が変わっても通信を継続)
+          const payload = { plate: rec.plate, mode: "tma" };
+          fetch(`${GAS_URL}?action=triggerTMA`, {
+            method: "POST",
+            body: JSON.stringify(payload),
+            keepalive: true
+          }).catch(e => console.error("TMA trigger error:", e));
+          
+          // 待たずに即座に作業アプリへ遷移
+          const params = new URLSearchParams({
+            station:    rec.station || "",
+            model:      rec.model   || "",
+            plate_full: rec.plate   || ""
+          });
+          location.href = `${WORK_APP_URL}?${params.toString()}`;
         });
+        // ▲▲▲
+        
         // 既存：点検ボタン
         const tireBtn = document.createElement("button");
         tireBtn.className = "tire-btn";
@@ -838,6 +829,23 @@ var Junkai = (() => {
 
     updateFilterButton();
     renderList();
+
+    // ▼▼▼ 自動チェック機構 (作業管理アプリからの帰還時) ▼▼▼
+    setTimeout(() => {
+      try {
+        const compPlate = localStorage.getItem("junkai:completed_plate");
+        if (compPlate) {
+          localStorage.removeItem("junkai:completed_plate"); // 一度発火したら消す
+          const targetChk = document.querySelector(`input.chk[data-plate="${compPlate}"]`);
+          if (targetChk && !targetChk.checked) {
+            // 対象が見つかればスクロールして、自動でクリックをシミュレート
+            targetChk.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => targetChk.click(), 400); 
+          }
+        }
+      } catch(e) {}
+    }, 300);
+    // ▲▲▲
   }
 
   return { initIndex, initCity };
