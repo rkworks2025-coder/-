@@ -1,11 +1,12 @@
 // 巡回アプリ app.js
-// version: s6b (TMA自動入力連携追加版・タイヤアプリリンク変更)
+// version: s6c (作業管理アプリ連携追加版)
 
 var Junkai = (() => {
 
   // ===== 設定 =====
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
   const TIRE_APP_URL = "https://rkworks2025-coder.github.io/Tire_Check/";
+  const WORK_APP_URL = "https://rkworks2025-coder.github.io/work/";
   const LS_CONFIG_KEY = "junkai:config";
   const TIMEOUT_MS = 15000;
 
@@ -730,7 +731,15 @@ var Junkai = (() => {
             const json = await res.json();
             
             if(json.ok) {
+              // ▼▼▼ 変更箇所：alert後に作業管理アプリへ遷移 ▼▼▼
               alert(`【${rec.plate}】の自動入力命令を送信しました。\n結果はDiscordで確認してください。`);
+              const params = new URLSearchParams({
+                station:    rec.station || "",
+                model:      rec.model   || "",
+                plate_full: rec.plate   || ""
+              });
+              location.href = `${WORK_APP_URL}?${params.toString()}`;
+              // ▲▲▲
             } else {
               alert("エラーが発生しました: " + (json.error || "自動入力命令に失敗しました"));
             }
