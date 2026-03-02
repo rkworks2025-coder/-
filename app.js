@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s6e (作業管理アプリ連携＆自動チェック＆爆速化)
+// version: s6f (自動チェック強化・TMA自動発火追加)
 
 var Junkai = (() => {
 
@@ -63,6 +63,48 @@ var Junkai = (() => {
     }
     throw lastErr || new Error("fetch-fail");
   }
+
+  // ===== 戻り時の自動アクション (Bfcache対応) =====
+  function handleReturnActions() {
+    setTimeout(() => {
+      try {
+        // 1. 作業管理アプリからの戻り -> 自動チェック
+        const compPlate = localStorage.getItem("junkai:completed_plate");
+        if (compPlate) {
+          localStorage.removeItem("junkai:completed_plate"); 
+          const targetChk = document.querySelector(`input.chk[data-plate="${compPlate}"]`);
+          if (targetChk && !targetChk.checked) {
+            targetChk.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => targetChk.click(), 400); 
+          }
+        }
+
+        // 2. タイヤ点検アプリからの戻り -> TMAボタン自動発火
+        const tireCompPlate = localStorage.getItem("junkai:tire_completed_plate");
+        if (tireCompPlate) {
+          localStorage.removeItem("junkai:tire_completed_plate");
+          const targetChk = document.querySelector(`input.chk[data-plate="${tireCompPlate}"]`);
+          if (targetChk) {
+            const row = targetChk.closest('.row');
+            if (row) {
+              const tmaBtn = row.querySelector('.tma-btn');
+              if (tmaBtn && !tmaBtn.disabled) {
+                tmaBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => tmaBtn.click(), 400);
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    }, 300);
+  }
+
+  // スマホブラウザ等で「戻る」によりキャッシュから復元された時の強力なセンサー
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) {
+      handleReturnActions();
+    }
+  });
 
   // ===== 設定処理 =====
 
@@ -560,7 +602,6 @@ var Junkai = (() => {
   }
 
   async function initCity(cityKey) {
-    // 起動時：キャッシュのみを使用
     loadLocalConfig(); 
 
     let cityName = cityKey;
@@ -580,9 +621,7 @@ var Junkai = (() => {
     const hint = document.getElementById("hint");
     if (!list || !hint) return;
 
-    // フィルタ設定の読み込み
     let currentFilter = loadFilter(cityName);
-    // フィルタボタンの設定
     const filterBtn = document.getElementById("filterBtn");
     const filterModal = document.getElementById("filterModal");
     const filterApply = document.getElementById("filterApply");
@@ -603,7 +642,6 @@ var Junkai = (() => {
         return;
       }
 
-      // フィルタリング適用
       const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter));
       hint.textContent = `件数：${filteredArr.length} / ${arr.length}`;
 
@@ -624,7 +662,6 @@ var Junkai = (() => {
         chk.className = "chk";
         chk.checked = !!rec.checked;
         
-        // ▼▼▼ 自動チェック機構用にナンバーをセット ▼▼▼
         chk.dataset.plate = rec.plate; 
         
         topLeft.appendChild(idxDiv);
@@ -691,6 +728,7 @@ var Junkai = (() => {
         
           renderList(); 
         });
+        
         // 中央
         const mid = document.createElement("div");
         mid.className = "mid";
@@ -726,7 +764,6 @@ var Junkai = (() => {
         const btnGroup = document.createElement("div");
         btnGroup.className = "btn-group";
 
-        // ▼▼▼ 修正：TMAボタン（非同期送信＆即時遷移） ▼▼▼
         const tmaBtn = document.createElement("button");
         tmaBtn.className = "tma-btn";
         tmaBtn.textContent = "TMA";
@@ -736,7 +773,6 @@ var Junkai = (() => {
           tmaBtn.disabled = true;
           tmaBtn.textContent = "遷移中";
           
-          // 裏側で送信だけ投げる (keepaliveで画面が変わっても通信を継続)
           const payload = { plate: rec.plate, mode: "tma" };
           fetch(`${GAS_URL}?action=triggerTMA`, {
             method: "POST",
@@ -744,7 +780,6 @@ var Junkai = (() => {
             keepalive: true
           }).catch(e => console.error("TMA trigger error:", e));
           
-          // 待たずに即座に作業アプリへ遷移
           const params = new URLSearchParams({
             station:    rec.station || "",
             model:      rec.model   || "",
@@ -752,9 +787,7 @@ var Junkai = (() => {
           });
           location.href = `${WORK_APP_URL}?${params.toString()}`;
         });
-        // ▲▲▲
         
-        // 既存：点検ボタン
         const tireBtn = document.createElement("button");
         tireBtn.className = "tire-btn";
         tireBtn.textContent = "点検";
@@ -779,9 +812,11 @@ var Junkai = (() => {
         row.appendChild(right);
         list.appendChild(row);
       }
+      
+      // リスト描画直後にもアクションをチェック
+      handleReturnActions();
     }
 
-    // フィルタボタンクリック
     if (filterBtn && filterModal) {
       filterBtn.addEventListener("click", () => {
         document.getElementById("filter_standby").checked = currentFilter.standby;
@@ -794,7 +829,6 @@ var Junkai = (() => {
       });
     }
 
-    // フィルタ適用
     if (filterApply) {
       filterApply.addEventListener("click", () => {
         currentFilter.standby = document.getElementById("filter_standby").checked;
@@ -811,14 +845,12 @@ var Junkai = (() => {
       });
     }
 
-    // フィルタキャンセル
     if (filterCancel) {
       filterCancel.addEventListener("click", () => {
         filterModal.classList.remove("show");
       });
     }
 
-    // モーダル外クリックで閉じる
     if (filterModal) {
       filterModal.addEventListener("click", (e) => {
         if (e.target === filterModal) {
@@ -829,23 +861,6 @@ var Junkai = (() => {
 
     updateFilterButton();
     renderList();
-
-    // ▼▼▼ 自動チェック機構 (作業管理アプリからの帰還時) ▼▼▼
-    setTimeout(() => {
-      try {
-        const compPlate = localStorage.getItem("junkai:completed_plate");
-        if (compPlate) {
-          localStorage.removeItem("junkai:completed_plate"); // 一度発火したら消す
-          const targetChk = document.querySelector(`input.chk[data-plate="${compPlate}"]`);
-          if (targetChk && !targetChk.checked) {
-            // 対象が見つかればスクロールして、自動でクリックをシミュレート
-            targetChk.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setTimeout(() => targetChk.click(), 400); 
-          }
-        }
-      } catch(e) {}
-    }, 300);
-    // ▲▲▲
   }
 
   return { initIndex, initCity };
