@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s6a (作業管理アプリ連携追加版)
+// version: s6d (作業管理アプリ連携追加版)
 
 var Junkai = (() => {
 
@@ -733,20 +733,17 @@ var Junkai = (() => {
             tmaBtn.disabled = true;
             tmaBtn.textContent = "送信中";
             
-            // ▼▼▼ 修正箇所：GAS側が e.parameter.json で受け取れるように形式を変更し、"mode": "tma" を追加 ▼▼▼
+            // ▼▼▼ 修正箇所：GASの仕様に合わせて純粋なJSON文字列として送信するように変更 ▼▼▼
             const payload = { plate: rec.plate, mode: "tma" };
             const res = await fetch(`${GAS_URL}?action=triggerTMA`, {
               method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: "json=" + encodeURIComponent(JSON.stringify(payload))
-            
+              body: JSON.stringify(payload)
             });
             // ▲▲▲
             
             const json = await res.json();
             
             if(json.ok) {
-              // ▼▼▼ 変更箇所：alert後に作業管理アプリへ遷移 ▼▼▼
               alert(`【${rec.plate}】の自動入力命令を送信しました。\n結果はDiscordで確認してください。`);
    
               const params = new URLSearchParams({
@@ -755,7 +752,6 @@ var Junkai = (() => {
                 plate_full: rec.plate   || ""
               });
               location.href = `${WORK_APP_URL}?${params.toString()}`;
-            // ▲▲▲
             } else {
               alert("エラーが発生しました: " + (json.error || "自動入力命令に失敗しました"));
             }
