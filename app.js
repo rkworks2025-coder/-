@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s6f (自動チェック強化・TMA自動発火追加)
+// version: s6g (作業モード切替追加・チェックダイアログ車番表示)
 
 var Junkai = (() => {
 
@@ -79,18 +79,23 @@ var Junkai = (() => {
           }
         }
 
-        // 2. タイヤ点検アプリからの戻り -> TMAボタン自動発火
+        // 2. タイヤ点検アプリからの戻り -> 作業モード判定によるTMA自動発火
         const tireCompPlate = localStorage.getItem("junkai:tire_completed_plate");
         if (tireCompPlate) {
           localStorage.removeItem("junkai:tire_completed_plate");
-          const targetChk = document.querySelector(`input.chk[data-plate="${tireCompPlate}"]`);
-          if (targetChk) {
-            const row = targetChk.closest('.row');
-            if (row) {
-              const tmaBtn = row.querySelector('.tma-btn');
-              if (tmaBtn && !tmaBtn.disabled) {
-                tmaBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setTimeout(() => tmaBtn.click(), 400);
+          
+          // 作業モードを確認（連続モードなら自動発火しない）
+          const workMode = localStorage.getItem("junkai:work_mode") || "single";
+          if (workMode !== "continuous") {
+            const targetChk = document.querySelector(`input.chk[data-plate="${tireCompPlate}"]`);
+            if (targetChk) {
+              const row = targetChk.closest('.row');
+              if (row) {
+                const tmaBtn = row.querySelector('.tma-btn');
+                if (tmaBtn && !tmaBtn.disabled) {
+                  tmaBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  setTimeout(() => tmaBtn.click(), 400);
+                }
               }
             }
           }
@@ -467,6 +472,18 @@ var Junkai = (() => {
   // ===== index.html 用：初期同期 =====
   async function initIndex() {
     loadLocalConfig();
+    
+    // ▼ 作業モード切替UIの初期化
+    const workModeSelect = document.getElementById("workModeSelect");
+    if (workModeSelect) {
+      const savedMode = localStorage.getItem("junkai:work_mode") || "single";
+      workModeSelect.value = savedMode;
+      
+      workModeSelect.addEventListener("change", (e) => {
+        localStorage.setItem("junkai:work_mode", e.target.value);
+      });
+    }
+
     // 画面構築
     if(document.getElementById("city-list-container")) {
        renderIndexButtons();
@@ -708,8 +725,10 @@ var Junkai = (() => {
         left.appendChild(dtDiv);
         left.appendChild(dateInput);
 
+        // ▼ チェックボックス操作時のダイアログに車番（plate）を追加
         chk.addEventListener("change", () => {
-          if (!confirm(chk.checked ? "チェックしますか?" : "外しますか?")) {
+          const msg = `【${rec.plate || "不明"}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`;
+          if (!confirm(msg)) {
             chk.checked = !chk.checked;
             return;
           }
