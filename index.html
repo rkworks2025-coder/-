@@ -4,7 +4,34 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>巡回リスト</title>
-  <link rel="stylesheet" href="style.css?v=s6a" />
+  <link rel="stylesheet" href="style.css?v=s6g" />
+  <style>
+    /* 作業モードスイッチ用のスタイル */
+    .mode-switch-container {
+      background: #1a1a1a;
+      padding: 10px 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #333;
+    }
+    .mode-switch-label {
+      font-size: 15px;
+      font-weight: bold;
+      color: #eee;
+    }
+    .mode-switch-select {
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 15px;
+      outline: none;
+    }
+  </style>
 </head>
 <body>
   <header class="appbar">
@@ -16,6 +43,14 @@
   </header>
 
   <main class="wrap">
+    <div class="mode-switch-container">
+      <div class="mode-switch-label">作業モード</div>
+      <select id="workModeSelect" class="mode-switch-select">
+        <option value="single">単独 (TMA自動)</option>
+        <option value="continuous">連続 (TMA手動)</option>
+      </select>
+    </div>
+
     <p id="statusText" class="hint">GAS設定を読み込み中...</p>
 
     <section class="cards" id="city-list-container">
@@ -44,10 +79,10 @@
     </div>
   </div>
 
-  <script src="app.js?v=s6a"></script>
+  <script src="app.js?v=s6g"></script>
   <script>
     Junkai.initIndex();
   </script>
-  <div class="version-label"></div>
+  <div class="version-label">s6g</div>
 </body>
 </html>
