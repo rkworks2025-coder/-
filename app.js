@@ -3,593 +3,865 @@
 
 var Junkai = (() => {
 
-  // ===== 設定 ===== 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec"; [cite: 36]
-  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/Tire_Check/"; [cite: 36]
-  const WORK_APP_URL = "https://rkworks2025-coder.github.io/work/"; [cite: 36]
-  const LS_CONFIG_KEY = "junkai:config"; [cite: 36]
-  const TIMEOUT_MS = 15000; [cite: 36]
+  // ===== 設定 =====
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
+  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/Tire_Check/";
+  const WORK_APP_URL = "https://rkworks2025-coder.github.io/work/";
+  const LS_CONFIG_KEY = "junkai:config";
+  const TIMEOUT_MS = 15000;
 
-  let appConfig = []; [cite: 36]
+  let appConfig = []; 
 
-  // ===== utility ===== 
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms)); [cite: 36]
-  const LS_KEY = (c) => `junkai:city:${c}`; [cite: 36]
-  const LS_FILTER_KEY = (c) => `junkai:filter:${c}`; [cite: 36]
+  // ===== utility =====
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const LS_KEY = (c) => `junkai:city:${c}`; 
+  const LS_FILTER_KEY = (c) => `junkai:filter:${c}`;
 
-  function getTodayJST() { [cite: 36]
-    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }); [cite: 36]
-  } [cite: 36]
+  // JSTでの日付文字列(YYYY-MM-DD)を取得する
+  function getTodayJST() {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
+  }
 
-  function showProgress(on, pct) { [cite: 37]
-    const m = document.getElementById("progressModal"); [cite: 37]
-    const bar = document.getElementById("progressBar"); [cite: 37]
-    if (!m) return; [cite: 37]
-    if (on) m.classList.add("show"); [cite: 37]
-    else m.classList.remove("show"); [cite: 38]
-    if (bar && typeof pct === "number") { [cite: 38]
-      const v = Math.max(0, Math.min(100, pct)); [cite: 38]
-      bar.style.width = v + "%"; [cite: 39]
-      bar.setAttribute("aria-valuenow", v); [cite: 39]
-    } [cite: 39]
-  } [cite: 39]
+  function showProgress(on, pct) {
+    const m = document.getElementById("progressModal");
+    const bar = document.getElementById("progressBar");
+    if (!m) return;
+    if (on) m.classList.add("show");
+    else m.classList.remove("show");
+    if (bar && typeof pct === "number") {
+      const v = Math.max(0, Math.min(100, pct));
+      bar.style.width = v + "%";
+      bar.setAttribute("aria-valuenow", v);
+    }
+  }
 
-  function statusText(msg) { [cite: 39]
-    const el = document.getElementById("statusText"); [cite: 40]
-    if (el) el.textContent = msg; [cite: 40]
-  } [cite: 40]
+  function statusText(msg) {
+    const el = document.getElementById("statusText");
+    if (el) el.textContent = msg;
+  }
 
-  async function fetchJSONWithRetry(url, retry = 2) { [cite: 40]
-    let lastErr = null; [cite: 41]
-    for (let i = 0; i <= retry; i++) { [cite: 41]
-      try { [cite: 41]
-        const ctl = new AbortController(); [cite: 41]
-        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS); [cite: 42]
-        const res = await fetch(url, { [cite: 42]
-          method: "GET", [cite: 42]
-          cache: "no-store", [cite: 42]
-          redirect: "follow", [cite: 42]
-          signal: ctl.signal [cite: 42]
-        }); [cite: 42]
-        clearTimeout(t); [cite: 43]
-        const raw = await res.text(); [cite: 43]
-        const text = raw.replace(/^\ufeff/, ""); [cite: 43]
-        return JSON.parse(text); [cite: 43]
-      } catch (e) { [cite: 44]
-        lastErr = e; [cite: 44]
-        await sleep(400 * (i + 1)); [cite: 44]
-      } [cite: 44]
-    } [cite: 45]
-    throw lastErr || new Error("fetch-fail"); [cite: 45]
-  } [cite: 46]
+  async function fetchJSONWithRetry(url, retry = 2) {
+    let lastErr = null;
+    for (let i = 0; i <= retry; i++) {
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+        const res = await fetch(url, {
+          method: "GET",
+          cache: "no-store",
+          redirect: "follow",
+          signal: ctl.signal
+        });
+        clearTimeout(t);
+        const raw = await res.text();
+        const text = raw.replace(/^\ufeff/, ""); 
+        return JSON.parse(text);
+      } catch (e) {
+        lastErr = e;
+        await sleep(400 * (i + 1));
+      }
+    }
+    throw lastErr || new Error("fetch-fail");
+  }
 
-  // ===== 戻り時の自動アクション (Bfcache対応) ===== [cite: 46]
-  function handleReturnActions() { [cite: 46]
-    setTimeout(() => { [cite: 46]
-      try { [cite: 46]
-        const compPlate = localStorage.getItem("junkai:completed_plate"); [cite: 46]
-        if (compPlate) { [cite: 46]
-          localStorage.removeItem("junkai:completed_plate"); [cite: 46]
-          const targetChk = document.querySelector(`input.chk[data-plate="${compPlate}"]`); [cite: 46]
-          if (targetChk && !targetChk.checked) { [cite: 46]
-            targetChk.scrollIntoView({ behavior: 'smooth', block: 'center' }); [cite: 47]
-            setTimeout(() => targetChk.click(), 400); [cite: 47]
-          } [cite: 47]
-        } [cite: 47]
-        const tireCompPlate = localStorage.getItem("junkai:tire_completed_plate"); [cite: 47]
-        if (tireCompPlate) { [cite: 47]
-          localStorage.removeItem("junkai:tire_completed_plate"); [cite: 48]
-          const workMode = localStorage.getItem("junkai:work_mode") || "single"; [cite: 48]
-          if (workMode !== "continuous") { [cite: 48]
-            const targetChk = document.querySelector(`input.chk[data-plate="${tireCompPlate}"]`); [cite: 48]
-            if (targetChk) { [cite: 49]
-              const row = targetChk.closest('.row'); [cite: 49]
-              if (row) { [cite: 50]
-                const tmaBtn = row.querySelector('.tma-btn'); [cite: 50]
-                if (tmaBtn && !tmaBtn.disabled) { [cite: 51]
-                  tmaBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }); [cite: 51]
-                  setTimeout(() => tmaBtn.click(), 400); [cite: 52]
-                } [cite: 51]
-              } [cite: 50]
-            } [cite: 49]
-          } [cite: 48]
-        } [cite: 47]
-      } catch(e) {} [cite: 53]
-    }, 300); [cite: 53]
-  } [cite: 53]
+  // ===== 戻り時の自動アクション (Bfcache対応) =====
+  function handleReturnActions() {
+    setTimeout(() => {
+      try {
+        // 1. 作業管理アプリからの戻り -> 自動チェック
+        const compPlate = localStorage.getItem("junkai:completed_plate");
+        if (compPlate) {
+          localStorage.removeItem("junkai:completed_plate"); 
+          const targetChk = document.querySelector(`input.chk[data-plate="${compPlate}"]`);
+          if (targetChk && !targetChk.checked) {
+            targetChk.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => targetChk.click(), 400); 
+          }
+        }
 
-  window.addEventListener('pageshow', (e) => { [cite: 53]
-    if (e.persisted) { [cite: 53]
-      handleReturnActions(); [cite: 53]
-    } [cite: 53]
-  }); [cite: 53]
+        // 2. タイヤ点検アプリからの戻り -> 作業モード判定によるTMA自動発火
+        const tireCompPlate = localStorage.getItem("junkai:tire_completed_plate");
+        if (tireCompPlate) {
+          localStorage.removeItem("junkai:tire_completed_plate");
+          
+          // 作業モードを確認（連続モードなら自動発火しない）
+          const workMode = localStorage.getItem("junkai:work_mode") || "single";
+          if (workMode !== "continuous") {
+            const targetChk = document.querySelector(`input.chk[data-plate="${tireCompPlate}"]`);
+            if (targetChk) {
+              const row = targetChk.closest('.row');
+              if (row) {
+                const tmaBtn = row.querySelector('.tma-btn');
+                if (tmaBtn && !tmaBtn.disabled) {
+                  tmaBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  setTimeout(() => tmaBtn.click(), 400);
+                }
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    }, 300);
+  }
 
-  // ===== 設定処理 ===== [cite: 54]
-  function loadLocalConfig() { [cite: 54]
-    const cached = localStorage.getItem(LS_CONFIG_KEY); [cite: 54]
-    if (cached) { [cite: 55]
-      try { [cite: 55]
-        const parsed = JSON.parse(cached); [cite: 56]
-        appConfig = Array.isArray(parsed) ? parsed : []; [cite: 56]
-      } catch(e) { [cite: 56]
-        appConfig = []; [cite: 57]
-      } [cite: 56]
-    } else { [cite: 57]
-      appConfig = []; [cite: 58]
-    } [cite: 58]
-  } [cite: 58]
+  // スマホブラウザ等で「戻る」によりキャッシュから復元された時の強力なセンサー
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) {
+      handleReturnActions();
+    }
+  });
 
-  async function fetchRemoteConfig() { [cite: 58]
-    try { [cite: 58]
-      const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`); [cite: 59]
-      if (json && Array.isArray(json.config)) { [cite: 59]
-        appConfig = json.config; [cite: 59]
-        localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(appConfig)); [cite: 59]
-        return true; [cite: 60]
-      } [cite: 59]
-    } catch(e) { [cite: 60]
-      console.warn("Config fetch failed", e); [cite: 60]
-      throw new Error("設定の取得に失敗しました"); [cite: 61]
-    } [cite: 60]
-    return false; [cite: 61]
-  } [cite: 61]
+  // ===== 設定処理 =====
+  function loadLocalConfig() {
+    const cached = localStorage.getItem(LS_CONFIG_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        appConfig = Array.isArray(parsed) ? parsed : [];
+      } catch(e) {
+        appConfig = [];
+      }
+    } else {
+      appConfig = [];
+    }
+  }
 
-  // ===== フィルタ機能 ===== [cite: 61]
-  function getDefaultFilter() { [cite: 61]
-    return { [cite: 61]
-      standby: true, stop: true, skip: false, "7days_rule": false, checked: false [cite: 62]
-    }; [cite: 62]
-  } [cite: 62]
+  async function fetchRemoteConfig() {
+    try {
+      const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`);
+      if (json && Array.isArray(json.config)) {
+        appConfig = json.config;
+        localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(appConfig));
+        return true;
+      }
+    } catch(e) {
+      console.warn("Config fetch failed", e);
+      throw new Error("設定の取得に失敗しました");
+    }
+    return false;
+  }
 
-  function loadFilter(city) { [cite: 62]
-    try { [cite: 62]
-      const saved = localStorage.getItem(LS_FILTER_KEY(city)); [cite: 63]
-      if (saved) { [cite: 63]
-        return JSON.parse(saved); [cite: 64]
-      } [cite: 63]
-    } catch(e) { [cite: 64]
-      console.warn("Filter load failed", e); [cite: 65]
-    } [cite: 64]
-    return getDefaultFilter(); [cite: 65]
-  } [cite: 65]
+  // ===== フィルタ機能 =====
+  function getDefaultFilter() {
+    return {
+      standby: true,      // 未巡回
+      stop: true,         // 停止
+      skip: false,        // 不要
+      "7days_rule": false, // 7days_rule
+      checked: false      // チェック済み
+    };
+  }
 
-  function saveFilter(city, filter) { [cite: 65]
-    localStorage.setItem(LS_FILTER_KEY(city), JSON.stringify(filter)); [cite: 66]
-  } [cite: 66]
+  function loadFilter(city) {
+    try {
+      const saved = localStorage.getItem(LS_FILTER_KEY(city));
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch(e) {
+      console.warn("Filter load failed", e);
+    }
+    return getDefaultFilter();
+  }
 
-  function getFilterLabel(filter) { [cite: 66]
-    const labels = []; [cite: 66]
-    if (filter.standby) labels.push("未"); [cite: 67]
-    if (filter.stop) labels.push("停"); [cite: 67]
-    if (filter.skip) labels.push("不"); [cite: 67]
-    if (filter["7days_rule"]) labels.push("7"); [cite: 67]
-    if (filter.checked) labels.push("済"); [cite: 68]
-    if (labels.length === 0) return "なし"; [cite: 68]
-    return labels.join("・"); [cite: 68]
-  } [cite: 68]
+  function saveFilter(city, filter) {
+    localStorage.setItem(LS_FILTER_KEY(city), JSON.stringify(filter));
+  }
 
-  function matchesFilter(rec, filter) { [cite: 68]
-    if (rec.checked) { [cite: 69]
-      return filter.checked === true; [cite: 69]
-    } [cite: 69]
-    const status = rec.status || ""; [cite: 70]
-    if (status === "stop") return filter.stop === true; [cite: 71]
-    if (status === "skip") return filter.skip === true; [cite: 72]
-    if (status === "7days_rule") return filter["7days_rule"] === true; [cite: 73]
-    return filter.standby === true; [cite: 74]
-  } [cite: 74]
+  function getFilterLabel(filter) {
+    const labels = [];
+    if (filter.standby) labels.push("未");
+    if (filter.stop) labels.push("停");
+    if (filter.skip) labels.push("不");
+    if (filter["7days_rule"]) labels.push("7");
+    if (filter.checked) labels.push("済");
+    
+    if (labels.length === 0) return "なし";
+    return labels.join("・");
+  }
 
-  // ===== インデックス画面構築 ===== [cite: 74]
-  function renderIndexButtons() { [cite: 74]
-    const container = document.getElementById("city-list-container"); [cite: 75]
-    if(!container) return; [cite: 75]
-    container.innerHTML = ""; [cite: 75]
+  function matchesFilter(rec, filter) {
+    // チェック済みの判定
+    if (rec.checked) {
+      return filter.checked === true;
+    }
+    
+    // ステータスによる判定
+    const status = rec.status || "";
+    if (status === "stop") {
+      return filter.stop === true;
+    }
+    if (status === "skip") {
+      return filter.skip === true;
+    }
+    if (status === "7days_rule") {
+      return filter["7days_rule"] === true;
+    }
+    
+    // 通常(standby)
+    return filter.standby === true;
+  }
 
-    appConfig.forEach(cfg => { [cite: 76]
-      const s = (cfg.status || "").trim(); [cite: 76]
-      if (s !== "" && s !== "help") return; [cite: 76]
-      const slug = cfg.slug; [cite: 76]
-      const name = cfg.name; [cite: 76]
-      const a = document.createElement("a"); [cite: 76]
-      a.className = "cardlink"; [cite: 76]
-      a.href = `${slug}.html`; [cite: 76]
-      if (s === 'help') { [cite: 76]
-        a.style.borderColor = "#fb7185"; [cite: 76]
-      } [cite: 76]
-      const h2 = document.createElement("h2"); [cite: 77]
-      h2.textContent = name + (s === 'help' ? " (Help)" : ""); [cite: 77]
-      const meta = document.createElement("div"); [cite: 77]
-      meta.className = "meta"; [cite: 77]
+  // ===== インデックス画面構築 =====
+  function renderIndexButtons() {
+    const container = document.getElementById("city-list-container");
+    if(!container) return;
+    container.innerHTML = "";
+
+    appConfig.forEach(cfg => {
+      // ホワイトリスト方式
+      const s = (cfg.status || "").trim();
+      if (s !== "" && s !== "help") return;
+
+      const slug = cfg.slug;  
+      const name = cfg.name;  
+      
+      const a = document.createElement("a");
+      a.className = "cardlink";
+      a.href = `${slug}.html`; 
+      
+      if (s === 'help') {
+        a.style.borderColor = "#fb7185"; 
+      }
+
+      const h2 = document.createElement("h2");
+      h2.textContent = name + (s === 'help' ? " (Help)" : "");
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      
       meta.innerHTML = `
         <span class="chip">済 <span id="${slug}-done">0</span></span>
         <span class="chip">停 <span id="${slug}-stop">0</span></span>
         <span class="chip">不要 <span id="${slug}-skip">0</span></span>
         <span class="chip">総 <span id="${slug}-total">0</span></span>
         <span class="chip">残 <span id="${slug}-rem">0</span></span>
-      `; [cite: 78]
-      a.appendChild(h2); [cite: 78]
-      a.appendChild(meta); [cite: 78]
-      container.appendChild(a); [cite: 78]
-    }); [cite: 76]
-  } [cite: 78]
+      `;
+      a.appendChild(h2);
+      a.appendChild(meta);
+      container.appendChild(a);
+    });
+  }
 
-  // ===== ローカル保存 ===== [cite: 78]
-  function saveCity(city, arr) { [cite: 79]
-    localStorage.setItem(LS_KEY(city), JSON.stringify(arr)); [cite: 79]
-  } [cite: 79]
+  // ===== ローカル保存 =====
+  function saveCity(city, arr) {
+    localStorage.setItem(LS_KEY(city), JSON.stringify(arr));
+  }
 
-  function readCity(city) { [cite: 79]
-    try { [cite: 79]
-      const s = localStorage.getItem(LS_KEY(city)); [cite: 80]
-      if (!s) return []; [cite: 80]
-      const a = JSON.parse(s); [cite: 80]
-      return Array.isArray(a) ? a : []; [cite: 80]
-    } catch (_) { return []; } [cite: 81]
-  } [cite: 81]
+  function readCity(city) {
+    try {
+      const s = localStorage.getItem(LS_KEY(city));
+      if (!s) return [];
+      const a = JSON.parse(s);
+      return Array.isArray(a) ? a : [];
+    } catch (_) { return []; }
+  }
 
-  function applyUIIndex(city, arr) { [cite: 82]
-    const target = appConfig.find(c => c.name === city); [cite: 82]
-    const p = target ? target.prefix : "?"; [cite: 82]
-    for (let i = 0; i < arr.length; i++) { [cite: 83]
-      arr[i].ui_index_num = i + 1; [cite: 83]
-      arr[i].ui_index = p + (i + 1); [cite: 83]
-    } [cite: 83]
-  } [cite: 83]
-
-  function normalizeRow(rowObj) { [cite: 84]
-    return { [cite: 84]
-      area: (rowObj.area || "").trim(), [cite: 84]
-      city: (rowObj.city || "").trim(), [cite: 84]
-      address: (rowObj.address || "").trim(), [cite: 84]
-      station: (rowObj.station || "").trim(), [cite: 84]
-      model: (rowObj.model || "").trim(), [cite: 84]
-      plate: (rowObj.plate || "").trim(), [cite: 84]
-      note: (rowObj.note || "").trim(), [cite: 84]
-      operator: (rowObj.operator || "").trim(), [cite: 84]
-      status: (rowObj.status || "").trim(), [cite: 84]
-      checked: !!rowObj.checked, [cite: 84]
-      last_inspected_at: (rowObj.last_inspected_at || "").trim(), [cite: 84]
-      index: Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0, [cite: 85]
-      ui_index: rowObj.ui_index || "", [cite: 86]
-      ui_index_num: rowObj.ui_index_num || 0 [cite: 86]
-    }; [cite: 87]
-  } [cite: 87]
-
-  // ===== カウンタ ===== [cite: 87]
-  function countCity(arr) { [cite: 88]
-    const c = { done: 0, stop: 0, skip: 0, total: arr.length }; [cite: 88]
-    for (const it of arr) { [cite: 88]
-      if (it.status === "stop") c.stop++; [cite: 89]
-      else if (it.status === "skip") c.skip++; [cite: 89]
-      if (it.checked) c.done++; [cite: 89]
-    } [cite: 88]
-    return c; [cite: 90]
-  } [cite: 90]
-
-  function repaintCounters() { [cite: 90]
-    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0; [cite: 91]
-    appConfig.forEach(cfg => { [cite: 91]
-      const city = cfg.name; [cite: 92]
-      const slug = cfg.slug; [cite: 92]
-      const arr = readCity(city); [cite: 92]
-      const cnt = countCity(arr); [cite: 92]
-      overallTotal += cnt.total; [cite: 92]
-      overallDone += cnt.done; [cite: 92]
-      overallStop += cnt.stop; [cite: 92]
-      overallSkip += cnt.skip; [cite: 92]
-      if(document.getElementById(`${slug}-done`)) { [cite: 92]
-        document.getElementById(`${slug}-done`).textContent = cnt.done; [cite: 92]
-        document.getElementById(`${slug}-stop`).textContent = cnt.stop; [cite: 92]
-        document.getElementById(`${slug}-skip`).textContent = cnt.skip; [cite: 92]
-        document.getElementById(`${slug}-total`).textContent = cnt.total; [cite: 92]
-        document.getElementById(`${slug}-rem`).textContent = (cnt.total - cnt.done - cnt.skip); [cite: 92]
-      } [cite: 92]
-    }); [cite: 91]
-    const allDoneEl = document.querySelector("#all-done"); [cite: 93]
-    const allStopEl = document.querySelector("#all-stop"); [cite: 93]
-    const allSkipEl = document.querySelector("#all-skip"); [cite: 93]
-    const allTotalEl = document.querySelector("#all-total"); [cite: 94]
-    const allRemEl = document.querySelector("#all-rem"); [cite: 94]
-    if (allDoneEl) allDoneEl.textContent = overallDone; [cite: 95]
-    if (allStopEl) allStopEl.textContent = overallStop; [cite: 95]
-    if (allSkipEl) allSkipEl.textContent = overallSkip; [cite: 95]
-    if (allTotalEl) allTotalEl.textContent = overallTotal; [cite: 95]
-    if (allRemEl) allRemEl.textContent = (overallTotal - overallDone - overallSkip); [cite: 96]
-    const hint = document.getElementById("overallHint"); [cite: 97]
-    if (hint) { [cite: 97]
-      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "同期してください"; [cite: 98]
-    } [cite: 97]
-  } [cite: 98]
-
-  // ===== Pull (ログ取込) 機能 ===== [cite: 99]
-  async function execPullLog() { [cite: 99]
-    const ok = confirm("【Pull】inspectionlogの内容をアプリに反映しますか？"); [cite: 99]
-    if (!ok) return; [cite: 99]
-    try { [cite: 99]
-      showProgress(true, 10); [cite: 99]
-      statusText("ログを取得中..."); [cite: 99]
-      const url = `${GAS_URL}?action=pullLog&_=${Date.now()}`; [cite: 100]
-      const json = await fetchJSONWithRetry(url, 2); [cite: 100]
-      showProgress(true, 50); [cite: 100]
-      if (!json || !json.ok || !Array.isArray(json.rows)) { [cite: 101]
-        throw new Error("ログ取得失敗"); [cite: 101]
-      } [cite: 101]
-      statusText("データ反映中..."); [cite: 101]
-      const logRows = json.rows; [cite: 101]
-      let updatedCount = 0; let addedCount = 0; let deletedCount = 0; [cite: 102]
-      for (const cfg of appConfig) { [cite: 102]
-        let cityData = readCity(cfg.name); [cite: 103]
-        let isCityModified = false; [cite: 103]
-        const cityLogs = logRows.filter(r => r.city === cfg.name); [cite: 104]
-        const validPlates = cityLogs.map(r => r.plate); [cite: 104]
-        const preCount = cityData.length; [cite: 105]
-        cityData = cityData.filter(localRow => validPlates.includes(localRow.plate)); [cite: 105]
-        const postCount = cityData.length; [cite: 105]
-        if (preCount !== postCount) { [cite: 105]
-           deletedCount += (preCount - postCount); [cite: 106]
-           isCityModified = true; [cite: 106]
-        } [cite: 106]
-        cityLogs.forEach(logRow => { [cite: 106]
-          const targetRow = cityData.find(r => r.plate === logRow.plate); [cite: 107]
-          let newChecked = false; let newStatus = ""; [cite: 107]
-          const s = (logRow.status || "").toLowerCase(); [cite: 107]
-          if (s === "checked" || s === "完了" || s === "済") { [cite: 108]
-             newChecked = true; [cite: 108]
-          } else if (s === "stop" || s === "stopped" || s === "停止") { [cite: 108]
-             newStatus = "stop"; [cite: 108]
-          } else if (s === "skip" || s === "unnecessary" || s === "不要") { [cite: 108]
-             newStatus = "skip"; [cite: 109]
-          } else if (s === "7days_rule") { [cite: 109]
-             newStatus = "7days_rule"; [cite: 109]
-          } [cite: 109]
-          let newDate = ""; [cite: 109]
-          if (logRow.date) { [cite: 109]
-            newDate = logRow.date.slice(0, 10); [cite: 110]
-          } [cite: 110]
-          if (targetRow) { [cite: 110]
-            if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) { [cite: 110]
-                targetRow.checked = newChecked; [cite: 110]
-                targetRow.status = newStatus; [cite: 111]
-                targetRow.last_inspected_at = newDate; [cite: 111]
-                isCityModified = true; [cite: 111]
-                updatedCount++; [cite: 111]
-            } [cite: 111]
-          } else { [cite: 111]
-            const newRec = { [cite: 112]
-              city: cfg.name, station: logRow.station, model: logRow.model, [cite: 112]
-              plate: logRow.plate, note: "", operator:"", status: newStatus, [cite: 113]
-              checked: newChecked, last_inspected_at: newDate, [cite: 113]
-              ui_index: logRow.ui_index || "", ui_index_num: 999 [cite: 114]
-            }; [cite: 115]
-            cityData.push(normalizeRow(newRec)); [cite: 115]
-            isCityModified = true; [cite: 116]
-            addedCount++; [cite: 116]
-          } [cite: 111]
-        }); [cite: 106]
-        if (isCityModified) { [cite: 116]
-          applyUIIndex(cfg.name, cityData); [cite: 117]
-          saveCity(cfg.name, cityData); [cite: 117]
-        } [cite: 117]
-      } [cite: 102]
-      repaintCounters(); [cite: 118]
-      showProgress(true, 100); [cite: 118]
-      statusText(`Pull完了 (更新:${updatedCount}, 追加:${addedCount}, 削除:${deletedCount})`); [cite: 118]
-      setTimeout(() => showProgress(false), 2000); [cite: 118]
-    } catch(e) { [cite: 119]
-      statusText("Pull失敗：" + e.message); [cite: 119]
-      showProgress(false); [cite: 119]
-    } [cite: 119]
-  } [cite: 119]
-
-  // ===== index.html 用：初期同期 ===== [cite: 120]
-  async function initIndex() { [cite: 120]
-    loadLocalConfig(); [cite: 120]
-    const workModeSelect = document.getElementById("workModeSelect"); [cite: 121]
-    if (workModeSelect) { [cite: 121]
-      const savedMode = localStorage.getItem("junkai:work_mode") || "single"; [cite: 122]
-      workModeSelect.value = savedMode; [cite: 122]
-      workModeSelect.addEventListener("change", (e) => { [cite: 123]
-        localStorage.setItem("junkai:work_mode", e.target.value); [cite: 123]
-      }); [cite: 123]
-    } [cite: 123]
-    if(document.getElementById("city-list-container")) { [cite: 124]
-       renderIndexButtons(); [cite: 124]
-       repaintCounters(); [cite: 124]
-    } [cite: 124]
-    statusText(""); [cite: 125]
-    const btn = document.getElementById("syncBtn"); [cite: 125]
-    if (btn) { [cite: 126]
-      btn.addEventListener("click", async () => { [cite: 126]
-        if (!confirm("初期同期を実行しますか?")) return; [cite: 126]
-        try { [cite: 126]
-          showProgress(true, 5); [cite: 126]
-          statusText("設定ファイル更新中…"); [cite: 126]
-          await fetchRemoteConfig(); [cite: 126]
-          appConfig.forEach(cfg => { [cite: 126]
-             localStorage.removeItem(LS_KEY(cfg.name)); [cite: 126]
-          }); [cite: 126]
-          statusText("車両データ取得中…"); [cite: 127]
-          const url = `${GAS_URL}?action=pull&_=${Date.now()}`; [cite: 127]
-          showProgress(true, 30); [cite: 127]
-          const json = await fetchJSONWithRetry(url, 2); [cite: 127]
-          showProgress(true, 60); [cite: 127]
-          if (!json || !Array.isArray(json.rows)) throw new Error("bad-shape"); [cite: 127]
-          const buckets = {}; [cite: 128]
-          appConfig.forEach(cfg => buckets[cfg.name] = []); [cite: 128]
-          for (const r of json.rows) { [cite: 128]
-            const norm = normalizeRow(r); [cite: 128]
-            if (buckets[norm.city]) { [cite: 128]
-              buckets[norm.city].push(norm); [cite: 129]
-            } [cite: 128]
-          } [cite: 128]
-          let wrote = 0; [cite: 130]
-          for (const cfg of appConfig) { [cite: 130]
-            const arr = buckets[cfg.name]; [cite: 131]
-            if (arr && arr.length > 0) { [cite: 131]
-              applyUIIndex(cfg.name, arr); [cite: 132]
-              saveCity(cfg.name, arr); [cite: 132]
-              wrote++; [cite: 132]
-            } [cite: 131]
-          } [cite: 130]
-          renderIndexButtons(); [cite: 134]
-          repaintCounters(); [cite: 134]
-          showProgress(true, 100); [cite: 134]
-          statusText("同期完了"); [cite: 134]
-        } catch (e) { [cite: 135]
-          statusText("同期失敗：" + e.message); [cite: 135]
-        } finally { [cite: 136]
-          setTimeout(() => showProgress(false), 400); [cite: 136]
-        } [cite: 136]
-      }); [cite: 126]
-    } [cite: 126]
-    const pullBtn = document.getElementById("pushLogBtn"); [cite: 137]
-    if (pullBtn) { [cite: 138]
-      pullBtn.addEventListener("click", execPullLog); [cite: 138]
-    } [cite: 138]
-  } [cite: 138]
-
-  async function syncInspectionAll() { [cite: 139]
-    const all = []; [cite: 139]
-    appConfig.forEach(cfg => { [cite: 140]
-      const arr = readCity(cfg.name); [cite: 140]
-      for (const rec of arr) all.push(rec); [cite: 140]
-    }); [cite: 140]
-    try { [cite: 141]
-      await fetch(`${GAS_URL}?action=syncInspection`, { [cite: 142]
-        method: "POST", body: JSON.stringify({ data: all }) [cite: 142]
-      }); [cite: 142]
-    } catch (e) {} [cite: 144]
-  } [cite: 144]
-
-  function rowBg(rec) { [cite: 148]
-    if (rec.checked) return "bg-pink"; [cite: 148]
-    if (rec.status === "7days_rule") return "bg-blue"; [cite: 148]
-    if (rec.status === "stop") return "bg-gray"; [cite: 149]
-    if (rec.status === "skip") return "bg-yellow"; [cite: 149]
-    return "bg-green"; [cite: 149]
-  } [cite: 149]
-
-  function persistCityRec(city, rec) { [cite: 150]
-    const arr = readCity(city); [cite: 150]
-    if (!Array.isArray(arr) || !arr.length) return; [cite: 150]
-    const idx = arr.findIndex(r => r.ui_index === rec.ui_index); [cite: 151]
-    if (idx === -1) return; [cite: 151]
-    arr[idx] = rec; [cite: 151]
-    saveCity(city, arr); [cite: 151]
-    repaintCounters(); [cite: 151]
-  } [cite: 151]
-
-  async function initCity(cityKey) { [cite: 152]
-    loadLocalConfig(); [cite: 152]
-    let targetCfg = appConfig.find(c => c.name === cityKey || c.slug === cityKey); [cite: 153]
-    if (!targetCfg) return; [cite: 154]
-    const cityName = targetCfg.name; [cite: 155]
-    const list = document.getElementById("list"); [cite: 155]
-    const hint = document.getElementById("hint"); [cite: 155]
-    let currentFilter = loadFilter(cityName); [cite: 156]
+  function applyUIIndex(city, arr) {
+    const target = appConfig.find(c => c.name === city);
+    const p = target ? target.prefix : "?";
     
-    function renderList() { [cite: 158]
-      const arr = readCity(cityName); [cite: 158]
-      list.innerHTML = ""; [cite: 158]
-      const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter)); [cite: 160]
-      hint.textContent = `件数：${filteredArr.length} / ${arr.length}`; [cite: 160]
-      for (const rec of filteredArr) { [cite: 161]
-        const row = document.createElement("div"); [cite: 161]
-        row.className = `row ${rowBg(rec)}`; [cite: 161]
-        const left = document.createElement("div"); [cite: 162]
-        left.className = "leftcol"; [cite: 162]
-        const topLeft = document.createElement("div"); [cite: 163]
-        topLeft.className = "left-top"; [cite: 163]
-        const idxDiv = document.createElement("div"); [cite: 163]
-        idxDiv.className = "idx"; [cite: 163]
-        idxDiv.textContent = rec.ui_index || ""; [cite: 163]
-        const chk = document.createElement("input"); [cite: 164]
-        chk.type = "checkbox"; chk.className = "chk"; chk.checked = !!rec.checked; [cite: 164]
-        chk.dataset.plate = rec.plate; [cite: 164]
-        chk.addEventListener("change", () => { [cite: 173]
-          if (!confirm(`【${rec.plate}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`)) { [cite: 173]
-            chk.checked = !chk.checked; return; [cite: 173]
-          } [cite: 173]
-          rec.checked = chk.checked; [cite: 174]
-          rec.last_inspected_at = chk.checked ? getTodayJST() : ""; [cite: 174]
-          row.className = `row ${rowBg(rec)}`; [cite: 174]
-          persistCityRec(cityName, rec); [cite: 175]
-          syncInspectionAll(); [cite: 175]
-          renderList(); [cite: 175]
-        }); [cite: 173]
-        topLeft.appendChild(idxDiv); topLeft.appendChild(chk); [cite: 173]
-        left.appendChild(topLeft); [cite: 173]
-        const mid = document.createElement("div"); [cite: 176]
-        mid.className = "mid"; [cite: 176]
-        mid.innerHTML = `<div class="title">${rec.station}</div><div class="sub">${rec.model}<br>${rec.plate}</div>`; [cite: 177]
-        const right = document.createElement("div"); [cite: 178]
-        right.className = "rightcol"; [cite: 178]
-        const sel = document.createElement("select"); [cite: 179]
-        sel.className = "state"; [cite: 179]
-        [["", "通常"], ["stop", "停止"], ["skip", "不要"]].forEach(([v, l]) => { [cite: 180]
-          const o = document.createElement("option"); o.value = v; o.textContent = l; [cite: 181]
-          if ((rec.status || "") === v) o.selected = true; [cite: 181]
-          sel.appendChild(o); [cite: 181]
-        }); [cite: 180]
-        sel.addEventListener("change", () => { [cite: 182]
-          rec.status = sel.value; row.className = `row ${rowBg(rec)}`; [cite: 182]
-          persistCityRec(cityName, rec); syncInspectionAll(); renderList(); [cite: 182]
-        }); [cite: 182]
-        const btnGroup = document.createElement("div"); [cite: 183]
-        btnGroup.className = "btn-group"; [cite: 183]
-        const tmaBtn = document.createElement("button"); [cite: 183]
-        tmaBtn.className = "tma-btn"; tmaBtn.textContent = "TMA"; [cite: 183]
+    for (let i = 0; i < arr.length; i++) {
+      arr[i].ui_index_num = i + 1;
+      arr[i].ui_index = p + (i + 1);
+    }
+  }
+
+  function normalizeRow(rowObj) {
+    return {
+      area:      (rowObj.area     || "").trim(),
+      city:      (rowObj.city     || "").trim(),
+      address:   (rowObj.address  || "").trim(),
+      station:   (rowObj.station  || "").trim(),
+      model:     (rowObj.model    || "").trim(),
+      plate:     (rowObj.plate    || "").trim(),
+      note:      (rowObj.note     || "").trim(),
+      operator:  (rowObj.operator || "").trim(),
+      status:    (rowObj.status   || "").trim(),
+      checked:   !!rowObj.checked,
+      last_inspected_at: (rowObj.last_inspected_at || "").trim(),
+      index:     Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0,
+      ui_index:  rowObj.ui_index || "",
+      ui_index_num: rowObj.ui_index_num || 0
+    };
+  }
+
+  // ===== カウンタ =====
+  function countCity(arr) {
+    const c = { done: 0, stop: 0, skip: 0, total: arr.length };
+    for (const it of arr) {
+      if (it.status === "stop") c.stop++;
+      else if (it.status === "skip") c.skip++;
+      if (it.checked) c.done++;
+    }
+    return c;
+  }
+
+  function repaintCounters() {
+    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
+    appConfig.forEach(cfg => {
+      const city = cfg.name; 
+      const slug = cfg.slug; 
+
+      const arr = readCity(city);
+      const cnt = countCity(arr);
+      overallTotal += cnt.total;
+      overallDone += cnt.done;
+      overallStop += cnt.stop;
+      overallSkip += cnt.skip;
+
+      if(document.getElementById(`${slug}-done`)) {
+        document.getElementById(`${slug}-done`).textContent = cnt.done;
+        document.getElementById(`${slug}-stop`).textContent = cnt.stop;
+        document.getElementById(`${slug}-skip`).textContent = cnt.skip;
+        document.getElementById(`${slug}-total`).textContent = cnt.total;
+        document.getElementById(`${slug}-rem`).textContent = (cnt.total - cnt.done - cnt.skip);
+      }
+    });
+    const allDoneEl  = document.querySelector("#all-done");
+    const allStopEl  = document.querySelector("#all-stop");
+    const allSkipEl  = document.querySelector("#all-skip");
+    const allTotalEl = document.querySelector("#all-total");
+    const allRemEl   = document.querySelector("#all-rem");
+
+    if (allDoneEl)  allDoneEl.textContent  = overallDone;
+    if (allStopEl)  allStopEl.textContent  = overallStop;
+    if (allSkipEl)  allSkipEl.textContent  = overallSkip;
+    if (allTotalEl) allTotalEl.textContent = overallTotal;
+    if (allRemEl)   allRemEl.textContent   = (overallTotal - overallDone - overallSkip);
+
+    const hint = document.getElementById("overallHint");
+    if (hint) {
+      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "同期してください";
+    }
+  }
+
+  // ===== Pull (ログ取込) 機能 =====
+  async function execPullLog() {
+    const ok = confirm("【Pull】inspectionlogの内容をアプリに反映しますか？\n(追加・更新・削除・状態変更が反映されます)");
+    if (!ok) return;
+
+    try {
+      showProgress(true, 10);
+      statusText("ログを取得中...");
+      
+      const url = `${GAS_URL}?action=pullLog&_=${Date.now()}`;
+      const json = await fetchJSONWithRetry(url, 2);
+      
+      showProgress(true, 50);
+      
+      if (!json || !json.ok || !Array.isArray(json.rows)) {
+        throw new Error("ログ取得失敗");
+      }
+
+      statusText("データ反映中...");
+      const logRows = json.rows;
+      let updatedCount = 0;
+      let addedCount = 0;
+      let deletedCount = 0; 
+
+      for (const cfg of appConfig) {
+        let cityData = readCity(cfg.name);
+        let isCityModified = false;
+
+        const cityLogs = logRows.filter(r => r.city === cfg.name);
+        // 削除処理
+        const validPlates = cityLogs.map(r => r.plate);
+        const preCount = cityData.length;
+        cityData = cityData.filter(localRow => validPlates.includes(localRow.plate));
+        const postCount = cityData.length;
         
-        // ★★★ TMAロジックのみ「整理券 ＆ 即遷移」に修正 ★★★ [cite: 184-185]
+        if (preCount !== postCount) {
+           deletedCount += (preCount - postCount);
+           isCityModified = true;
+        }
+
+        // 更新・追加処理
+        cityLogs.forEach(logRow => {
+          const targetRow = cityData.find(r => r.plate === logRow.plate);
+
+          // ステータス判定
+          let newChecked = false;
+          let newStatus = ""; 
+          const s = (logRow.status || "").toLowerCase();
+
+          if (s === "checked" || s === "完了" || s === "済") {
+             newChecked = true;
+          } else if (s === "stop" || s === "stopped" || s === "停止") {
+             newStatus = "stop";
+          } else if (s === "skip" || s === "unnecessary" || s === "不要") {
+             newStatus = "skip";
+          } else if (s === "7days_rule") {
+             newStatus = "7days_rule"; 
+          }
+
+          let newDate = "";
+          if (logRow.date) {
+            newDate = logRow.date.slice(0, 10);
+          }
+
+          if (targetRow) {
+            // ■ 既存更新
+            if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) {
+                targetRow.checked = newChecked;
+                targetRow.status = newStatus;
+                targetRow.last_inspected_at = newDate;
+                isCityModified = true;
+                updatedCount++;
+            }
+          } else {
+            // ■ 新規追加
+            const newRec = {
+              city:    cfg.name,
+              station: logRow.station,
+              model:   logRow.model,
+              plate:   logRow.plate,
+              note:    "", 
+              operator:"",
+              status:  newStatus,
+              checked: newChecked,
+              last_inspected_at: newDate,
+              ui_index: logRow.ui_index || "",
+              ui_index_num: 999 
+            };
+            cityData.push(normalizeRow(newRec));
+            isCityModified = true;
+            addedCount++;
+          }
+        });
+        if (isCityModified) {
+          applyUIIndex(cfg.name, cityData);
+          saveCity(cfg.name, cityData);
+        }
+      }
+
+      repaintCounters();
+      showProgress(true, 100);
+      statusText(`Pull完了 (更新:${updatedCount}, 追加:${addedCount}, 削除:${deletedCount})`);
+      setTimeout(() => showProgress(false), 2000);
+
+    } catch(e) {
+      console.error(e);
+      statusText("Pull失敗：" + e.message);
+      showProgress(false);
+    }
+  }
+
+
+  // ===== index.html 用：初期同期 =====
+  async function initIndex() {
+    loadLocalConfig();
+    // ▼ 作業モード切替UIの初期化
+    const workModeSelect = document.getElementById("workModeSelect");
+    if (workModeSelect) {
+      const savedMode = localStorage.getItem("junkai:work_mode") || "single";
+      workModeSelect.value = savedMode;
+      workModeSelect.addEventListener("change", (e) => {
+        localStorage.setItem("junkai:work_mode", e.target.value);
+      });
+    }
+
+    // 画面構築
+    if(document.getElementById("city-list-container")) {
+       renderIndexButtons();
+       repaintCounters();
+    }
+    statusText("");
+    // 初期同期ボタン
+    const btn = document.getElementById("syncBtn");
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        const ok = confirm("【注意】初期同期を実行します。\n現在のアプリ内のデータは全てリセットされます。\nよろしいですか?");
+        if (!ok) return;
+
+        try {
+          showProgress(true, 5);
+          statusText("設定ファイル更新中…");
+
+          await fetchRemoteConfig();
+          
+          appConfig.forEach(cfg => {
+             localStorage.removeItem(LS_KEY(cfg.name));
+          });
+
+          statusText("車両データ取得中…");
+          const url = `${GAS_URL}?action=pull&_=${Date.now()}`;
+          showProgress(true, 30);
+
+          const json = await fetchJSONWithRetry(url, 2);
+          showProgress(true, 60);
+
+          if (!json || !Array.isArray(json.rows)) throw new Error("bad-shape");
+
+          const buckets = {};
+          appConfig.forEach(cfg => buckets[cfg.name] = []);
+
+          for (const r of json.rows) {
+            if (!r || typeof r !== "object") continue;
+            const norm = normalizeRow(r);
+            const cityName = norm.city;
+            if (buckets[cityName]) {
+              buckets[cityName].push(norm);
+            }
+          }
+
+          let wrote = 0;
+          for (const cfg of appConfig) {
+            const arr = buckets[cfg.name];
+            if (arr && arr.length > 0) {
+              applyUIIndex(cfg.name, arr);
+              saveCity(cfg.name, arr);
+              wrote++;
+            }
+          }
+
+          if (wrote === 0) {
+            statusText("同期失敗：有効なデータがありませんでした");
+            showProgress(false);
+            return;
+          }
+
+          renderIndexButtons();
+          repaintCounters();
+          
+          showProgress(true, 100);
+          statusText("同期完了");
+        } catch (e) {
+          console.error("sync error", e);
+          statusText("同期失敗：" + e.message);
+        } finally {
+          setTimeout(() => showProgress(false), 400);
+        }
+      });
+    }
+
+    // Pullボタン
+    const pullBtn = document.getElementById("pushLogBtn");
+    if (pullBtn) {
+      pullBtn.textContent = "Pull"; 
+      pullBtn.addEventListener("click", execPullLog);
+    }
+  }
+
+  // ===== city ページ =====
+  async function syncInspectionAll() {
+    const all = [];
+    appConfig.forEach(cfg => {
+      const arr = readCity(cfg.name);
+      for (const rec of arr) all.push(rec);
+    });
+    try {
+      const h=document.getElementById("hint");
+      if(h) h.textContent="送信中...";
+      const res = await fetch(`${GAS_URL}?action=syncInspection`, {
+        method: "POST",
+        body: JSON.stringify({ data: all })
+      });
+      await res.json();
+      if(h) {
+        h.textContent="送信成功";
+        setTimeout(()=>h.textContent=`件数：${all.length}`, 1500);
+      }
+    } catch (e) {
+      const h=document.getElementById("hint");
+      if(h) h.textContent="送信失敗";
+    }
+  }
+
+  function within7d(last) {
+    if (!last) return false;
+    const t = Date.parse(last);
+    if (!Number.isFinite(t)) return false;
+    const diff = Date.now() - t;
+    return diff < 7 * 24 * 60 * 60 * 1000;
+  }
+
+  function rowBg(rec) {
+    if (rec.checked) return "bg-pink";
+    if (rec.status === "7days_rule") return "bg-blue";
+    if (rec.status === "stop") return "bg-gray";
+    if (rec.status === "skip") return "bg-yellow";
+    return "bg-green";
+  }
+
+  function persistCityRec(city, rec) {
+    const arr = readCity(city);
+    if (!Array.isArray(arr) || !arr.length) return;
+    const idx = arr.findIndex(r => r.ui_index === rec.ui_index);
+    if (idx === -1) return;
+    arr[idx] = rec;
+    saveCity(city, arr);
+    repaintCounters();
+  }
+
+  async function initCity(cityKey) {
+    loadLocalConfig(); 
+
+    let cityName = cityKey;
+    let targetCfg = appConfig.find(c => c.name === cityKey);
+    if (!targetCfg) {
+       targetCfg = appConfig.find(c => c.slug === cityKey);
+       if(targetCfg) cityName = targetCfg.name;
+    }
+
+    if (!targetCfg) {
+      const h = document.getElementById("hint");
+      if(h) h.textContent = "設定エラー：Config未ロード";
+      return;
+    }
+
+    const list = document.getElementById("list");
+    const hint = document.getElementById("hint");
+    if (!list || !hint) return;
+
+    let currentFilter = loadFilter(cityName);
+    const filterBtn = document.getElementById("filterBtn");
+    const filterModal = document.getElementById("filterModal");
+    const filterApply = document.getElementById("filterApply");
+    const filterCancel = document.getElementById("filterCancel");
+
+    function updateFilterButton() {
+      if (filterBtn) {
+        filterBtn.textContent = `フィルタ: ${getFilterLabel(currentFilter)} ▼`;
+      }
+    }
+
+    function renderList() {
+      const arr = readCity(cityName);
+      list.innerHTML = "";
+
+      if (arr.length === 0) {
+        hint.textContent = "データなし";
+        return;
+      }
+
+      const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter));
+      hint.textContent = `件数：${filteredArr.length} / ${arr.length}`;
+      for (const rec of filteredArr) {
+        const row = document.createElement("div");
+        row.className = `row ${rowBg(rec)}`;
+
+        // 左カラム
+        const left = document.createElement("div");
+        left.className = "leftcol";
+        const topLeft = document.createElement("div");
+        topLeft.className = "left-top";
+        const idxDiv = document.createElement("div");
+        idxDiv.className = "idx";
+        idxDiv.textContent = rec.ui_index || "";
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.className = "chk";
+        chk.checked = !!rec.checked;
+        
+        chk.dataset.plate = rec.plate; 
+        
+        topLeft.appendChild(idxDiv);
+        topLeft.appendChild(chk);
+        const dtDiv = document.createElement("div");
+        dtDiv.className = "datetime";
+        const dateInput = document.createElement("input");
+        dateInput.type = "date";
+        dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
+        function updateDateTime() {
+          if (rec.last_inspected_at) {
+            let d = new Date(rec.last_inspected_at);
+            if (Number.isFinite(d.getTime())) {
+              const yyyy = String(d.getFullYear());
+              const mm = String(d.getMonth() + 1).padStart(2, "0");
+              const dd = String(d.getDate()).padStart(2, "0");
+              dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
+              dtDiv.style.display = "";
+              dateInput.value = `${yyyy}-${mm}-${dd}`;
+              return;
+            }
+          }
+          dtDiv.innerHTML = "";
+          dtDiv.style.display = "none";
+          dateInput.value = "";
+        }
+        updateDateTime();
+        dtDiv.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!rec.checked) return;
+          try { dateInput.focus(); dateInput.showPicker(); } catch (err) { dateInput.click(); }
+        });
+        dateInput.addEventListener("change", () => {
+          if (!dateInput.value) return; 
+          if (confirm("日付を変更しますか?")) {
+            rec.last_inspected_at = dateInput.value;
+            updateDateTime();
+            persistCityRec(cityName, rec);
+            syncInspectionAll(); 
+          }
+        });
+        left.appendChild(topLeft);
+        left.appendChild(dtDiv);
+        left.appendChild(dateInput);
+
+        // ▼ チェックボックス操作時のダイアログ
+        chk.addEventListener("change", () => {
+          const msg = `【${rec.plate || "不明"}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`;
+          if (!confirm(msg)) {
+            chk.checked = !chk.checked;
+            return;
+          }
+          if (chk.checked) {
+            rec.checked = true;
+            rec.last_inspected_at = getTodayJST();
+          } else {
+            rec.checked = false;
+            rec.last_inspected_at = "";
+          }
+          updateDateTime();
+          row.className = `row ${rowBg(rec)}`;
+  
+          persistCityRec(cityName, rec);
+          syncInspectionAll();
+        
+          renderList(); 
+        });
+        // 中央
+        const mid = document.createElement("div");
+        mid.className = "mid";
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = rec.station || "";
+        const sub = document.createElement("div");
+        sub.className = "sub";
+        sub.innerHTML = `${rec.model || ""}<br>${rec.plate || ""}`;
+        mid.appendChild(title);
+        mid.appendChild(sub);
+
+        // 右カラム
+        const right = document.createElement("div");
+        right.className = "rightcol";
+        const sel = document.createElement("select");
+        sel.className = "state";
+        const statusOptions = [["", "通常"], ["stop", "停止"], ["skip", "不要"]];
+        for (const [value, label] of statusOptions) {
+          const o = document.createElement("option");
+          o.value = value;
+          o.textContent = label;
+          if ((rec.status || "") === value) o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener("change", () => {
+          rec.status = sel.value;
+          row.className = `row ${rowBg(rec)}`;
+          persistCityRec(cityName, rec);
+          syncInspectionAll();
+          renderList(); 
+        });
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "btn-group";
+
+        const tmaBtn = document.createElement("button");
+        tmaBtn.className = "tma-btn";
+        tmaBtn.textContent = "TMA";
+
+        // ★★★ TMAロジックのみ「整理券番号発行 ＆ 即遷移」に修正 ★★★ [cite: 183-185]
         tmaBtn.addEventListener("click", () => {
           if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？`)) return;
-          tmaBtn.disabled = true; tmaBtn.textContent = "遷移中";
+          
+          tmaBtn.disabled = true;
+          tmaBtn.textContent = "遷移中";
+          
+          // 整理券番号（requestId）の生成
           const requestId = "req-" + Date.now() + "-" + Math.random().toString(36).slice(-4);
+          
+          // 1. GASへバックグラウンド送信（レスポンスを待たない）
           fetch(`${GAS_URL}?action=triggerTMA`, {
             method: "POST",
             body: JSON.stringify({ plate: rec.plate, requestId: requestId }),
             keepalive: true
-          }).catch(() => {});
+          }).catch(e => console.error("Background trigger error:", e));
+          
+          // 2. 即座に作業管理アプリへ遷移（パラメータを付与）
           const params = new URLSearchParams({
-            station: rec.station || "", model: rec.model || "", plate_full: rec.plate || "",
-            tma_plate: rec.plate, tma_req_id: requestId
+            station:    rec.station || "",
+            model:      rec.model   || "",
+            plate_full: rec.plate   || "",
+            tma_plate:  rec.plate,      // 自動入力用
+            tma_req_id: requestId       // 重複防止用ID
           });
           location.href = `${WORK_APP_URL}?${params.toString()}`;
         });
 
-        const tireBtn = document.createElement("button"); [cite: 187]
-        tireBtn.className = "tire-btn"; tireBtn.textContent = "点検"; [cite: 187]
-        tireBtn.addEventListener("click", () => { [cite: 188]
-          location.href = `${TIRE_APP_URL}?${new URLSearchParams({station:rec.station, model:rec.model, plate_full:rec.plate}).toString()}`; [cite: 188]
-        }); [cite: 188]
-        btnGroup.appendChild(tmaBtn); btnGroup.appendChild(tireBtn); [cite: 189]
-        right.appendChild(sel); right.appendChild(btnGroup); [cite: 189]
-        row.appendChild(left); row.appendChild(mid); row.appendChild(right); [cite: 189]
-        list.appendChild(row); [cite: 189]
-      } [cite: 161]
-    } [cite: 158]
+        const tireBtn = document.createElement("button");
+        tireBtn.className = "tire-btn";
+        tireBtn.textContent = "点検";
+        tireBtn.addEventListener("click", () => {
+          const params = new URLSearchParams({
+            station:    rec.station || "",
+            model:      rec.model   || "",
+            plate_full: rec.plate   || ""
+          });
+          location.href = `${TIRE_APP_URL}?${params.toString()}`;
+        });
 
-    document.getElementById("filterBtn").addEventListener("click", () => { [cite: 191]
-      document.getElementById("filterModal").classList.add("show"); [cite: 191]
-    }); [cite: 191]
-    document.getElementById("filterApply").addEventListener("click", () => { [cite: 192]
-      currentFilter = { [cite: 192]
-        standby: document.getElementById("filter_standby").checked, [cite: 192]
-        stop: document.getElementById("filter_stop").checked, [cite: 192]
-        skip: document.getElementById("filter_skip").checked, [cite: 192]
-        "7days_rule": document.getElementById("filter_7days").checked, [cite: 192]
-        checked: document.getElementById("filter_checked").checked [cite: 192]
-      }; [cite: 192]
-      saveFilter(cityName, currentFilter); [cite: 193]
-      document.getElementById("filterModal").classList.remove("show"); [cite: 193]
-      renderList(); [cite: 193]
-    }); [cite: 192]
-    document.getElementById("filterCancel").addEventListener("click", () => { [cite: 194]
-      document.getElementById("filterModal").classList.remove("show"); [cite: 194]
-    }); [cite: 194]
-    renderList(); [cite: 195]
-  } [cite: 195]
+        btnGroup.appendChild(tmaBtn);
+        btnGroup.appendChild(tireBtn);
 
-  return { initIndex, initCity }; [cite: 195]
+        right.appendChild(sel);
+        right.appendChild(btnGroup);
 
-})(); [cite: 195]
+        row.appendChild(left);
+        row.appendChild(mid);
+        row.appendChild(right);
+        list.appendChild(row);
+      }
+      
+      // リスト描画直後にもアクションをチェック
+      handleReturnActions();
+    }
+
+    if (filterBtn && filterModal) {
+      filterBtn.addEventListener("click", () => {
+        document.getElementById("filter_standby").checked = currentFilter.standby;
+        document.getElementById("filter_stop").checked = currentFilter.stop;
+        document.getElementById("filter_skip").checked = currentFilter.skip;
+        document.getElementById("filter_7days").checked = currentFilter["7days_rule"];
+        document.getElementById("filter_checked").checked = currentFilter.checked;
+        
+        filterModal.classList.add("show");
+      });
+    }
+
+    if (filterApply) {
+      filterApply.addEventListener("click", () => {
+        currentFilter.standby = document.getElementById("filter_standby").checked;
+        currentFilter.stop = document.getElementById("filter_stop").checked;
+        currentFilter.skip = document.getElementById("filter_skip").checked;
+        currentFilter["7days_rule"] = document.getElementById("filter_7days").checked;
+        currentFilter.checked = document.getElementById("filter_checked").checked;
+        
+        saveFilter(cityName, currentFilter);
+        updateFilterButton();
+     
+        filterModal.classList.remove("show");
+        renderList();
+      });
+    }
+
+    if (filterCancel) {
+      filterCancel.addEventListener("click", () => {
+        filterModal.classList.remove("show");
+      });
+    }
+
+    if (filterModal) {
+      filterModal.addEventListener("click", (e) => {
+        if (e.target === filterModal) {
+          filterModal.classList.remove("show");
+        }
+      });
+    }
+
+    updateFilterButton();
+    renderList();
+  }
+
+  return { initIndex, initCity };
+
+})();
