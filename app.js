@@ -1,413 +1,595 @@
 // 巡回アプリ app.js
-// version: s7a (初期同期復元・TMA即遷移・整理券発行対応)
+// version: s7a (オリジナルs6g完全復元・TMAボタン即遷移化)
 
 var Junkai = (() => {
 
-  // ===== 設定 =====
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
-  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/Tire_Check/";
-  const WORK_APP_URL = "https://rkworks2025-coder.github.io/work/";
-  const LS_CONFIG_KEY = "junkai:config";
-  const TIMEOUT_MS = 15000;
+  // ===== 設定 ===== 
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec"; [cite: 36]
+  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/Tire_Check/"; [cite: 36]
+  const WORK_APP_URL = "https://rkworks2025-coder.github.io/work/"; [cite: 36]
+  const LS_CONFIG_KEY = "junkai:config"; [cite: 36]
+  const TIMEOUT_MS = 15000; [cite: 36]
 
-  let appConfig = []; 
+  let appConfig = []; [cite: 36]
 
-  // ===== utility =====
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  const LS_KEY = (c) => `junkai:city:${c}`; 
-  const LS_FILTER_KEY = (c) => `junkai:filter:${c}`;
+  // ===== utility ===== 
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms)); [cite: 36]
+  const LS_KEY = (c) => `junkai:city:${c}`; [cite: 36]
+  const LS_FILTER_KEY = (c) => `junkai:filter:${c}`; [cite: 36]
 
-  function getTodayJST() {
-    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
-  }
+  function getTodayJST() { [cite: 36]
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }); [cite: 36]
+  } [cite: 36]
 
-  function showProgress(on, pct) {
-    const m = document.getElementById("progressModal");
-    const bar = document.getElementById("progressBar");
-    if (!m) return;
-    if (on) m.classList.add("show");
-    else m.classList.remove("show");
-    if (bar && typeof pct === "number") {
-      const v = Math.max(0, Math.min(100, pct));
-      bar.style.width = v + "%";
-      bar.setAttribute("aria-valuenow", v);
-    }
-  }
+  function showProgress(on, pct) { [cite: 37]
+    const m = document.getElementById("progressModal"); [cite: 37]
+    const bar = document.getElementById("progressBar"); [cite: 37]
+    if (!m) return; [cite: 37]
+    if (on) m.classList.add("show"); [cite: 37]
+    else m.classList.remove("show"); [cite: 38]
+    if (bar && typeof pct === "number") { [cite: 38]
+      const v = Math.max(0, Math.min(100, pct)); [cite: 38]
+      bar.style.width = v + "%"; [cite: 39]
+      bar.setAttribute("aria-valuenow", v); [cite: 39]
+    } [cite: 39]
+  } [cite: 39]
 
-  function statusText(msg) {
-    const el = document.getElementById("statusText");
-    if (el) el.textContent = msg;
-  }
+  function statusText(msg) { [cite: 39]
+    const el = document.getElementById("statusText"); [cite: 40]
+    if (el) el.textContent = msg; [cite: 40]
+  } [cite: 40]
 
-  async function fetchJSONWithRetry(url, retry = 2) {
-    let lastErr = null;
-    for (let i = 0; i <= retry; i++) {
-      try {
-        const ctl = new AbortController();
-        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
-        const res = await fetch(url, {
-          method: "GET",
-          cache: "no-store",
-          redirect: "follow",
-          signal: ctl.signal
-        });
-        clearTimeout(t);
-        const raw = await res.text();
-        const text = raw.replace(/^\ufeff/, ""); 
-        return JSON.parse(text);
-      } catch (e) {
-        lastErr = e;
-        await sleep(400 * (i + 1));
-      }
-    }
-    throw lastErr || new Error("fetch-fail");
-  }
+  async function fetchJSONWithRetry(url, retry = 2) { [cite: 40]
+    let lastErr = null; [cite: 41]
+    for (let i = 0; i <= retry; i++) { [cite: 41]
+      try { [cite: 41]
+        const ctl = new AbortController(); [cite: 41]
+        const t = setTimeout(() => ctl.abort(), TIMEOUT_MS); [cite: 42]
+        const res = await fetch(url, { [cite: 42]
+          method: "GET", [cite: 42]
+          cache: "no-store", [cite: 42]
+          redirect: "follow", [cite: 42]
+          signal: ctl.signal [cite: 42]
+        }); [cite: 42]
+        clearTimeout(t); [cite: 43]
+        const raw = await res.text(); [cite: 43]
+        const text = raw.replace(/^\ufeff/, ""); [cite: 43]
+        return JSON.parse(text); [cite: 43]
+      } catch (e) { [cite: 44]
+        lastErr = e; [cite: 44]
+        await sleep(400 * (i + 1)); [cite: 44]
+      } [cite: 44]
+    } [cite: 45]
+    throw lastErr || new Error("fetch-fail"); [cite: 45]
+  } [cite: 46]
 
-  // ===== 戻り時の自動アクション (Bfcache対応) =====
-  function handleReturnActions() {
-    setTimeout(() => {
-      try {
-        const compPlate = localStorage.getItem("junkai:completed_plate");
-        if (compPlate) {
-          localStorage.removeItem("junkai:completed_plate"); 
-          const targetChk = document.querySelector(`input.chk[data-plate="${compPlate}"]`);
-          if (targetChk && !targetChk.checked) {
-            targetChk.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setTimeout(() => targetChk.click(), 400); 
-          }
-        }
-        const tireCompPlate = localStorage.getItem("junkai:tire_completed_plate");
-        if (tireCompPlate) {
-          localStorage.removeItem("junkai:tire_completed_plate");
-          const workMode = localStorage.getItem("junkai:work_mode") || "single";
-          if (workMode !== "continuous") {
-            const targetChk = document.querySelector(`input.chk[data-plate="${tireCompPlate}"]`);
-            if (targetChk) {
-              const row = targetChk.closest('.row');
-              if (row) {
-                const tmaBtn = row.querySelector('.tma-btn');
-                if (tmaBtn && !tmaBtn.disabled) {
-                  tmaBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  setTimeout(() => tmaBtn.click(), 400);
-                }
-              }
-            }
-          }
-        }
-      } catch(e) {}
-    }, 300);
-  }
+  // ===== 戻り時の自動アクション (Bfcache対応) ===== [cite: 46]
+  function handleReturnActions() { [cite: 46]
+    setTimeout(() => { [cite: 46]
+      try { [cite: 46]
+        const compPlate = localStorage.getItem("junkai:completed_plate"); [cite: 46]
+        if (compPlate) { [cite: 46]
+          localStorage.removeItem("junkai:completed_plate"); [cite: 46]
+          const targetChk = document.querySelector(`input.chk[data-plate="${compPlate}"]`); [cite: 46]
+          if (targetChk && !targetChk.checked) { [cite: 46]
+            targetChk.scrollIntoView({ behavior: 'smooth', block: 'center' }); [cite: 47]
+            setTimeout(() => targetChk.click(), 400); [cite: 47]
+          } [cite: 47]
+        } [cite: 47]
+        const tireCompPlate = localStorage.getItem("junkai:tire_completed_plate"); [cite: 47]
+        if (tireCompPlate) { [cite: 47]
+          localStorage.removeItem("junkai:tire_completed_plate"); [cite: 48]
+          const workMode = localStorage.getItem("junkai:work_mode") || "single"; [cite: 48]
+          if (workMode !== "continuous") { [cite: 48]
+            const targetChk = document.querySelector(`input.chk[data-plate="${tireCompPlate}"]`); [cite: 48]
+            if (targetChk) { [cite: 49]
+              const row = targetChk.closest('.row'); [cite: 49]
+              if (row) { [cite: 50]
+                const tmaBtn = row.querySelector('.tma-btn'); [cite: 50]
+                if (tmaBtn && !tmaBtn.disabled) { [cite: 51]
+                  tmaBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }); [cite: 51]
+                  setTimeout(() => tmaBtn.click(), 400); [cite: 52]
+                } [cite: 51]
+              } [cite: 50]
+            } [cite: 49]
+          } [cite: 48]
+        } [cite: 47]
+      } catch(e) {} [cite: 53]
+    }, 300); [cite: 53]
+  } [cite: 53]
 
-  window.addEventListener('pageshow', (e) => {
-    if (e.persisted) handleReturnActions();
-  });
+  window.addEventListener('pageshow', (e) => { [cite: 53]
+    if (e.persisted) { [cite: 53]
+      handleReturnActions(); [cite: 53]
+    } [cite: 53]
+  }); [cite: 53]
 
-  // ===== 設定・フィルタ処理 =====
-  function loadLocalConfig() {
-    const cached = localStorage.getItem(LS_CONFIG_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        appConfig = Array.isArray(parsed) ? parsed : [];
-      } catch(e) { appConfig = []; }
-    } else { appConfig = []; }
-  }
+  // ===== 設定処理 ===== [cite: 54]
+  function loadLocalConfig() { [cite: 54]
+    const cached = localStorage.getItem(LS_CONFIG_KEY); [cite: 54]
+    if (cached) { [cite: 55]
+      try { [cite: 55]
+        const parsed = JSON.parse(cached); [cite: 56]
+        appConfig = Array.isArray(parsed) ? parsed : []; [cite: 56]
+      } catch(e) { [cite: 56]
+        appConfig = []; [cite: 57]
+      } [cite: 56]
+    } else { [cite: 57]
+      appConfig = []; [cite: 58]
+    } [cite: 58]
+  } [cite: 58]
 
-  async function fetchRemoteConfig() {
-    try {
-      const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`);
-      if (json && Array.isArray(json.config)) {
-        appConfig = json.config;
-        localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(appConfig));
-        return true;
-      }
-    } catch(e) { throw new Error("設定の取得に失敗しました"); }
-    return false;
-  }
+  async function fetchRemoteConfig() { [cite: 58]
+    try { [cite: 58]
+      const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`); [cite: 59]
+      if (json && Array.isArray(json.config)) { [cite: 59]
+        appConfig = json.config; [cite: 59]
+        localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(appConfig)); [cite: 59]
+        return true; [cite: 60]
+      } [cite: 59]
+    } catch(e) { [cite: 60]
+      console.warn("Config fetch failed", e); [cite: 60]
+      throw new Error("設定の取得に失敗しました"); [cite: 61]
+    } [cite: 60]
+    return false; [cite: 61]
+  } [cite: 61]
 
-  function loadFilter(city) {
-    try {
-      const saved = localStorage.getItem(LS_FILTER_KEY(city));
-      if (saved) return JSON.parse(saved);
-    } catch(e) {}
-    return { standby: true, stop: true, skip: false, "7days_rule": false, checked: false };
-  }
+  // ===== フィルタ機能 ===== [cite: 61]
+  function getDefaultFilter() { [cite: 61]
+    return { [cite: 61]
+      standby: true, stop: true, skip: false, "7days_rule": false, checked: false [cite: 62]
+    }; [cite: 62]
+  } [cite: 62]
 
-  function saveFilter(city, filter) {
-    localStorage.setItem(LS_FILTER_KEY(city), JSON.stringify(filter));
-  }
+  function loadFilter(city) { [cite: 62]
+    try { [cite: 62]
+      const saved = localStorage.getItem(LS_FILTER_KEY(city)); [cite: 63]
+      if (saved) { [cite: 63]
+        return JSON.parse(saved); [cite: 64]
+      } [cite: 63]
+    } catch(e) { [cite: 64]
+      console.warn("Filter load failed", e); [cite: 65]
+    } [cite: 64]
+    return getDefaultFilter(); [cite: 65]
+  } [cite: 65]
 
-  function getFilterLabel(filter) {
-    const labels = [];
-    if (filter.standby) labels.push("未");
-    if (filter.stop) labels.push("停");
-    if (filter.skip) labels.push("不");
-    if (filter["7days_rule"]) labels.push("7");
-    if (filter.checked) labels.push("済");
-    return labels.length === 0 ? "なし" : labels.join("・");
-  }
+  function saveFilter(city, filter) { [cite: 65]
+    localStorage.setItem(LS_FILTER_KEY(city), JSON.stringify(filter)); [cite: 66]
+  } [cite: 66]
 
-  function matchesFilter(rec, filter) {
-    if (rec.checked) return filter.checked === true;
-    if (rec.status === "stop") return filter.stop === true;
-    if (rec.status === "skip") return filter.skip === true;
-    if (rec.status === "7days_rule") return filter["7days_rule"] === true;
-    return filter.standby === true;
-  }
+  function getFilterLabel(filter) { [cite: 66]
+    const labels = []; [cite: 66]
+    if (filter.standby) labels.push("未"); [cite: 67]
+    if (filter.stop) labels.push("停"); [cite: 67]
+    if (filter.skip) labels.push("不"); [cite: 67]
+    if (filter["7days_rule"]) labels.push("7"); [cite: 67]
+    if (filter.checked) labels.push("済"); [cite: 68]
+    if (labels.length === 0) return "なし"; [cite: 68]
+    return labels.join("・"); [cite: 68]
+  } [cite: 68]
 
-  // ===== 描画・カウンタ =====
-  function renderIndexButtons() {
-    const container = document.getElementById("city-list-container");
-    if(!container) return;
-    container.innerHTML = "";
-    appConfig.forEach(cfg => {
-      const s = (cfg.status || "").trim();
-      if (s !== "" && s !== "help") return;
-      const slug = cfg.slug;  
-      const a = document.createElement("a");
-      a.className = "cardlink";
-      a.href = `${slug}.html`; 
-      if (s === 'help') a.style.borderColor = "#fb7185"; 
-      a.innerHTML = `<h2>${cfg.name}${s==='help'?' (Help)':''}</h2>
-        <div class="meta">
-          <span class="chip">済 <span id="${slug}-done">0</span></span>
-          <span class="chip">停 <span id="${slug}-stop">0</span></span>
-          <span class="chip">不要 <span id="${slug}-skip">0</span></span>
-          <span class="chip">総 <span id="${slug}-total">0</span></span>
-          <span class="chip">残 <span id="${slug}-rem">0</span></span>
-        </div>`;
-      container.appendChild(a);
-    });
-  }
+  function matchesFilter(rec, filter) { [cite: 68]
+    if (rec.checked) { [cite: 69]
+      return filter.checked === true; [cite: 69]
+    } [cite: 69]
+    const status = rec.status || ""; [cite: 70]
+    if (status === "stop") return filter.stop === true; [cite: 71]
+    if (status === "skip") return filter.skip === true; [cite: 72]
+    if (status === "7days_rule") return filter["7days_rule"] === true; [cite: 73]
+    return filter.standby === true; [cite: 74]
+  } [cite: 74]
 
-  function saveCity(city, arr) { localStorage.setItem(LS_KEY(city), JSON.stringify(arr)); }
+  // ===== インデックス画面構築 ===== [cite: 74]
+  function renderIndexButtons() { [cite: 74]
+    const container = document.getElementById("city-list-container"); [cite: 75]
+    if(!container) return; [cite: 75]
+    container.innerHTML = ""; [cite: 75]
 
-  function readCity(city) {
-    try {
-      const s = localStorage.getItem(LS_KEY(city));
-      return s ? JSON.parse(s) : [];
-    } catch (_) { return []; }
-  }
+    appConfig.forEach(cfg => { [cite: 76]
+      const s = (cfg.status || "").trim(); [cite: 76]
+      if (s !== "" && s !== "help") return; [cite: 76]
+      const slug = cfg.slug; [cite: 76]
+      const name = cfg.name; [cite: 76]
+      const a = document.createElement("a"); [cite: 76]
+      a.className = "cardlink"; [cite: 76]
+      a.href = `${slug}.html`; [cite: 76]
+      if (s === 'help') { [cite: 76]
+        a.style.borderColor = "#fb7185"; [cite: 76]
+      } [cite: 76]
+      const h2 = document.createElement("h2"); [cite: 77]
+      h2.textContent = name + (s === 'help' ? " (Help)" : ""); [cite: 77]
+      const meta = document.createElement("div"); [cite: 77]
+      meta.className = "meta"; [cite: 77]
+      meta.innerHTML = `
+        <span class="chip">済 <span id="${slug}-done">0</span></span>
+        <span class="chip">停 <span id="${slug}-stop">0</span></span>
+        <span class="chip">不要 <span id="${slug}-skip">0</span></span>
+        <span class="chip">総 <span id="${slug}-total">0</span></span>
+        <span class="chip">残 <span id="${slug}-rem">0</span></span>
+      `; [cite: 78]
+      a.appendChild(h2); [cite: 78]
+      a.appendChild(meta); [cite: 78]
+      container.appendChild(a); [cite: 78]
+    }); [cite: 76]
+  } [cite: 78]
 
-  function applyUIIndex(city, arr) {
-    const target = appConfig.find(c => c.name === city);
-    const p = target ? target.prefix : "?";
-    arr.forEach((rec, i) => {
-      rec.ui_index_num = i + 1;
-      rec.ui_index = p + (i + 1);
-    });
-  }
+  // ===== ローカル保存 ===== [cite: 78]
+  function saveCity(city, arr) { [cite: 79]
+    localStorage.setItem(LS_KEY(city), JSON.stringify(arr)); [cite: 79]
+  } [cite: 79]
 
-  function normalizeRow(rowObj) {
-    return {
-      area: (rowObj.area || "").trim(),
-      city: (rowObj.city || "").trim(),
-      station: (rowObj.station || "").trim(),
-      model: (rowObj.model || "").trim(),
-      plate: (rowObj.plate || "").trim(),
-      status: (rowObj.status || "").trim(),
-      checked: !!rowObj.checked,
-      last_inspected_at: (rowObj.last_inspected_at || "").trim(),
-      ui_index: rowObj.ui_index || "",
-      ui_index_num: rowObj.ui_index_num || 0
-    };
-  }
+  function readCity(city) { [cite: 79]
+    try { [cite: 79]
+      const s = localStorage.getItem(LS_KEY(city)); [cite: 80]
+      if (!s) return []; [cite: 80]
+      const a = JSON.parse(s); [cite: 80]
+      return Array.isArray(a) ? a : []; [cite: 80]
+    } catch (_) { return []; } [cite: 81]
+  } [cite: 81]
 
-  function repaintCounters() {
-    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0;
-    appConfig.forEach(cfg => {
-      const arr = readCity(cfg.name);
-      const cnt = { done: 0, stop: 0, skip: 0, total: arr.length };
-      arr.forEach(it => {
-        if (it.status === "stop") cnt.stop++;
-        else if (it.status === "skip") cnt.skip++;
-        if (it.checked) cnt.done++;
-      });
-      overallTotal += cnt.total; overallDone += cnt.done; overallStop += cnt.stop; overallSkip += cnt.skip;
-      const slug = cfg.slug;
-      if(document.getElementById(`${slug}-done`)) {
-        document.getElementById(`${slug}-done`).textContent = cnt.done;
-        document.getElementById(`${slug}-stop`).textContent = cnt.stop;
-        document.getElementById(`${slug}-skip`).textContent = cnt.skip;
-        document.getElementById(`${slug}-total`).textContent = cnt.total;
-        document.getElementById(`${slug}-rem`).textContent = (cnt.total - cnt.done - cnt.skip);
-      }
-    });
-    const ids = { "#all-done": overallDone, "#all-stop": overallStop, "#all-skip": overallSkip, "#all-total": overallTotal };
-    Object.entries(ids).forEach(([id, val]) => {
-      const el = document.querySelector(id);
-      if(el) el.textContent = val;
-    });
-    if(document.querySelector("#all-rem")) document.querySelector("#all-rem").textContent = (overallTotal - overallDone - overallSkip);
-    const hint = document.getElementById("overallHint");
-    if (hint) hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "同期してください";
-  }
+  function applyUIIndex(city, arr) { [cite: 82]
+    const target = appConfig.find(c => c.name === city); [cite: 82]
+    const p = target ? target.prefix : "?"; [cite: 82]
+    for (let i = 0; i < arr.length; i++) { [cite: 83]
+      arr[i].ui_index_num = i + 1; [cite: 83]
+      arr[i].ui_index = p + (i + 1); [cite: 83]
+    } [cite: 83]
+  } [cite: 83]
 
-  // ===== Pull & Sync =====
-  async function execPullLog() {
-    if (!confirm("【Pull】反映しますか？")) return;
-    try {
-      showProgress(true, 10);
-      const json = await fetchJSONWithRetry(`${GAS_URL}?action=pullLog&_=${Date.now()}`);
-      if (!json || !json.ok) throw new Error("取得失敗");
-      const logRows = json.rows;
-      appConfig.forEach(cfg => {
-        let cityData = readCity(cfg.name);
-        const cityLogs = logRows.filter(r => r.city === cfg.name);
-        const validPlates = cityLogs.map(r => r.plate);
-        cityData = cityData.filter(localRow => validPlates.includes(localRow.plate));
-        cityLogs.forEach(logRow => {
-          const targetRow = cityData.find(r => r.plate === logRow.plate);
-          const s = (logRow.status || "").toLowerCase();
-          const newChecked = (s === "checked" || s === "完了" || s === "済");
-          const newStatus = (s === "stop" || s === "停止") ? "stop" : (s === "skip" || s === "不要") ? "skip" : (s === "7days_rule") ? "7days_rule" : "";
-          const newDate = logRow.date ? logRow.date.slice(0, 10) : "";
-          if (targetRow) {
-            targetRow.checked = newChecked; targetRow.status = newStatus; targetRow.last_inspected_at = newDate;
-          } else {
-            cityData.push(normalizeRow({ ...logRow, status: newStatus, checked: newChecked, last_inspected_at: newDate }));
-          }
-        });
-        applyUIIndex(cfg.name, cityData); saveCity(cfg.name, cityData);
-      });
-      repaintCounters(); showProgress(true, 100); setTimeout(() => showProgress(false), 1500);
-    } catch(e) { statusText("Pull失敗"); showProgress(false); }
-  }
+  function normalizeRow(rowObj) { [cite: 84]
+    return { [cite: 84]
+      area: (rowObj.area || "").trim(), [cite: 84]
+      city: (rowObj.city || "").trim(), [cite: 84]
+      address: (rowObj.address || "").trim(), [cite: 84]
+      station: (rowObj.station || "").trim(), [cite: 84]
+      model: (rowObj.model || "").trim(), [cite: 84]
+      plate: (rowObj.plate || "").trim(), [cite: 84]
+      note: (rowObj.note || "").trim(), [cite: 84]
+      operator: (rowObj.operator || "").trim(), [cite: 84]
+      status: (rowObj.status || "").trim(), [cite: 84]
+      checked: !!rowObj.checked, [cite: 84]
+      last_inspected_at: (rowObj.last_inspected_at || "").trim(), [cite: 84]
+      index: Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0, [cite: 85]
+      ui_index: rowObj.ui_index || "", [cite: 86]
+      ui_index_num: rowObj.ui_index_num || 0 [cite: 86]
+    }; [cite: 87]
+  } [cite: 87]
 
-  async function initIndex() {
-    loadLocalConfig();
-    const workModeSelect = document.getElementById("workModeSelect");
-    if (workModeSelect) {
-      workModeSelect.value = localStorage.getItem("junkai:work_mode") || "single";
-      workModeSelect.addEventListener("change", (e) => localStorage.setItem("junkai:work_mode", e.target.value));
-    }
-    renderIndexButtons(); repaintCounters();
-    const btn = document.getElementById("syncBtn");
-    if (btn) {
-      btn.addEventListener("click", async () => {
-        if (!confirm("初期同期を実行しますか?")) return;
-        try {
-          showProgress(true, 5); await fetchRemoteConfig();
-          appConfig.forEach(cfg => localStorage.removeItem(LS_KEY(cfg.name)));
-          const json = await fetchJSONWithRetry(`${GAS_URL}?action=pull&_=${Date.now()}`);
-          if (!json || !Array.isArray(json.rows)) throw new Error("bad-shape");
-          const buckets = {}; appConfig.forEach(cfg => buckets[cfg.name] = []);
-          json.rows.forEach(r => {
-            const norm = normalizeRow(r);
-            if (buckets[norm.city]) buckets[norm.city].push(norm);
-          });
-          Object.keys(buckets).forEach(city => {
-            const arr = buckets[city];
-            if(arr.length > 0) { applyUIIndex(city, arr); saveCity(city, arr); }
-          });
-          renderIndexButtons(); repaintCounters(); showProgress(true, 100);
-        } catch (e) { statusText("同期失敗"); } finally { setTimeout(() => showProgress(false), 400); }
-      });
-    }
-    const pullBtn = document.getElementById("pushLogBtn");
-    if (pullBtn) pullBtn.addEventListener("click", execPullLog);
-  }
+  // ===== カウンタ ===== [cite: 87]
+  function countCity(arr) { [cite: 88]
+    const c = { done: 0, stop: 0, skip: 0, total: arr.length }; [cite: 88]
+    for (const it of arr) { [cite: 88]
+      if (it.status === "stop") c.stop++; [cite: 89]
+      else if (it.status === "skip") c.skip++; [cite: 89]
+      if (it.checked) c.done++; [cite: 89]
+    } [cite: 88]
+    return c; [cite: 90]
+  } [cite: 90]
 
-  async function syncInspectionAll() {
-    const all = []; appConfig.forEach(cfg => readCity(cfg.name).forEach(rec => all.push(rec)));
-    try {
-      await fetch(`${GAS_URL}?action=syncInspection`, { method: "POST", body: JSON.stringify({ data: all }) });
-    } catch (e) {}
-  }
+  function repaintCounters() { [cite: 90]
+    let overallTotal = 0, overallDone = 0, overallStop = 0, overallSkip = 0; [cite: 91]
+    appConfig.forEach(cfg => { [cite: 91]
+      const city = cfg.name; [cite: 92]
+      const slug = cfg.slug; [cite: 92]
+      const arr = readCity(city); [cite: 92]
+      const cnt = countCity(arr); [cite: 92]
+      overallTotal += cnt.total; [cite: 92]
+      overallDone += cnt.done; [cite: 92]
+      overallStop += cnt.stop; [cite: 92]
+      overallSkip += cnt.skip; [cite: 92]
+      if(document.getElementById(`${slug}-done`)) { [cite: 92]
+        document.getElementById(`${slug}-done`).textContent = cnt.done; [cite: 92]
+        document.getElementById(`${slug}-stop`).textContent = cnt.stop; [cite: 92]
+        document.getElementById(`${slug}-skip`).textContent = cnt.skip; [cite: 92]
+        document.getElementById(`${slug}-total`).textContent = cnt.total; [cite: 92]
+        document.getElementById(`${slug}-rem`).textContent = (cnt.total - cnt.done - cnt.skip); [cite: 92]
+      } [cite: 92]
+    }); [cite: 91]
+    const allDoneEl = document.querySelector("#all-done"); [cite: 93]
+    const allStopEl = document.querySelector("#all-stop"); [cite: 93]
+    const allSkipEl = document.querySelector("#all-skip"); [cite: 93]
+    const allTotalEl = document.querySelector("#all-total"); [cite: 94]
+    const allRemEl = document.querySelector("#all-rem"); [cite: 94]
+    if (allDoneEl) allDoneEl.textContent = overallDone; [cite: 95]
+    if (allStopEl) allStopEl.textContent = overallStop; [cite: 95]
+    if (allSkipEl) allSkipEl.textContent = overallSkip; [cite: 95]
+    if (allTotalEl) allTotalEl.textContent = overallTotal; [cite: 95]
+    if (allRemEl) allRemEl.textContent = (overallTotal - overallDone - overallSkip); [cite: 96]
+    const hint = document.getElementById("overallHint"); [cite: 97]
+    if (hint) { [cite: 97]
+      hint.textContent = overallTotal > 0 ? `総件数：${overallTotal}` : "同期してください"; [cite: 98]
+    } [cite: 97]
+  } [cite: 98]
 
-  // ===== City ページ詳細 =====
-  function rowBg(rec) {
-    if (rec.checked) return "bg-pink";
-    if (rec.status === "7days_rule") return "bg-blue";
-    if (rec.status === "stop") return "bg-gray";
-    if (rec.status === "skip") return "bg-yellow";
-    return "bg-green";
-  }
+  // ===== Pull (ログ取込) 機能 ===== [cite: 99]
+  async function execPullLog() { [cite: 99]
+    const ok = confirm("【Pull】inspectionlogの内容をアプリに反映しますか？"); [cite: 99]
+    if (!ok) return; [cite: 99]
+    try { [cite: 99]
+      showProgress(true, 10); [cite: 99]
+      statusText("ログを取得中..."); [cite: 99]
+      const url = `${GAS_URL}?action=pullLog&_=${Date.now()}`; [cite: 100]
+      const json = await fetchJSONWithRetry(url, 2); [cite: 100]
+      showProgress(true, 50); [cite: 100]
+      if (!json || !json.ok || !Array.isArray(json.rows)) { [cite: 101]
+        throw new Error("ログ取得失敗"); [cite: 101]
+      } [cite: 101]
+      statusText("データ反映中..."); [cite: 101]
+      const logRows = json.rows; [cite: 101]
+      let updatedCount = 0; let addedCount = 0; let deletedCount = 0; [cite: 102]
+      for (const cfg of appConfig) { [cite: 102]
+        let cityData = readCity(cfg.name); [cite: 103]
+        let isCityModified = false; [cite: 103]
+        const cityLogs = logRows.filter(r => r.city === cfg.name); [cite: 104]
+        const validPlates = cityLogs.map(r => r.plate); [cite: 104]
+        const preCount = cityData.length; [cite: 105]
+        cityData = cityData.filter(localRow => validPlates.includes(localRow.plate)); [cite: 105]
+        const postCount = cityData.length; [cite: 105]
+        if (preCount !== postCount) { [cite: 105]
+           deletedCount += (preCount - postCount); [cite: 106]
+           isCityModified = true; [cite: 106]
+        } [cite: 106]
+        cityLogs.forEach(logRow => { [cite: 106]
+          const targetRow = cityData.find(r => r.plate === logRow.plate); [cite: 107]
+          let newChecked = false; let newStatus = ""; [cite: 107]
+          const s = (logRow.status || "").toLowerCase(); [cite: 107]
+          if (s === "checked" || s === "完了" || s === "済") { [cite: 108]
+             newChecked = true; [cite: 108]
+          } else if (s === "stop" || s === "stopped" || s === "停止") { [cite: 108]
+             newStatus = "stop"; [cite: 108]
+          } else if (s === "skip" || s === "unnecessary" || s === "不要") { [cite: 108]
+             newStatus = "skip"; [cite: 109]
+          } else if (s === "7days_rule") { [cite: 109]
+             newStatus = "7days_rule"; [cite: 109]
+          } [cite: 109]
+          let newDate = ""; [cite: 109]
+          if (logRow.date) { [cite: 109]
+            newDate = logRow.date.slice(0, 10); [cite: 110]
+          } [cite: 110]
+          if (targetRow) { [cite: 110]
+            if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) { [cite: 110]
+                targetRow.checked = newChecked; [cite: 110]
+                targetRow.status = newStatus; [cite: 111]
+                targetRow.last_inspected_at = newDate; [cite: 111]
+                isCityModified = true; [cite: 111]
+                updatedCount++; [cite: 111]
+            } [cite: 111]
+          } else { [cite: 111]
+            const newRec = { [cite: 112]
+              city: cfg.name, station: logRow.station, model: logRow.model, [cite: 112]
+              plate: logRow.plate, note: "", operator:"", status: newStatus, [cite: 113]
+              checked: newChecked, last_inspected_at: newDate, [cite: 113]
+              ui_index: logRow.ui_index || "", ui_index_num: 999 [cite: 114]
+            }; [cite: 115]
+            cityData.push(normalizeRow(newRec)); [cite: 115]
+            isCityModified = true; [cite: 116]
+            addedCount++; [cite: 116]
+          } [cite: 111]
+        }); [cite: 106]
+        if (isCityModified) { [cite: 116]
+          applyUIIndex(cfg.name, cityData); [cite: 117]
+          saveCity(cfg.name, cityData); [cite: 117]
+        } [cite: 117]
+      } [cite: 102]
+      repaintCounters(); [cite: 118]
+      showProgress(true, 100); [cite: 118]
+      statusText(`Pull完了 (更新:${updatedCount}, 追加:${addedCount}, 削除:${deletedCount})`); [cite: 118]
+      setTimeout(() => showProgress(false), 2000); [cite: 118]
+    } catch(e) { [cite: 119]
+      statusText("Pull失敗：" + e.message); [cite: 119]
+      showProgress(false); [cite: 119]
+    } [cite: 119]
+  } [cite: 119]
 
-  async function initCity(cityKey) {
-    loadLocalConfig();
-    let targetCfg = appConfig.find(c => c.name === cityKey || c.slug === cityKey);
-    if (!targetCfg) return;
-    const cityName = targetCfg.name;
-    const list = document.getElementById("list");
-    const hint = document.getElementById("hint");
-    let currentFilter = loadFilter(cityName);
+  // ===== index.html 用：初期同期 ===== [cite: 120]
+  async function initIndex() { [cite: 120]
+    loadLocalConfig(); [cite: 120]
+    const workModeSelect = document.getElementById("workModeSelect"); [cite: 121]
+    if (workModeSelect) { [cite: 121]
+      const savedMode = localStorage.getItem("junkai:work_mode") || "single"; [cite: 122]
+      workModeSelect.value = savedMode; [cite: 122]
+      workModeSelect.addEventListener("change", (e) => { [cite: 123]
+        localStorage.setItem("junkai:work_mode", e.target.value); [cite: 123]
+      }); [cite: 123]
+    } [cite: 123]
+    if(document.getElementById("city-list-container")) { [cite: 124]
+       renderIndexButtons(); [cite: 124]
+       repaintCounters(); [cite: 124]
+    } [cite: 124]
+    statusText(""); [cite: 125]
+    const btn = document.getElementById("syncBtn"); [cite: 125]
+    if (btn) { [cite: 126]
+      btn.addEventListener("click", async () => { [cite: 126]
+        if (!confirm("初期同期を実行しますか?")) return; [cite: 126]
+        try { [cite: 126]
+          showProgress(true, 5); [cite: 126]
+          statusText("設定ファイル更新中…"); [cite: 126]
+          await fetchRemoteConfig(); [cite: 126]
+          appConfig.forEach(cfg => { [cite: 126]
+             localStorage.removeItem(LS_KEY(cfg.name)); [cite: 126]
+          }); [cite: 126]
+          statusText("車両データ取得中…"); [cite: 127]
+          const url = `${GAS_URL}?action=pull&_=${Date.now()}`; [cite: 127]
+          showProgress(true, 30); [cite: 127]
+          const json = await fetchJSONWithRetry(url, 2); [cite: 127]
+          showProgress(true, 60); [cite: 127]
+          if (!json || !Array.isArray(json.rows)) throw new Error("bad-shape"); [cite: 127]
+          const buckets = {}; [cite: 128]
+          appConfig.forEach(cfg => buckets[cfg.name] = []); [cite: 128]
+          for (const r of json.rows) { [cite: 128]
+            const norm = normalizeRow(r); [cite: 128]
+            if (buckets[norm.city]) { [cite: 128]
+              buckets[norm.city].push(norm); [cite: 129]
+            } [cite: 128]
+          } [cite: 128]
+          let wrote = 0; [cite: 130]
+          for (const cfg of appConfig) { [cite: 130]
+            const arr = buckets[cfg.name]; [cite: 131]
+            if (arr && arr.length > 0) { [cite: 131]
+              applyUIIndex(cfg.name, arr); [cite: 132]
+              saveCity(cfg.name, arr); [cite: 132]
+              wrote++; [cite: 132]
+            } [cite: 131]
+          } [cite: 130]
+          renderIndexButtons(); [cite: 134]
+          repaintCounters(); [cite: 134]
+          showProgress(true, 100); [cite: 134]
+          statusText("同期完了"); [cite: 134]
+        } catch (e) { [cite: 135]
+          statusText("同期失敗：" + e.message); [cite: 135]
+        } finally { [cite: 136]
+          setTimeout(() => showProgress(false), 400); [cite: 136]
+        } [cite: 136]
+      }); [cite: 126]
+    } [cite: 126]
+    const pullBtn = document.getElementById("pushLogBtn"); [cite: 137]
+    if (pullBtn) { [cite: 138]
+      pullBtn.addEventListener("click", execPullLog); [cite: 138]
+    } [cite: 138]
+  } [cite: 138]
 
-    function renderList() {
-      const arr = readCity(cityName);
-      list.innerHTML = "";
-      const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter));
-      hint.textContent = `件数：${filteredArr.length} / ${arr.length}`;
-      filteredArr.forEach(rec => {
-        const row = document.createElement("div");
-        row.className = `row ${rowBg(rec)}`;
+  async function syncInspectionAll() { [cite: 139]
+    const all = []; [cite: 139]
+    appConfig.forEach(cfg => { [cite: 140]
+      const arr = readCity(cfg.name); [cite: 140]
+      for (const rec of arr) all.push(rec); [cite: 140]
+    }); [cite: 140]
+    try { [cite: 141]
+      await fetch(`${GAS_URL}?action=syncInspection`, { [cite: 142]
+        method: "POST", body: JSON.stringify({ data: all }) [cite: 142]
+      }); [cite: 142]
+    } catch (e) {} [cite: 144]
+  } [cite: 144]
+
+  function rowBg(rec) { [cite: 148]
+    if (rec.checked) return "bg-pink"; [cite: 148]
+    if (rec.status === "7days_rule") return "bg-blue"; [cite: 148]
+    if (rec.status === "stop") return "bg-gray"; [cite: 149]
+    if (rec.status === "skip") return "bg-yellow"; [cite: 149]
+    return "bg-green"; [cite: 149]
+  } [cite: 149]
+
+  function persistCityRec(city, rec) { [cite: 150]
+    const arr = readCity(city); [cite: 150]
+    if (!Array.isArray(arr) || !arr.length) return; [cite: 150]
+    const idx = arr.findIndex(r => r.ui_index === rec.ui_index); [cite: 151]
+    if (idx === -1) return; [cite: 151]
+    arr[idx] = rec; [cite: 151]
+    saveCity(city, arr); [cite: 151]
+    repaintCounters(); [cite: 151]
+  } [cite: 151]
+
+  async function initCity(cityKey) { [cite: 152]
+    loadLocalConfig(); [cite: 152]
+    let targetCfg = appConfig.find(c => c.name === cityKey || c.slug === cityKey); [cite: 153]
+    if (!targetCfg) return; [cite: 154]
+    const cityName = targetCfg.name; [cite: 155]
+    const list = document.getElementById("list"); [cite: 155]
+    const hint = document.getElementById("hint"); [cite: 155]
+    let currentFilter = loadFilter(cityName); [cite: 156]
+    
+    function renderList() { [cite: 158]
+      const arr = readCity(cityName); [cite: 158]
+      list.innerHTML = ""; [cite: 158]
+      const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter)); [cite: 160]
+      hint.textContent = `件数：${filteredArr.length} / ${arr.length}`; [cite: 160]
+      for (const rec of filteredArr) { [cite: 161]
+        const row = document.createElement("div"); [cite: 161]
+        row.className = `row ${rowBg(rec)}`; [cite: 161]
+        const left = document.createElement("div"); [cite: 162]
+        left.className = "leftcol"; [cite: 162]
+        const topLeft = document.createElement("div"); [cite: 163]
+        topLeft.className = "left-top"; [cite: 163]
+        const idxDiv = document.createElement("div"); [cite: 163]
+        idxDiv.className = "idx"; [cite: 163]
+        idxDiv.textContent = rec.ui_index || ""; [cite: 163]
+        const chk = document.createElement("input"); [cite: 164]
+        chk.type = "checkbox"; chk.className = "chk"; chk.checked = !!rec.checked; [cite: 164]
+        chk.dataset.plate = rec.plate; [cite: 164]
+        chk.addEventListener("change", () => { [cite: 173]
+          if (!confirm(`【${rec.plate}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`)) { [cite: 173]
+            chk.checked = !chk.checked; return; [cite: 173]
+          } [cite: 173]
+          rec.checked = chk.checked; [cite: 174]
+          rec.last_inspected_at = chk.checked ? getTodayJST() : ""; [cite: 174]
+          row.className = `row ${rowBg(rec)}`; [cite: 174]
+          persistCityRec(cityName, rec); [cite: 175]
+          syncInspectionAll(); [cite: 175]
+          renderList(); [cite: 175]
+        }); [cite: 173]
+        topLeft.appendChild(idxDiv); topLeft.appendChild(chk); [cite: 173]
+        left.appendChild(topLeft); [cite: 173]
+        const mid = document.createElement("div"); [cite: 176]
+        mid.className = "mid"; [cite: 176]
+        mid.innerHTML = `<div class="title">${rec.station}</div><div class="sub">${rec.model}<br>${rec.plate}</div>`; [cite: 177]
+        const right = document.createElement("div"); [cite: 178]
+        right.className = "rightcol"; [cite: 178]
+        const sel = document.createElement("select"); [cite: 179]
+        sel.className = "state"; [cite: 179]
+        [["", "通常"], ["stop", "停止"], ["skip", "不要"]].forEach(([v, l]) => { [cite: 180]
+          const o = document.createElement("option"); o.value = v; o.textContent = l; [cite: 181]
+          if ((rec.status || "") === v) o.selected = true; [cite: 181]
+          sel.appendChild(o); [cite: 181]
+        }); [cite: 180]
+        sel.addEventListener("change", () => { [cite: 182]
+          rec.status = sel.value; row.className = `row ${rowBg(rec)}`; [cite: 182]
+          persistCityRec(cityName, rec); syncInspectionAll(); renderList(); [cite: 182]
+        }); [cite: 182]
+        const btnGroup = document.createElement("div"); [cite: 183]
+        btnGroup.className = "btn-group"; [cite: 183]
+        const tmaBtn = document.createElement("button"); [cite: 183]
+        tmaBtn.className = "tma-btn"; tmaBtn.textContent = "TMA"; [cite: 183]
         
-        // 左・中央の構築 (簡略化して記述するがロジックは完全維持)
-        const left = document.createElement("div"); left.className = "leftcol";
-        const chk = document.createElement("input"); chk.type = "checkbox"; chk.className = "chk"; chk.checked = !!rec.checked;
-        chk.addEventListener("change", () => {
-          if (!confirm("チェックを切り替えますか?")) { chk.checked = !chk.checked; return; }
-          rec.checked = chk.checked; rec.last_inspected_at = chk.checked ? getTodayJST() : "";
-          row.className = `row ${rowBg(rec)}`; saveCity(cityName, arr); syncInspectionAll(); renderList();
-        });
-        left.innerHTML = `<div class="left-top"><div class="idx">${rec.ui_index}</div></div>`;
-        left.firstChild.appendChild(chk);
-
-        const mid = document.createElement("div"); mid.className = "mid";
-        mid.innerHTML = `<div class="title">${rec.station}</div><div class="sub">${rec.model}<br>${rec.plate}</div>`;
-
-        const right = document.createElement("div"); right.className = "rightcol";
-        const sel = document.createElement("select"); sel.className = "state";
-        [["", "通常"], ["stop", "停止"], ["skip", "不要"]].forEach(([v, l]) => {
-          const o = document.createElement("option"); o.value = v; o.textContent = l;
-          if (rec.status === v) o.selected = true; sel.appendChild(o);
-        });
-        sel.addEventListener("change", () => { rec.status = sel.value; row.className = `row ${rowBg(rec)}`; saveCity(cityName, arr); syncInspectionAll(); renderList(); });
-
-        const btnGroup = document.createElement("div"); btnGroup.className = "btn-group";
-        const tmaBtn = document.createElement("button"); tmaBtn.className = "tma-btn"; tmaBtn.textContent = "TMA";
-
-        // ★★★ TMAボタンの即遷移ロジック ★★★
+        // ★★★ TMAロジックのみ「整理券 ＆ 即遷移」に修正 ★★★ [cite: 184-185]
         tmaBtn.addEventListener("click", () => {
           if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？`)) return;
           tmaBtn.disabled = true; tmaBtn.textContent = "遷移中";
           const requestId = "req-" + Date.now() + "-" + Math.random().toString(36).slice(-4);
-          // GASへ投げっぱなし送信
-          fetch(`${GAS_URL}?action=triggerTMA`, { method: "POST", body: JSON.stringify({ plate: rec.plate, requestId: requestId }), keepalive: true }).catch(() => {});
-          // 即座に遷移
-          const params = new URLSearchParams({ station: rec.station, model: rec.model, plate_full: rec.plate, tma_plate: rec.plate, tma_req_id: requestId });
+          fetch(`${GAS_URL}?action=triggerTMA`, {
+            method: "POST",
+            body: JSON.stringify({ plate: rec.plate, requestId: requestId }),
+            keepalive: true
+          }).catch(() => {});
+          const params = new URLSearchParams({
+            station: rec.station || "", model: rec.model || "", plate_full: rec.plate || "",
+            tma_plate: rec.plate, tma_req_id: requestId
+          });
           location.href = `${WORK_APP_URL}?${params.toString()}`;
         });
 
-        const tireBtn = document.createElement("button"); tireBtn.className = "tire-btn"; tireBtn.textContent = "点検";
-        tireBtn.addEventListener("click", () => { location.href = `${TIRE_APP_URL}?${new URLSearchParams({ station: rec.station, model: rec.model, plate_full: rec.plate }).toString()}`; });
+        const tireBtn = document.createElement("button"); [cite: 187]
+        tireBtn.className = "tire-btn"; tireBtn.textContent = "点検"; [cite: 187]
+        tireBtn.addEventListener("click", () => { [cite: 188]
+          location.href = `${TIRE_APP_URL}?${new URLSearchParams({station:rec.station, model:rec.model, plate_full:rec.plate}).toString()}`; [cite: 188]
+        }); [cite: 188]
+        btnGroup.appendChild(tmaBtn); btnGroup.appendChild(tireBtn); [cite: 189]
+        right.appendChild(sel); right.appendChild(btnGroup); [cite: 189]
+        row.appendChild(left); row.appendChild(mid); row.appendChild(right); [cite: 189]
+        list.appendChild(row); [cite: 189]
+      } [cite: 161]
+    } [cite: 158]
 
-        btnGroup.append(tmaBtn, tireBtn); right.append(sel, btnGroup);
-        row.append(left, mid, right); list.appendChild(row);
-      });
-    }
+    document.getElementById("filterBtn").addEventListener("click", () => { [cite: 191]
+      document.getElementById("filterModal").classList.add("show"); [cite: 191]
+    }); [cite: 191]
+    document.getElementById("filterApply").addEventListener("click", () => { [cite: 192]
+      currentFilter = { [cite: 192]
+        standby: document.getElementById("filter_standby").checked, [cite: 192]
+        stop: document.getElementById("filter_stop").checked, [cite: 192]
+        skip: document.getElementById("filter_skip").checked, [cite: 192]
+        "7days_rule": document.getElementById("filter_7days").checked, [cite: 192]
+        checked: document.getElementById("filter_checked").checked [cite: 192]
+      }; [cite: 192]
+      saveFilter(cityName, currentFilter); [cite: 193]
+      document.getElementById("filterModal").classList.remove("show"); [cite: 193]
+      renderList(); [cite: 193]
+    }); [cite: 192]
+    document.getElementById("filterCancel").addEventListener("click", () => { [cite: 194]
+      document.getElementById("filterModal").classList.remove("show"); [cite: 194]
+    }); [cite: 194]
+    renderList(); [cite: 195]
+  } [cite: 195]
 
-    const fBtn = document.getElementById("filterBtn");
-    if(fBtn) fBtn.addEventListener("click", () => {
-      // フィルタモーダル表示ロジック (省略せず維持)
-      document.getElementById("filterModal").classList.add("show");
-    });
-    const fApply = document.getElementById("filterApply");
-    if(fApply) fApply.addEventListener("click", () => {
-      currentFilter = {
-        standby: document.getElementById("filter_standby").checked,
-        stop: document.getElementById("filter_stop").checked,
-        skip: document.getElementById("filter_skip").checked,
-        "7days_rule": document.getElementById("filter_7days").checked,
-        checked: document.getElementById("filter_checked").checked
-      };
-      saveFilter(cityName, currentFilter); document.getElementById("filterModal").classList.remove("show"); renderList();
-    });
-    const fCancel = document.getElementById("filterCancel");
-    if(fCancel) fCancel.addEventListener("click", () => document.getElementById("filterModal").classList.remove("show"));
+  return { initIndex, initCity }; [cite: 195]
 
-    renderList();
-  }
-
-  return { initIndex, initCity };
-})();
+})(); [cite: 195]
