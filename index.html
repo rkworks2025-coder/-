@@ -2,79 +2,44 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" /> [cite: 6]
   <title>巡回リスト s8a</title>
-  <link rel="stylesheet" href="style.css?v=s8a" />
+  <link rel="stylesheet" href="style.css?v=s8a" /> [cite: 6]
 </head>
 <body>
   <header class="appbar">
-    <div class="title">巡回リスト</div>
+    <div class="title">巡回リスト</div> [cite: 6]
     <div class="btns">
-      <button id="syncBtn" class="btn primary">同期</button>
-      <button id="pushLogBtn" class="btn primary">Pull</button>
+      <button id="syncBtn" class="btn primary">同期</button> [cite: 6]
+      <button id="pushLogBtn" class="btn primary">Pull</button> [cite: 6]
     </div>
   </header>
   <main class="wrap">
     <div class="mode-switch-container">
+      <div class="mode-switch-label">作業モード</div> [cite: 6]
       <select id="workModeSelect" class="mode-switch-select">
-        <option value="single">単独 (TMA自動)</option>
-        <option value="continuous">連続 (TMA手動)</option>
-      </select>
-      <div class="mode-switch-label">作業モード</div>
+        <option value="single">単独 (TMA自動)</option> [cite: 6]
+        <option value="continuous">連続 (TMA手動)</option> [cite: 6]
+      </select> [cite: 7]
     </div>
-    
-    <p id="statusText" class="hint"></p>
-    <section class="cards" id="city-list-container"></section>
+    <p id="statusText" class="hint"></p> [cite: 7]
+    <section class="cards" id="city-list-container"></section> [cite: 7]
     <section class="cards" style="margin-top:8px;">
       <div class="cardlink">
-        <h2>全エリア</h2>
+        <h2>全エリア</h2> [cite: 7]
         <div class="meta">
-          <span class="chip">済 <span id="all-done">0</span></span>
-          <span class="chip">停 <span id="all-stop">0</span></span>
-          <span class="chip">不要 <span id="all-skip">0</span></span>
-          <span class="chip">総 <span id="all-total">0</span></span>
-          <span class="chip">残 <span id="all-rem">0</span></span>
+          <span class="chip">済 <span id="all-done">0</span></span> [cite: 7]
+          <span class="chip">停 <span id="all-stop">0</span></span> [cite: 7]
+          <span class="chip">不要 <span id="all-skip">0</span></span> [cite: 7]
+          <span class="chip">総 <span id="all-total">0</span></span> [cite: 8]
+          <span class="chip">残 <span id="all-rem">0</span></span> [cite: 8]
         </div>
       </div>
     </section>
   </main>
-
+  <div id="progressModal" class="modal"><div class="dialog"><h3>同期中…</h3><div class="barwrap"><div id="progressBar" class="bar"></div></div></div></div> [cite: 8]
+  <script src="app.js?v=s8a"></script> [cite: 8]
+  <script>Junkai.initIndex();</script> [cite: 8]
   <div class="version-label"></div>
-
-  <div id="sync-modal" class="modal">
-    <div class="dialog">
-      <div id="sync-msg">同期中...</div>
-      <div class="barwrap"><div id="sync-bar" class="bar"></div></div>
-    </div>
-  </div>
-
-  <div id="filter-modal" class="modal">
-    <div class="filter-dialog">
-      <h3>表示フィルタ</h3>
-      <div class="filter-options">
-        <div class="filter-option">
-          <input type="checkbox" id="f-done" checked>
-          <label for="f-done">完了 (済)</label>
-        </div>
-        <div class="filter-option">
-          <input type="checkbox" id="f-stop" checked>
-          <label for="f-stop">停止 (停)</label>
-        </div>
-        <div class="filter-option">
-          <input type="checkbox" id="f-skip" checked>
-          <label for="f-skip">スキップ (不要)</label>
-        </div>
-        <div class="filter-option">
-          <input type="checkbox" id="f-rem" checked>
-          <label for="f-rem">未完了 (残)</label>
-        </div>
-      </div>
-      <div class="filter-actions">
-        <button id="filter-close" class="btn">閉じる</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="app.js?v=s8a"></script>
 </body>
 </html>
