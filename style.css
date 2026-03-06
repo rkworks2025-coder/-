@@ -13,7 +13,7 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s6b"; /* TMAボタンUI修正版 */
+  --app-version:"s7a"; /* 作業モード切替UI修正版 */
 }
 
 *{box-sizing:border-box;}
@@ -29,6 +29,36 @@ html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-app
 
 /* iPhone対応：全体マージン */
 .wrap{max-width:940px;margin:8px auto;padding:0 8px 60px;}
+
+/* 作業モード切替スイッチ (index.txt) */
+.mode-switch-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  margin-bottom: 12px;
+}
+.mode-switch-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.mode-switch-select {
+  appearance: none;
+  background: #0f172a; /* 統一感のある黒抜き(濃紺) */
+  color: var(--fg);
+  border: 1px solid var(--line);
+  padding: 6px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+  text-align: center;
+}
 
 /* Hint */
 .hint{color:var(--muted);font-size:12px;margin:4px 2px;}
