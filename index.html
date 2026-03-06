@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>巡回リスト s7a</title>
-  <link rel="stylesheet" href="style.css?v=s7a" />
+  <title>巡回リスト s8a</title>
+  <link rel="stylesheet" href="style.css?v=s8a" />
 </head>
 <body>
   <header class="appbar">
@@ -16,12 +16,13 @@
   </header>
   <main class="wrap">
     <div class="mode-switch-container">
-      <div class="mode-switch-label">作業モード</div>
       <select id="workModeSelect" class="mode-switch-select">
         <option value="single">単独 (TMA自動)</option>
         <option value="continuous">連続 (TMA手動)</option>
       </select>
+      <div class="mode-switch-label">作業モード</div>
     </div>
+    
     <p id="statusText" class="hint"></p>
     <section class="cards" id="city-list-container"></section>
     <section class="cards" style="margin-top:8px;">
@@ -37,9 +38,43 @@
       </div>
     </section>
   </main>
-  <div id="progressModal" class="modal"><div class="dialog"><h3>同期中…</h3><div class="barwrap"><div id="progressBar" class="bar"></div></div></div></div>
-  <script src="app.js?v=s7a"></script>
-  <script>Junkai.initIndex();</script>
-  <div class="version-label">s7a</div>
+
+  <div class="version-label"></div>
+
+  <div id="sync-modal" class="modal">
+    <div class="dialog">
+      <div id="sync-msg">同期中...</div>
+      <div class="barwrap"><div id="sync-bar" class="bar"></div></div>
+    </div>
+  </div>
+
+  <div id="filter-modal" class="modal">
+    <div class="filter-dialog">
+      <h3>表示フィルタ</h3>
+      <div class="filter-options">
+        <div class="filter-option">
+          <input type="checkbox" id="f-done" checked>
+          <label for="f-done">完了 (済)</label>
+        </div>
+        <div class="filter-option">
+          <input type="checkbox" id="f-stop" checked>
+          <label for="f-stop">停止 (停)</label>
+        </div>
+        <div class="filter-option">
+          <input type="checkbox" id="f-skip" checked>
+          <label for="f-skip">スキップ (不要)</label>
+        </div>
+        <div class="filter-option">
+          <input type="checkbox" id="f-rem" checked>
+          <label for="f-rem">未完了 (残)</label>
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button id="filter-close" class="btn">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=s8a"></script>
 </body>
 </html>
