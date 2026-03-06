@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s6g (作業モード切替追加・チェックダイアログ車番表示)
+// version: s7a (オリジナルs6g完全復元・TMAボタン即遷移化)
 
 var Junkai = (() => {
 
@@ -112,8 +112,6 @@ var Junkai = (() => {
   });
 
   // ===== 設定処理 =====
-
-  // 1. ローカルキャッシュのみ読み込む(起動用・通信なし)
   function loadLocalConfig() {
     const cached = localStorage.getItem(LS_CONFIG_KEY);
     if (cached) {
@@ -128,7 +126,6 @@ var Junkai = (() => {
     }
   }
 
-  // 2. GASから設定を強制更新する(初期同期ボタン用)
   async function fetchRemoteConfig() {
     try {
       const json = await fetchJSONWithRetry(`${GAS_URL}?action=config`);
@@ -145,8 +142,6 @@ var Junkai = (() => {
   }
 
   // ===== フィルタ機能 =====
-
-  // デフォルトフィルタ設定
   function getDefaultFilter() {
     return {
       standby: true,      // 未巡回
@@ -157,7 +152,6 @@ var Junkai = (() => {
     };
   }
 
-  // フィルタ設定の読み込み
   function loadFilter(city) {
     try {
       const saved = localStorage.getItem(LS_FILTER_KEY(city));
@@ -170,12 +164,10 @@ var Junkai = (() => {
     return getDefaultFilter();
   }
 
-  // フィルタ設定の保存
   function saveFilter(city, filter) {
     localStorage.setItem(LS_FILTER_KEY(city), JSON.stringify(filter));
   }
 
-  // フィルタラベル生成
   function getFilterLabel(filter) {
     const labels = [];
     if (filter.standby) labels.push("未");
@@ -188,7 +180,6 @@ var Junkai = (() => {
     return labels.join("・");
   }
 
-  // レコードがフィルタ条件に合致するか判定
   function matchesFilter(rec, filter) {
     // チェック済みの判定
     if (rec.checked) {
@@ -229,7 +220,6 @@ var Junkai = (() => {
       a.className = "cardlink";
       a.href = `${slug}.html`; 
       
-   
       if (s === 'help') {
         a.style.borderColor = "#fb7185"; 
       }
@@ -242,7 +232,6 @@ var Junkai = (() => {
       
       meta.innerHTML = `
         <span class="chip">済 <span id="${slug}-done">0</span></span>
-        
         <span class="chip">停 <span id="${slug}-stop">0</span></span>
         <span class="chip">不要 <span id="${slug}-skip">0</span></span>
         <span class="chip">総 <span id="${slug}-total">0</span></span>
@@ -265,8 +254,7 @@ var Junkai = (() => {
       if (!s) return [];
       const a = JSON.parse(s);
       return Array.isArray(a) ? a : [];
-    } catch (_) { return [];
-    }
+    } catch (_) { return []; }
   }
 
   function applyUIIndex(city, arr) {
@@ -286,17 +274,14 @@ var Junkai = (() => {
       address:   (rowObj.address  || "").trim(),
       station:   (rowObj.station  || "").trim(),
       model:     (rowObj.model    || "").trim(),
-      
       plate:     (rowObj.plate    || "").trim(),
       note:      (rowObj.note     || "").trim(),
       operator:  (rowObj.operator || "").trim(),
       status:    (rowObj.status   || "").trim(),
       checked:   !!rowObj.checked,
       last_inspected_at: (rowObj.last_inspected_at || "").trim(),
-      index:     Number.isFinite(+rowObj.index) ?
-      parseInt(rowObj.index, 10) : 0,
-      ui_index:  rowObj.ui_index ||
-      "",
+      index:     Number.isFinite(+rowObj.index) ? parseInt(rowObj.index, 10) : 0,
+      ui_index:  rowObj.ui_index || "",
       ui_index_num: rowObj.ui_index_num || 0
     };
   }
@@ -328,7 +313,6 @@ var Junkai = (() => {
       if(document.getElementById(`${slug}-done`)) {
         document.getElementById(`${slug}-done`).textContent = cnt.done;
         document.getElementById(`${slug}-stop`).textContent = cnt.stop;
- 
         document.getElementById(`${slug}-skip`).textContent = cnt.skip;
         document.getElementById(`${slug}-total`).textContent = cnt.total;
         document.getElementById(`${slug}-rem`).textContent = (cnt.total - cnt.done - cnt.skip);
@@ -401,13 +385,11 @@ var Junkai = (() => {
           let newStatus = ""; 
           const s = (logRow.status || "").toLowerCase();
 
-        
           if (s === "checked" || s === "完了" || s === "済") {
              newChecked = true;
           } else if (s === "stop" || s === "stopped" || s === "停止") {
              newStatus = "stop";
           } else if (s === "skip" || s === "unnecessary" || s === "不要") {
-        
              newStatus = "skip";
           } else if (s === "7days_rule") {
              newStatus = "7days_rule"; 
@@ -418,7 +400,6 @@ var Junkai = (() => {
             newDate = logRow.date.slice(0, 10);
           }
 
- 
           if (targetRow) {
             // ■ 既存更新
             if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) {
@@ -434,14 +415,12 @@ var Junkai = (() => {
               city:    cfg.name,
               station: logRow.station,
               model:   logRow.model,
-         
               plate:   logRow.plate,
               note:    "", 
               operator:"",
               status:  newStatus,
               checked: newChecked,
               last_inspected_at: newDate,
-             
               ui_index: logRow.ui_index || "",
               ui_index_num: 999 
             };
@@ -472,13 +451,11 @@ var Junkai = (() => {
   // ===== index.html 用：初期同期 =====
   async function initIndex() {
     loadLocalConfig();
-    
     // ▼ 作業モード切替UIの初期化
     const workModeSelect = document.getElementById("workModeSelect");
     if (workModeSelect) {
       const savedMode = localStorage.getItem("junkai:work_mode") || "single";
       workModeSelect.value = savedMode;
-      
       workModeSelect.addEventListener("change", (e) => {
         localStorage.setItem("junkai:work_mode", e.target.value);
       });
@@ -503,7 +480,6 @@ var Junkai = (() => {
 
           await fetchRemoteConfig();
           
-       
           appConfig.forEach(cfg => {
              localStorage.removeItem(LS_KEY(cfg.name));
           });
@@ -592,14 +568,6 @@ var Junkai = (() => {
     }
   }
 
-  function within7d(last) {
-    if (!last) return false;
-    const t = Date.parse(last);
-    if (!Number.isFinite(t)) return false;
-    const diff = Date.now() - t;
-    return diff < 7 * 24 * 60 * 60 * 1000;
-  }
-
   function rowBg(rec) {
     if (rec.checked) return "bg-pink";
     if (rec.status === "7days_rule") return "bg-blue";
@@ -661,7 +629,6 @@ var Junkai = (() => {
 
       const filteredArr = arr.filter(rec => matchesFilter(rec, currentFilter));
       hint.textContent = `件数：${filteredArr.length} / ${arr.length}`;
-
       for (const rec of filteredArr) {
         const row = document.createElement("div");
         row.className = `row ${rowBg(rec)}`;
@@ -683,49 +650,9 @@ var Junkai = (() => {
         
         topLeft.appendChild(idxDiv);
         topLeft.appendChild(chk);
-
-        const dtDiv = document.createElement("div");
-        dtDiv.className = "datetime";
-        const dateInput = document.createElement("input");
-        dateInput.type = "date";
-        dateInput.style.cssText = "position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;z-index:-1;";
-        function updateDateTime() {
-          if (rec.last_inspected_at) {
-            let d = new Date(rec.last_inspected_at);
-            if (Number.isFinite(d.getTime())) {
-              const yyyy = String(d.getFullYear());
-              const mm = String(d.getMonth() + 1).padStart(2, "0");
-              const dd = String(d.getDate()).padStart(2, "0");
-              dtDiv.innerHTML = `${yyyy}<br>${mm}/${dd}`;
-              dtDiv.style.display = "";
-              dateInput.value = `${yyyy}-${mm}-${dd}`;
-              return;
-            }
-          }
-          dtDiv.innerHTML = "";
-          dtDiv.style.display = "none";
-          dateInput.value = "";
-        }
-        updateDateTime();
-        dtDiv.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (!rec.checked) return;
-          try { dateInput.focus(); dateInput.showPicker(); } catch (err) { dateInput.click(); }
-        });
-        dateInput.addEventListener("change", () => {
-          if (!dateInput.value) return; 
-          if (confirm("日付を変更しますか?")) {
-            rec.last_inspected_at = dateInput.value;
-            updateDateTime();
-            persistCityRec(cityName, rec);
-            syncInspectionAll(); 
-          }
-        });
         left.appendChild(topLeft);
-        left.appendChild(dtDiv);
-        left.appendChild(dateInput);
 
-        // ▼ チェックボックス操作時のダイアログに車番（plate）を追加
+        // ▼ チェックボックス操作時のダイアログ
         chk.addEventListener("change", () => {
           const msg = `【${rec.plate || "不明"}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`;
           if (!confirm(msg)) {
@@ -735,19 +662,17 @@ var Junkai = (() => {
           if (chk.checked) {
             rec.checked = true;
             rec.last_inspected_at = getTodayJST();
-  
           } else {
             rec.checked = false;
             rec.last_inspected_at = "";
           }
-          updateDateTime();
           row.className = `row ${rowBg(rec)}`;
+  
           persistCityRec(cityName, rec);
           syncInspectionAll();
         
           renderList(); 
         });
-        
         // 中央
         const mid = document.createElement("div");
         mid.className = "mid";
@@ -786,27 +711,35 @@ var Junkai = (() => {
         const tmaBtn = document.createElement("button");
         tmaBtn.className = "tma-btn";
         tmaBtn.textContent = "TMA";
+
+        // ★★★ TMAロジックのみ修正 (s6g からの更新) ★★★
         tmaBtn.addEventListener("click", () => {
-          if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？\n※タイヤのデータが未送信の場合は、先に点検アプリから送信してください。`)) return;
+          if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？`)) return;
           
           tmaBtn.disabled = true;
           tmaBtn.textContent = "遷移中";
           
-          const payload = { plate: rec.plate, mode: "tma" };
+          // 整理券番号（requestId）の生成
+          const requestId = "req-" + Date.now() + "-" + Math.random().toString(36).slice(-4);
+          
+          // 1. GASへバックグラウンド送信
           fetch(`${GAS_URL}?action=triggerTMA`, {
             method: "POST",
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ plate: rec.plate, requestId: requestId }),
             keepalive: true
-          }).catch(e => console.error("TMA trigger error:", e));
+          }).catch(() => {});
           
+          // 2. 即座に作業管理アプリへ遷移
           const params = new URLSearchParams({
             station:    rec.station || "",
             model:      rec.model   || "",
-            plate_full: rec.plate   || ""
+            plate_full: rec.plate   || "",
+            tma_plate:  rec.plate,
+            tma_req_id: requestId
           });
           location.href = `${WORK_APP_URL}?${params.toString()}`;
         });
-        
+
         const tireBtn = document.createElement("button");
         tireBtn.className = "tire-btn";
         tireBtn.textContent = "点検";
@@ -817,7 +750,6 @@ var Junkai = (() => {
             plate_full: rec.plate   || ""
           });
           location.href = `${TIRE_APP_URL}?${params.toString()}`;
-    
         });
 
         btnGroup.appendChild(tmaBtn);
@@ -867,14 +799,6 @@ var Junkai = (() => {
     if (filterCancel) {
       filterCancel.addEventListener("click", () => {
         filterModal.classList.remove("show");
-      });
-    }
-
-    if (filterModal) {
-      filterModal.addEventListener("click", (e) => {
-        if (e.target === filterModal) {
-          filterModal.classList.remove("show");
-        }
       });
     }
 
