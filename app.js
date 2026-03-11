@@ -714,30 +714,54 @@ var Junkai = (() => {
 
         // ★★★ TMAロジックのみ修正 (s6g からの更新) ★★★
         tmaBtn.addEventListener("click", () => {
-          if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？`)) return;
+          const tmaModal = document.getElementById('tmaModal');
+          const tmaModalTitle = document.getElementById('tmaModalTitle');
+          const btnOk = document.getElementById('tmaModalOk');
+          const btnCancel = document.getElementById('tmaModalCancel');
+
+          // モーダルが取得できない場合は標準のconfirmにフォールバック
+          if (!tmaModal || !tmaModalTitle || !btnOk || !btnCancel) {
+            if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？`)) return;
+            executeTma();
+            return;
+          }
+
+          tmaModalTitle.textContent = `【${rec.plate}】`;
+          tmaModal.classList.add('show');
+
+          btnOk.onclick = () => {
+            tmaModal.classList.remove('show');
+            executeTma();
+          };
+
+          btnCancel.onclick = () => {
+            tmaModal.classList.remove('show');
+          };
           
-          tmaBtn.disabled = true;
-          tmaBtn.textContent = "遷移中";
-          
-          // 整理券番号（requestId）の生成
-          const requestId = "req-" + Date.now() + "-" + Math.random().toString(36).slice(-4);
-          
-          // 1. GASへバックグラウンド送信
-          fetch(`${GAS_URL}?action=triggerTMA`, {
-            method: "POST",
-            body: JSON.stringify({ plate: rec.plate, requestId: requestId }),
-            keepalive: true
-          }).catch(() => {});
-          
-          // 2. 即座に作業管理アプリへ遷移
-          const params = new URLSearchParams({
-            station:    rec.station || "",
-            model:      rec.model   || "",
-            plate_full: rec.plate   || "",
-            tma_plate:  rec.plate,
-            tma_req_id: requestId
-          });
-          location.href = `${WORK_APP_URL}?${params.toString()}`;
+          function executeTma() {
+            tmaBtn.disabled = true;
+            tmaBtn.textContent = "遷移中";
+            
+            // 整理券番号（requestId）の生成
+            const requestId = "req-" + Date.now() + "-" + Math.random().toString(36).slice(-4);
+            
+            // 1. GASへバックグラウンド送信
+            fetch(`${GAS_URL}?action=triggerTMA`, {
+              method: "POST",
+              body: JSON.stringify({ plate: rec.plate, requestId: requestId }),
+              keepalive: true
+            }).catch(() => {});
+            
+            // 2. 即座に作業管理アプリへ遷移
+            const params = new URLSearchParams({
+              station:    rec.station || "",
+              model:      rec.model   || "",
+              plate_full: rec.plate   || "",
+              tma_plate:  rec.plate,
+              tma_req_id: requestId
+            });
+            location.href = `${WORK_APP_URL}?${params.toString()}`;
+          }
         });
 
         const tireBtn = document.createElement("button");
