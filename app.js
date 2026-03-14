@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s8b (TMAモーダル対応 ＋ 前回点検日時表示の復元)
+// version: s8c (TMAモーダル対応 ＋ 前回点検日時表示 MM/DD 化)
 
 var Junkai = (() => {
 
@@ -652,11 +652,16 @@ var Junkai = (() => {
         topLeft.appendChild(chk);
         left.appendChild(topLeft);
 
-        // ★★★ 修正: 前回点検日時の表示を復元 ★★★
+        // ★★★ 修正: 前回点検日時の表示 (MM/DD形式) ★★★
         if (rec.last_inspected_at) {
           const dtDiv = document.createElement("div");
           dtDiv.className = "datetime";
-          dtDiv.textContent = rec.last_inspected_at;
+          let dispDate = rec.last_inspected_at;
+          // YYYY-MM-DD 形式の場合、MM/DD の部分だけを抽出
+          if (dispDate.length >= 10 && dispDate.charAt(4) === '-') {
+            dispDate = dispDate.substring(5, 10).replace('-', '/');
+          }
+          dtDiv.textContent = dispDate;
           left.appendChild(dtDiv);
         }
 
