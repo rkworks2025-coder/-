@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s7a (オリジナルs6g完全復元・TMAボタン即遷移化)
+// version: s8b (TMAモーダル対応 ＋ 前回点検日時表示の復元)
 
 var Junkai = (() => {
 
@@ -652,6 +652,14 @@ var Junkai = (() => {
         topLeft.appendChild(chk);
         left.appendChild(topLeft);
 
+        // ★★★ 修正: 前回点検日時の表示を復元 ★★★
+        if (rec.last_inspected_at) {
+          const dtDiv = document.createElement("div");
+          dtDiv.className = "datetime";
+          dtDiv.textContent = rec.last_inspected_at;
+          left.appendChild(dtDiv);
+        }
+
         // ▼ チェックボックス操作時のダイアログ
         chk.addEventListener("change", () => {
           const msg = `【${rec.plate || "不明"}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`;
@@ -712,7 +720,7 @@ var Junkai = (() => {
         tmaBtn.className = "tma-btn";
         tmaBtn.textContent = "TMA";
 
-        // ★★★ TMAロジックのみ修正 (s6g からの更新) ★★★
+        // ★★★ TMAロジック (カスタムモーダル対応版) ★★★
         tmaBtn.addEventListener("click", () => {
           const tmaModal = document.getElementById('tmaModal');
           const tmaModalTitle = document.getElementById('tmaModalTitle');
