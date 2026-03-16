@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s8c (TMAモーダル対応 ＋ 前回点検日時表示 MM/DD 化)
+// version: s9a (エリア汎用化対応 ＋ TMAモーダル対応 ＋ 前回点検日時表示 MM/DD 化)
 
 var Junkai = (() => {
 
@@ -218,7 +218,8 @@ var Junkai = (() => {
       
       const a = document.createElement("a");
       a.className = "cardlink";
-      a.href = `${slug}.html`; 
+      // ★変更: 汎用ページ(area.html)へパラメータを渡す
+      a.href = `area.html?city=${slug}`; 
       
       if (s === 'help') {
         a.style.borderColor = "#fb7185"; 
@@ -543,7 +544,7 @@ var Junkai = (() => {
     }
   }
 
-  // ===== city ページ =====
+  // ===== city / area ページ =====
   async function syncInspectionAll() {
     const all = [];
     appConfig.forEach(cfg => {
@@ -598,9 +599,15 @@ var Junkai = (() => {
 
     if (!targetCfg) {
       const h = document.getElementById("hint");
-      if(h) h.textContent = "設定エラー：Config未ロード";
+      if(h) h.textContent = "設定エラー：Config未ロードまたは無効なエリアです";
       return;
     }
+
+    // ★追加: ページタイトルの動的変更
+    const pageTitle = document.getElementById("pageTitle");
+    const headerTitle = document.getElementById("headerTitle");
+    if (pageTitle) pageTitle.textContent = targetCfg.name;
+    if (headerTitle) headerTitle.textContent = targetCfg.name;
 
     const list = document.getElementById("list");
     const hint = document.getElementById("hint");
@@ -652,7 +659,7 @@ var Junkai = (() => {
         topLeft.appendChild(chk);
         left.appendChild(topLeft);
 
-        // ★★★ 修正: 前回点検日時の表示 (MM/DD形式) ★★★
+        // 前回点検日時の表示 (MM/DD形式)
         if (rec.last_inspected_at) {
           const dtDiv = document.createElement("div");
           dtDiv.className = "datetime";
@@ -725,14 +732,13 @@ var Junkai = (() => {
         tmaBtn.className = "tma-btn";
         tmaBtn.textContent = "TMA";
 
-        // ★★★ TMAロジック (カスタムモーダル対応版) ★★★
+        // TMAロジック
         tmaBtn.addEventListener("click", () => {
           const tmaModal = document.getElementById('tmaModal');
           const tmaModalTitle = document.getElementById('tmaModalTitle');
           const btnOk = document.getElementById('tmaModalOk');
           const btnCancel = document.getElementById('tmaModalCancel');
 
-          // モーダルが取得できない場合は標準のconfirmにフォールバック
           if (!tmaModal || !tmaModalTitle || !btnOk || !btnCancel) {
             if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？`)) return;
             executeTma();
@@ -843,6 +849,18 @@ var Junkai = (() => {
     renderList();
   }
 
-  return { initIndex, initCity };
+  // ★追加: area.html 用の初期化エントリーポイント
+  async function initAreaPage() {
+    const params = new URLSearchParams(window.location.search);
+    const cityKey = params.get('city');
+    if (!cityKey) {
+      const hint = document.getElementById("hint");
+      if(hint) hint.textContent = "パラメータエラー：対象エリアが指定されていません";
+      return;
+    }
+    await initCity(cityKey);
+  }
+
+  return { initIndex, initCity, initAreaPage };
 
 })();
