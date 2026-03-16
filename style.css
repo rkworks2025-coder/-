@@ -13,7 +13,7 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s9a"; /* エリア汎用化対応版 */
+  --app-version:"s9a";
 }
 
 *{box-sizing:border-box;}
@@ -98,7 +98,7 @@ font-size: 16px; line-height: 1.3; }
 
 .row .mid{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .row .title{font-weight:800;font-size:15px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2;}
-.row .sub{color:#cbd5f5;white-space:normal;line-height:1.1;font-size:12px;}
+.row .sub{color:#cbd5f5;white-space:normal;line-height:1.1;font-size:14px;}
 
 .rightcol{display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
 .state{padding:4px 6px;border:1px solid var(--line);border-radius:10px;background:#020617;color:var(--fg);font-size:13px;cursor:pointer;}
