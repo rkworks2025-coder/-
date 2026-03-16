@@ -1,11 +1,11 @@
 // 巡回アプリ app.js
-// version: s9a (エリア汎用化対応 ＋ TMAモーダル対応 ＋ 前回点検日時表示 MM/DD 化)
+// version: s9b (TireCheck URL更新)
 
 var Junkai = (() => {
 
   // ===== 設定 =====
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
-  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/Tire_Check/";
+  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/TireCheck/";
   const WORK_APP_URL = "https://rkworks2025-coder.github.io/work/";
   const LS_CONFIG_KEY = "junkai:config";
   const TIMEOUT_MS = 15000;
