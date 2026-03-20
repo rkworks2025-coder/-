@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s9c (TMA自動発火ロジックの堅牢化：監視タイマー導入)
+// version: s9d (TMAモーダル表示内容の拡張：車種表示追加)
 
 var Junkai = (() => {
 
@@ -555,12 +555,15 @@ var Junkai = (() => {
         tmaBtn.addEventListener("click", () => {
           const tmaModal = document.getElementById('tmaModal');
           const tmaModalTitle = document.getElementById('tmaModalTitle');
+          const tmaModalModel = document.getElementById('tmaModalModel');
           const btnOk = document.getElementById('tmaModalOk');
           if (!tmaModal || !tmaModalTitle || !btnOk) {
-            if(!confirm(`【${rec.plate}】\nTMA自動入力を実行します覚？`)) return;
+            if(!confirm(`【${rec.plate}】\nTMA自動入力を実行しますか？`)) return;
             executeTma(); return;
           }
-          tmaModalTitle.textContent = `【${rec.plate}】`; tmaModal.classList.add('show');
+          tmaModalTitle.textContent = `【${rec.plate}】`;
+          if (tmaModalModel) tmaModalModel.textContent = rec.model || "";
+          tmaModal.classList.add('show');
           btnOk.onclick = () => { tmaModal.classList.remove('show'); executeTma(); };
           document.getElementById('tmaModalCancel').onclick = () => tmaModal.classList.remove('show');
           function executeTma() {
