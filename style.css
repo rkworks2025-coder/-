@@ -13,7 +13,7 @@
   --blue:#38bdf8;
 
   --accent:#38bdf8;
-  --app-version:"s9b";
+  --app-version:"s9d";
 }
 
 *{box-sizing:border-box;}
@@ -69,8 +69,8 @@ font-size: 16px; line-height: 1.3; }
 
 .empty{color:var(--muted);font-size:14px;margin-top:10px;}
 
-/* モーダル */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:50;}
+/* モーダル：配置を下部にオフセット (親指が届きやすい位置) */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;padding-bottom:15vh;z-index:50;}
 .modal.show{display:flex;}
 .dialog{width:min(480px,90vw);background:#020617;color:#fff;border-radius:12px;padding:16px 14px;border:1px solid #111827;}
 .barwrap{height:8px;background:#020617;border-radius:999px;overflow:hidden;margin-top:10px;border:1px solid #1f2937;}
