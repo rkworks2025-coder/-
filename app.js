@@ -1,5 +1,5 @@
 // 巡回アプリ app.js
-// version: s9d (TMAモーダル表示内容の拡張：車種表示追加)
+// version: s9d (チェック操作のオリジナルモーダル化)
 
 var Junkai = (() => {
 
@@ -523,15 +523,48 @@ var Junkai = (() => {
           dtDiv.textContent = dispDate;
           left.appendChild(dtDiv);
         }
-        chk.addEventListener("change", () => {
-          if (!confirm(`【${rec.plate}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`)) {
-            chk.checked = !chk.checked; return;
+        
+        // チェック操作ロジック（オリジナルモーダル化）
+        chk.addEventListener("change", (e) => {
+          const checkModal = document.getElementById('checkModal');
+          const checkModalTitle = document.getElementById('checkModalTitle');
+          const checkModalModel = document.getElementById('checkModalModel');
+          const checkModalMsg = document.getElementById('checkModalMsg');
+          const btnOk = document.getElementById('checkModalOk');
+          const btnCancel = document.getElementById('checkModalCancel');
+
+          if (!checkModal || !checkModalTitle || !btnOk) {
+            // モーダルが取得できない場合のフォールバック
+            if (!confirm(`【${rec.plate}】\n${chk.checked ? "チェックしますか?" : "外しますか?"}`)) {
+              chk.checked = !chk.checked; return;
+            }
+            executeCheck(); return;
           }
-          rec.checked = chk.checked;
-          rec.last_inspected_at = chk.checked ? getTodayJST() : "";
-          row.className = `row ${rowBg(rec)}`;
-          persistCityRec(cityName, rec); syncInspectionAll(); renderList(); 
+
+          // モーダル表示
+          checkModalTitle.textContent = `【${rec.plate}】`;
+          if (checkModalModel) checkModalModel.textContent = rec.model || "";
+          if (checkModalMsg) checkModalMsg.textContent = chk.checked ? "チェックしますか？" : "外しますか？";
+          checkModal.classList.add('show');
+
+          btnOk.onclick = () => {
+            checkModal.classList.remove('show');
+            executeCheck();
+          };
+
+          btnCancel.onclick = () => {
+            checkModal.classList.remove('show');
+            chk.checked = !chk.checked; // 状態を元に戻す
+          };
+
+          function executeCheck() {
+            rec.checked = chk.checked;
+            rec.last_inspected_at = chk.checked ? getTodayJST() : "";
+            row.className = `row ${rowBg(rec)}`;
+            persistCityRec(cityName, rec); syncInspectionAll(); renderList(); 
+          }
         });
+
         const mid = document.createElement("div");
         mid.className = "mid";
         const title = document.createElement("div"); title.className = "title"; title.textContent = rec.station || "";
