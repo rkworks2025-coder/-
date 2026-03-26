@@ -602,7 +602,6 @@ var Junkai = (() => {
           function executeTma() {
             tmaBtn.disabled = true; tmaBtn.textContent = "遷移中";
             const requestId = "req-" + Date.now() + "-" + Math.random().toString(36).slice(-4);
-            fetch(`${GAS_URL}?action=triggerTMA`, { method: "POST", body: JSON.stringify({ plate: rec.plate, requestId: requestId }), keepalive: true }).catch(() => {});
             
             const params = new URLSearchParams({ 
               station: rec.station || "", 
@@ -619,6 +618,7 @@ var Junkai = (() => {
               localStorage.removeItem("junkai:preloaded_splash_url");
             }
 
+            // 現場の電波負荷を抑えるため、GASへの送信は作業管理アプリ側へ一本化（ここでは遷移のみ）
             location.href = `${WORK_APP_URL}?${params.toString()}`;
           }
         });
