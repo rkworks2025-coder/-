@@ -603,7 +603,22 @@ var Junkai = (() => {
             tmaBtn.disabled = true; tmaBtn.textContent = "遷移中";
             const requestId = "req-" + Date.now() + "-" + Math.random().toString(36).slice(-4);
             fetch(`${GAS_URL}?action=triggerTMA`, { method: "POST", body: JSON.stringify({ plate: rec.plate, requestId: requestId }), keepalive: true }).catch(() => {});
-            const params = new URLSearchParams({ station: rec.station || "", model: rec.model || "", plate_full: rec.plate || "", tma_plate: rec.plate, tma_req_id: requestId });
+            
+            const params = new URLSearchParams({ 
+              station: rec.station || "", 
+              model: rec.model || "", 
+              plate_full: rec.plate || "", 
+              tma_plate: rec.plate, 
+              tma_req_id: requestId 
+            });
+
+            // ★タイヤ点検アプリがプリロードした画像URLがあれば引き継ぐ
+            const preloadedImg = localStorage.getItem("junkai:preloaded_splash_url");
+            if (preloadedImg) {
+              params.set("splash_img", preloadedImg);
+              localStorage.removeItem("junkai:preloaded_splash_url");
+            }
+
             location.href = `${WORK_APP_URL}?${params.toString()}`;
           }
         });
