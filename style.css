@@ -1,165 +1,232 @@
-:root{
-  /* ダークモード用カラー定義 */
-  --fg:#e5e7eb;
-  --muted:#9ca3af;
-  --card:#020617;
-  --line:#1f2937;
-
-  /* ステータスカラー */
-  --green:#22c55e;
-  --pink:#fb7185;
-  --gray:#6b7280;
-  --yellow:#eab308;
-  --blue:#38bdf8;
-
-  --accent:#38bdf8;
-  --app-version:"s9f";
+:root{ --bg:#111; --fg:#eee; --muted:#9aa; --card:#1a1a1a; --brand:#ff8c00; --line:#1f2937; }
+*{ box-sizing:border-box; }
+body{ margin:0; background:var(--bg); color:var(--fg);
+font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
 }
 
-*{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:#020617;color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;}
+/* 全体のパディングを圧縮 (16px -> 8px) */
+.wrap{ padding: 8px; max-width:740px; margin:0 auto; padding-bottom: 20px; }
 
-/* App Bar */
-.appbar{position:sticky;top:0;z-index:20;background:#020617;border-bottom:1px solid #111827;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px;}
-.appbar .title{font-weight:800;letter-spacing:.02em;font-size:20px;}
-.appbar .btns{display:flex;gap:8px;}
-.btn{appearance:none;border:1px solid var(--line);background:#020617;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;color:var(--fg);cursor:pointer;white-space:nowrap;}
-.btn.primary{background:#0f172a;border-color:#1d4ed8;color:#bfdbfe;}
-.btn:hover{background:#0f172a;}
+/* ヘッダーの余白調整 */
+header{ display:flex; align-items:center; justify-content:space-between;
+padding: 8px 16px; }
+h1{ font-size: 17px; margin:0; }
 
-/* iPhone対応：全体マージン */
-.wrap{max-width:940px;margin:8px auto;padding:0 8px 60px;}
+.ver-badge{ position:fixed; right:10px; top:10px; background:#222; color:#fff; padding:6px 10px; border-radius:10px; font-weight:700; font-size:12px;
+border:1px solid #333; z-index:100; }
 
-/* Hint */
-.hint{color:var(--muted);font-size:12px;margin:4px 2px;}
-
-/* Grid Gap */
-.cards{display:grid;grid-template-columns:1fr;gap:6px;}
-
-/* カードリンク */
-.cardlink{display:block;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;}
-.cardlink:hover{background:#020617;border-color:#334155;}
-
-/* カード内タイトル */
-.cardlink h2 { margin: 0;
-font-size: 16px; line-height: 1.3; }
-
-/* メタ情報(チップコンテナ) */
-.meta{display:flex;gap:4px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:6px;}
-
-/* チップと数値のサイズアップ */
-.chip {
-  display:inline-flex;
-  align-items:center;
-  gap:3px;
-  background:#111827;
-  border:1px solid var(--line);
-  border-radius:999px;
-  padding:2px 6px;
-  color:var(--muted);
-  font-size:11px;
-  height:24px;
-}
-.chip span {
-  font-weight:700;
-  color:#f3f4f6;
-  font-size:13px;
-  letter-spacing: -0.5px;
+/* カードのパディング圧縮 (16px -> 10px) */
+.card{ background:var(--card); border-radius:12px; padding: 10px;
 }
 
-.empty{color:var(--muted);font-size:14px;margin-top:10px;}
+/* タイトルの余白・サイズ調整 */
+.title{ margin: 0 0 8px; font-weight:700; color:#fff; font-size: 14px; border-bottom:1px solid #333; padding-bottom: 4px;
+}
 
-/* モーダル：配置を下部にオフセット (親指が届きやすい位置) */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;padding-bottom:25vh;z-index:50;}
-.modal.show{display:flex;}
-.dialog{width:min(480px,90vw);background:#020617;color:#fff;border-radius:12px;padding:16px 14px;border:1px solid #111827;}
-.barwrap{height:8px;background:#020617;border-radius:999px;overflow:hidden;margin-top:10px;border:1px solid #1f2937;}
-.bar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399);}
+/* 車両情報の圧縮 */
+.veh-info { display:flex; flex-direction:column; gap: 2px; margin-bottom: 8px; background: #141414; padding: 8px; border-radius: 8px; border: 1px solid #2a2a2a;
+}
+.info-item { font-size: 14px; font-weight: bold; }
+.info-item .label { color: var(--muted); font-weight: normal; font-size: 12px; display: inline-block; width: 35px;
+}
 
-/* フィルタモーダル用スタイル */
-.filter-dialog{width:min(360px,90vw);background:#020617;color:#fff;border-radius:12px;padding:20px;border:1px solid #111827;}
-.filter-dialog h3{margin:0 0 16px 0;font-size:16px;font-weight:700;}
-.filter-options{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
-.filter-option{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0f172a;border:1px solid var(--line);border-radius:8px;}
-.filter-option input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:#38bdf8;}
-.filter-option label{font-size:14px;cursor:pointer;flex:1;}
-.filter-actions{display:flex;gap:10px;justify-content:flex-end;}
-.filter-actions .btn{min-width:80px;}
+/* ▼ 変更: ストップウォッチエリアをflex化してTMAボタンと横並びに */
+.stopwatch-container { display: flex; align-items: center; margin: 8px 0; }
+/* ストップウォッチは左エリア(flex:1)内で右寄せ → 視覚的に中央寄り */
+#stopwatch { flex: 1; text-align: right; font-size: 42px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; color: #fff; line-height: 1; text-shadow: 0 0 8px rgba(255,140,0,0.3);
+}
 
-/* リスト */
-.list{display:flex;flex-direction:column;gap:8px;}
-.row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:8px;position:relative;overflow:hidden;}
-.row::before{content:"";position:absolute;top:0;bottom:0;left:0;width:4px;background:transparent;border-radius:14px 0 0 14px;}
-.row::after{content:"";position:absolute;top:0;bottom:0;right:0;width:4px;background:transparent;border-radius:0 14px 14px 0;}
+/* ▼ 追加: TMAボタン (巡回アプリのスタイルをそのまま流用) */
+.tma-btn { margin-left: 12px; padding: 8px 14px; font-size: 13px; border-radius: 10px; border: 1px solid #0d9488; background: var(--bg); color: #2dd4bf; cursor: pointer; font-weight: 700; white-space: nowrap; }
+.tma-btn:hover { background: #0f172a; border-color: #14b8a6; color: #5eead4; }
+.tma-btn:disabled { border-color: #374151; color: #4b5563; cursor: not-allowed; }
 
-.row .idx{font-weight:800;color:#e5e7eb;}
-.row .leftcol{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
-.row .left-top{display:flex;align-items:center;gap:6px;}
+/* 解錠・施錠エリアの大幅圧縮 (Main Target) */
+.time-stamp{ display:grid; grid-template-columns:1fr 1fr; gap: 8px; margin-top: 6px; }
+.stamp-card{ background:#141414; border:1px solid #2a2a2a; border-radius:8px; padding: 6px;
+text-align: center; }
+.stamp-head{ display:flex; justify-content:center; align-items:center; margin-bottom: 2px; }
+.stamp-title{ font-weight:700; color: var(--muted); font-size: 12px;
+}
+/* 時刻の文字サイズ縮小 (26px -> 20px) */
+.stamp-time{ font-size: 20px; font-weight:bold; letter-spacing:0px; color: #fff; line-height: 1.2; }
 
-.row .mid{display:flex;flex-direction:column;gap:2px;min-width:0;}
-.row .title{font-weight:800;font-size:15px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2;}
-.row .sub{color:#cbd5f5;white-space:normal;line-height:1.1;font-size:14px;}
+/* 備忘録チェック項目の行間圧縮（左右反転を追加） */
+.check-row { display: flex;
+flex-direction: row-reverse; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #333; }
+.check-row:last-child { border-bottom: none; padding-bottom: 0;
+}
+.check-label { font-size: 14px; font-weight: bold; }
 
-.rightcol{display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
-.state{padding:4px 6px;border:1px solid var(--line);border-radius:10px;background:#020617;color:var(--fg);font-size:13px;cursor:pointer;}
+/* トグルボタン、プルダウンのスリム化 */
+.toggle-group { display: flex; background: #222; border-radius: 8px; overflow: hidden;
+border: 1px solid #333; }
+.toggle-btn { flex: 1; padding: 6px 12px; background: transparent; border: none; color: #aaa; font-size: 14px;
+font-weight: bold; cursor: pointer; transition: 0.2s; }
+.toggle-btn.active { background: var(--brand); color: #000; }
 
-.btn-group{display:flex;gap:4px;}
+.select-group { display: flex; align-items: center; gap: 6px;
+}
+.select-group select { background: #222; color: #fff; border: 1px solid #444; padding: 6px 10px; border-radius: 8px; font-size: 15px; outline: none;
+appearance: none; text-align: center; min-width: 50px; }
+.select-group .slash { color: #666; font-size: 16px; }
 
-/* タイヤ点検ボタン */
-.tire-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid var(--line);background:#020617;color:var(--fg);cursor:pointer;font-weight:700;}
-.tire-btn:hover{background:#0f172a;}
+/* ボタンのスタイル変更 (べた塗りを廃止しアウトラインへ統一) */
+.btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.1s;
+}
+.btn:active { opacity: 0.7; }
 
-/* TMAボタン (ダークUI調和・アウトライン型) */
-.tma-btn{padding:8px 12px;font-size:13px;border-radius:10px;border:1px solid #0d9488;background:#020617;color:#2dd4bf;cursor:pointer;font-weight:700;}
-.tma-btn:hover{background:#0f172a;border-color:#14b8a6;color:#5eead4;}
-.tma-btn:disabled{background:#020617;border-color:#374151;color:#4b5563;cursor:not-allowed;}
+/* OK、作業完了用 (アウトラインオレンジ) */
+.btn.primary {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: transparent;
+}
 
-/* 背景色 */
-.bg-green{background:var(--card);border:1px solid var(--green);}
-.bg-green::before,.bg-green::after{background:var(--green);}
-.bg-pink{background:var(--card);border:1px solid var(--pink);}
-.bg-pink::before,.bg-pink::after{background:var(--pink);}
-.bg-gray{background:var(--card);border:1px solid var(--gray);}
-.bg-gray::before,.bg-gray::after{background:var(--gray);}
-.bg-yellow{background:var(--card);border:1px solid var(--yellow);}
-.bg-yellow::before,.bg-yellow::after{background:var(--yellow);}
-.bg-blue{background:var(--card);border:1px solid var(--blue);}
-.bg-blue::before,.bg-blue::after{background:var(--blue);}
+.toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:16px; background:#222;
+border:1px solid #333; color:#fff; padding:10px 18px; border-radius:10px; z-index:999; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
 
-.ver{position:fixed;right:8px;bottom:6px;font-size:10px;color:#64748b;opacity:.7;pointer-events:none;z-index:9;}
-.datetime{font-size:12px;color:#9ca3af;line-height:1.2;text-align:left;white-space:normal;}
+/* フッターセクションの余白詰める */
+.foot.section{ margin-top: 10px; padding-top: 8px; border-top:1px dashed #333; }
 
-.version-label{position:fixed;right:8px;bottom:8px;font-size:11px;color:var(--muted);opacity:.8;pointer-events:none;z-index:9999;}
-.version-label::before{content:"ver ";}
-.version-label::after{content:var(--app-version);}
+/* スプラッシュ画面の設定 */
+#splash { position: fixed; inset: 0; z-index: 9999;
+background: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+#splash img { width: 100%; height: 100%; object-fit: cover;
+}
 
-/* 作業モード切り替え (2行レイアウト) */
-.mode-switch-container{margin:4px 2px 12px;padding:0 2px;}
-.mode-switch-label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;}
-.mode-switch-select{display:block;appearance:none;background:#0f172a;border:1px solid var(--line);border-radius:10px;color:var(--fg);padding:8px 32px 8px 12px;font-size:14px;font-weight:700;cursor:pointer;color-scheme:dark;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:16px;}
+/* メッセージブロック全体を斜めにして配置 */
+#splash .msg { 
+  position: absolute; 
+  bottom: 10%; 
+  width: 100%; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center;
+  transform: rotate(-8deg);
+  line-height: 1.5;
+}
+/* フォントサイズを大幅にアップ */
+#splash .msg-line1, #splash .msg-line2 { 
+  font-family: 'Yomogi', sans-serif;
+  color: #fff; 
+  font-size: 44px; 
+  font-weight: bold; 
+  text-shadow: 2px 2px 6px #000; 
+  padding: 0 10px;
+}
+#splash .msg-line1 { 
+  background: linear-gradient(transparent 55%, rgba(255, 140, 0, 0.8) 55%); 
+  margin-right: 80px;
+  z-index: 2; 
+}
+#splash .msg-line2 { 
+  background: linear-gradient(transparent 55%, rgba(255, 64, 129, 0.8) 55%);
+  margin-left: 80px;
+  z-index: 1; 
+}
 
-/* チェックボックス */
-.chk{width:18px;height:18px;cursor:pointer;accent-color:#38bdf8;}
+/* オリジナルモーダル設定 */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 15vh;
+  z-index: 10000;
+}
+.modal.show { display: flex; }
 
-/* TMA確認用カスタムモーダル */
-.tma-confirm-actions {
+.dialog {
+  width: min(480px, 90vw);
+  background: #020617;
+  color: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.modal-msg {
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.modal-actions {
   display: flex;
   gap: 12px;
-  margin-top: 24px;
-  flex-direction: row; 
 }
-.tma-confirm-actions .btn {
-  flex: 1; 
-  padding: 12px 0; 
+
+.modal-actions .btn {
+  flex: 1;
+  padding: 12px 0;
   font-size: 16px;
+  font-weight: bold;
 }
-.tma-confirm-actions .btn-ok {
+
+/* ▼ 追加: TMAモーダル用アクションボタン (巡回アプリの .tma-confirm-actions と同等) */
+.tma-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+.tma-modal-actions .btn {
+  flex: 1;
+  padding: 12px 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+.tma-modal-actions .btn-ok {
   background: #020617;
   border: 1px solid #0d9488;
   color: #2dd4bf;
 }
-.tma-confirm-actions .btn-ok:hover {
+.tma-modal-actions .btn-ok:hover {
   background: #0f172a;
   border-color: #14b8a6;
   color: #5eead4;
+}
+
+/* スマホ用調整 */
+@media (max-width: 480px) {
+  .wrap { padding: 6px;
+  }
+  .card { padding: 8px; }
+  header { padding: 6px 10px; }
+  h1 { font-size: 16px;
+  }
+  #stopwatch { font-size: 36px; }
+  .time-stamp { gap: 6px; margin-top: 4px; }
+  .stamp-card { padding: 4px;
+  }
+  .stamp-time { font-size: 18px; }
+  .check-label { font-size: 13px; }
+  .select-group select { padding: 4px 8px;
+  font-size: 14px; min-width: 45px; }
+  .toggle-btn { padding: 4px 10px; font-size: 13px;
+  }
+  
+  /* スマホ版のメッセージサイズと行間調整 */
+  #splash .msg { line-height: 1.6;
+  }
+  #splash .msg-line1, #splash .msg-line2 { font-size: 38px; }
+  #splash .msg-line1 { margin-right: 40px;
+  }
+  #splash .msg-line2 { margin-left: 40px; }
 }
