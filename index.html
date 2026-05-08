@@ -1,44 +1,129 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>巡回リスト s9b</title>
-  <link rel="stylesheet" href="style.css?v=s9b" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>作業管理 V1J</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Yomogi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=V1J"/>
 </head>
 <body>
-  <header class="appbar">
-    <div class="title">巡回リスト</div>
-    <div class="btns">
-      <button id="syncBtn" class="btn primary">同期</button>
-      <button id="pushLogBtn" class="btn primary">Pull</button>
+  <div id="splash">
+    <img id="splashImg" src="" alt="Loading...">
+    <div class="msg">
+      <div class="msg-line1">作業スタート！</div>
+      <div class="msg-line2">頑張って！♥</div>
     </div>
-  </header>
-  <main class="wrap">
-    <div class="mode-switch-container">
-      <div class="mode-switch-label">作業モード</div>
-      <select id="workModeSelect" class="mode-switch-select">
-        <option value="single">単独 (TMA自動)</option>
-        <option value="continuous">連続 (TMA手動)</option>
-      </select>
-    </div>
-    <p id="statusText" class="hint"></p>
-    <section class="cards" id="city-list-container"></section>
-    <section class="cards" style="margin-top:8px;">
-      <div class="cardlink">
-        <h2>全エリア</h2>
-        <div class="meta">
-          <span class="chip">済 <span id="all-done">0</span></span>
-          <span class="chip">停 <span id="all-stop">0</span></span>
-          <span class="chip">不要 <span id="all-skip">0</span></span>
-          <span class="chip">総 <span id="all-total">0</span></span>
-          <span class="chip">残 <span id="all-rem">0</span></span>
+  </div>
+
+  <div class="ver-badge">V1J</div>
+  <header><h1>作業管理</h1></header>
+  
+  <div class="wrap">
+    <div class="card">
+      <div class="veh-info">
+        <div class="info-item"><span class="label">ST:</span> <span id="disp_station">--</span></div>
+        <div class="info-item"><span class="label">車種:</span> <span id="disp_model">--</span></div>
+        <div class="info-item"><span class="label">車番:</span> <span id="disp_plate">--</span></div>
+      </div>
+      
+      <!-- ▼ 変更: flex化してTMAボタンを右端に追加 -->
+      <div class="stopwatch-container">
+        <div id="stopwatch">00:00</div>
+        <button id="workTmaBtn" class="tma-btn" type="button">TMA</button>
+      </div>
+
+      <div class="time-stamp">
+        <div class="stamp-card">
+          <div class="stamp-head"><div class="stamp-title">解錠</div></div>
+          <div id="unlockTime" class="stamp-time">--:--</div>
+        </div>
+        <div class="stamp-card">
+          <div class="stamp-head"><div class="stamp-title">施錠</div></div>
+          <div id="lockTime" class="stamp-time">--:--</div>
         </div>
       </div>
-    </section>
-  </main>
-  <div id="progressModal" class="modal"><div class="dialog"><h3>同期中…</h3><div class="barwrap"><div id="progressBar" class="bar"></div></div></div></div>
-  <script src="app.js?v=s9b"></script>
-  <script>Junkai.initIndex();</script>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="check-row">
+        <div class="check-label">ジュニアシート</div>
+        <div class="toggle-group" id="tg_junior">
+          <button type="button" class="toggle-btn active" data-val="無">無</button>
+          <button type="button" class="toggle-btn" data-val="有">有</button>
+        </div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-label">ジャッキ</div>
+        <div class="toggle-group" id="tg_jack">
+          <button type="button" class="toggle-btn active" data-val="無">無</button>
+          <button type="button" class="toggle-btn" data-val="有">有</button>
+        </div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-label">パンク修理剤 期限</div>
+        <div class="select-group">
+          <select id="sel_punk_mm"><option value="">月</option></select> <span class="slash">/</span>
+          <select id="sel_punk_yy"><option value="">年</option></select>
+        </div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-label">発煙筒 期限</div>
+        <div class="select-group">
+          <select id="sel_flare_mm"><option value="">月</option></select> <span class="slash">/</span>
+          <select id="sel_flare_yy"><option value="">年</option></select>
+        </div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-label">忘れ物</div>
+        <div class="toggle-group" id="tg_lost">
+          <button type="button" class="toggle-btn active" data-val="無">無</button>
+          <button type="button" class="toggle-btn" data-val="有">有</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot section" style="margin-top:16px;">
+      <button id="completeBtn" class="btn primary" type="button" style="width:100%; font-size:18px; padding:14px; font-weight:bold;">作業完了</button>
+    </div>
+  </div>
+
+  <!-- 作業完了・TMA失敗再送確認用モーダル (既存) -->
+  <div id="confirmModal" class="modal">
+    <div class="dialog">
+      <div class="modal-msg">作業を完了しますか？</div>
+      <div class="modal-actions">
+        <button id="modalOkBtn" class="btn primary">OK</button>
+        <button id="modalCancelBtn" class="btn">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ▼ 追加: TMA手動再実行用モーダル -->
+  <div id="workTmaModal" class="modal">
+    <div class="dialog">
+      <h3 id="workTmaModalTitle" style="margin:0 0 6px 0; font-size:18px;"></h3>
+      <p id="workTmaModalModel" style="margin:0 0 10px 0; color:var(--fg); font-size:15px; font-weight:bold;"></p>
+      <p style="margin:0; color:var(--muted); font-size:14px;">TMA自動入力を再実行しますか？</p>
+      <div class="tma-modal-actions">
+        <button id="workTmaModalOk" class="btn btn-ok">OK</button>
+        <button id="workTmaModalCancel" class="btn">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div> 
+  <script>
+    window.TMA_GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
+    window.SHEETS_URL = "https://script.google.com/macros/s/AKfycbyo2U1_TBxvzhJL50GHY8S0NeT1k0kueWb4tI1q2Oaw87NuGXqwjO7PWyCDdqFNZTdz/exec";
+    window.SHEETS_KEY = "tl1";
+  </script>
+  <script src="app.js?v=V1J" defer></script>
 </body>
 </html>
