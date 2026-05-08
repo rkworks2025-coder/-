@@ -33,7 +33,7 @@ border:1px solid #333; z-index:100; }
 /* ▼ 変更: ストップウォッチエリアをflex化してTMAボタンと横並びに */
 .stopwatch-container { display: flex; align-items: center; margin: 8px 0; }
 /* ストップウォッチは左エリア(flex:1)内で右寄せ → 視覚的に中央寄り */
-#stopwatch { flex: 1; text-align: right; font-size: 42px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; color: #fff; line-height: 1; text-shadow: 0 0 8px rgba(255,140,0,0.3);
+#stopwatch { flex: 1; text-align: center; font-size: 42px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; color: #fff; line-height: 1; text-shadow: 0 0 8px rgba(255,140,0,0.3);
 }
 
 /* ▼ 追加: TMAボタン (巡回アプリのスタイルをそのまま流用) */
