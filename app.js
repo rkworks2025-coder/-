@@ -632,6 +632,7 @@ var Junkai = (() => {
           }
         });
         const tireBtn = document.createElement("button"); tireBtn.className = "tire-btn"; tireBtn.textContent = "点検";
+        tireBtn.dataset.tirePlate = rec.plate || "";
         tireBtn.addEventListener("click", () => {
           const params = new URLSearchParams({ station: rec.station || "", model: rec.model || "", plate_full: rec.plate || "" });
           location.href = `${TIRE_APP_URL}?${params.toString()}`;
@@ -678,19 +679,37 @@ var Junkai = (() => {
   async function initAreaPage() {
     const params = new URLSearchParams(window.location.search);
     const cityKey = params.get('city');
-
-    // nextパラメータがあれば即座にそのURLへリダイレクト（JKS-IIからの中継）
-    const next = params.get('next');
-    if (next) {
-      location.href = decodeURIComponent(next);
-      return;
-    }
-
     if (!cityKey) {
       if(document.getElementById("hint")) document.getElementById("hint").textContent = "対象エリア未指定";
       return;
     }
     await initCity(cityKey);
+
+    // JKS-IIからの自動点検ボタンクリック
+    const autoPlate   = localStorage.getItem('junkai:auto_tire_plate');
+    const autoStation = localStorage.getItem('junkai:auto_tire_station');
+    if (autoPlate && autoStation) {
+      localStorage.removeItem('junkai:auto_tire_plate');
+      localStorage.removeItem('junkai:auto_tire_station');
+      localStorage.removeItem('junkai:auto_tire_model');
+
+      // 最大3秒間、該当車両の点検ボタンが描画されるのを待ってクリック
+      let retryCount = 0;
+      const interval = setInterval(() => {
+        const tireBtns = document.querySelectorAll('[data-tire-plate]');
+        let found = false;
+        tireBtns.forEach(btn => {
+          if (btn.dataset.tirePlate === autoPlate) {
+            clearInterval(interval);
+            btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => btn.click(), 300);
+            found = true;
+          }
+        });
+        if (found) return;
+        if (++retryCount >= 30) clearInterval(interval);
+      }, 100);
+    }
   }
 
   return { initIndex, initCity, initAreaPage };
