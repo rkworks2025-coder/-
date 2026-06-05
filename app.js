@@ -678,6 +678,14 @@ var Junkai = (() => {
   async function initAreaPage() {
     const params = new URLSearchParams(window.location.search);
     const cityKey = params.get('city');
+
+    // nextパラメータがあれば即座にそのURLへリダイレクト（JKS-IIからの中継）
+    const next = params.get('next');
+    if (next) {
+      location.href = decodeURIComponent(next);
+      return;
+    }
+
     if (!cityKey) {
       if(document.getElementById("hint")) document.getElementById("hint").textContent = "対象エリア未指定";
       return;
