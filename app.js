@@ -143,15 +143,17 @@ var Junkai = (() => {
       handleReturnActions();
       // auto_tire_plateの処理（initAreaPageと同じロジック）
       if (autoPlate) {
-        const autoStation = localStorage.getItem('junkai:auto_tire_station');
         const tireBtns = document.querySelectorAll('[data-tire-plate]');
         tireBtns.forEach(btn => {
           if (btn.dataset.tirePlate === autoPlate) {
-            localStorage.removeItem('junkai:auto_tire_plate');
-            localStorage.removeItem('junkai:auto_tire_station');
-            localStorage.removeItem('junkai:auto_tire_model');
             btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setTimeout(() => btn.click(), 300);
+            setTimeout(() => {
+              const ok = confirm(`【${autoPlate}】\n点検を開始しますか？`);
+              localStorage.removeItem('junkai:auto_tire_plate');
+              localStorage.removeItem('junkai:auto_tire_station');
+              localStorage.removeItem('junkai:auto_tire_model');
+              if (ok) btn.click();
+            }, 300);
           }
         });
       }
@@ -725,11 +727,7 @@ var Junkai = (() => {
     const autoPlate   = localStorage.getItem('junkai:auto_tire_plate');
     const autoStation = localStorage.getItem('junkai:auto_tire_station');
     if (autoPlate && autoStation) {
-      localStorage.removeItem('junkai:auto_tire_plate');
-      localStorage.removeItem('junkai:auto_tire_station');
-      localStorage.removeItem('junkai:auto_tire_model');
-
-      // 最大3秒間、該当車両の点検ボタンが描画されるのを待ってクリック
+      // 最大3秒間、該当車両の点検ボタンが描画されるのを待ってモーダル表示
       let retryCount = 0;
       const interval = setInterval(() => {
         const tireBtns = document.querySelectorAll('[data-tire-plate]');
@@ -738,7 +736,19 @@ var Junkai = (() => {
           if (btn.dataset.tirePlate === autoPlate) {
             clearInterval(interval);
             btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setTimeout(() => btn.click(), 300);
+            setTimeout(() => {
+              const ok = confirm(`【${autoPlate}】\n点検を開始しますか？`);
+              if (ok) {
+                localStorage.removeItem('junkai:auto_tire_plate');
+                localStorage.removeItem('junkai:auto_tire_station');
+                localStorage.removeItem('junkai:auto_tire_model');
+                btn.click();
+              } else {
+                localStorage.removeItem('junkai:auto_tire_plate');
+                localStorage.removeItem('junkai:auto_tire_station');
+                localStorage.removeItem('junkai:auto_tire_model');
+              }
+            }, 300);
             found = true;
           }
         });
