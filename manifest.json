@@ -2,7 +2,7 @@
   "name": "巡回アプリ",
   "short_name": "巡回",
   "description": "カーシェア巡回管理アプリ",
-  "start_url": "./index.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0f1a",
   "theme_color": "#0a0f1a",
