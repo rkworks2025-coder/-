@@ -501,7 +501,7 @@ var Junkai = (() => {
     const btn = document.getElementById("syncBtn");
     if (btn) {
       btn.addEventListener("click", async () => {
-        if (!confirm("【注意】初期同期を実行します。よろしいですか?（今回分のみが対象で、前回分には影響しません）")) return;
+        if (!confirm("【注意】初期同期を実行します。よろしいですか?（今回分・前回分とも作り直し、inspectionlogにも自動反映します）")) return;
         try {
           showProgress(true, 5);
           statusText("設定ファイル更新中…");
@@ -534,8 +534,29 @@ var Junkai = (() => {
               wrote++;
             }
           }
+          // 前回分も同様に全体管理から作り直す。チェック済み等の状態は
+          // このあとPullを実行すればinspectionlogから復元されるため、
+          // ここでは今回分と同じく単純に作り直してよい。
+          if (Array.isArray(json.prevRows) && json.prevRows.length > 0) {
+            appConfig.forEach(cfg => localStorage.removeItem(LS_KEY(cfg.name, "prev")));
+            const prevBuckets = {};
+            appConfig.forEach(cfg => prevBuckets[cfg.name] = []);
+            for (const r of json.prevRows) {
+              const norm = normalizeRow(r);
+              if (prevBuckets[norm.city]) prevBuckets[norm.city].push(norm);
+            }
+            for (const cfg of appConfig) {
+              const arr = prevBuckets[cfg.name];
+              if (arr && arr.length > 0) {
+                applyUIIndex(cfg.name, arr);
+                saveCity(cfg.name, arr, "prev");
+              }
+            }
+          }
           renderIndexButtons(); repaintCounters();
-          showProgress(true, 100); statusText("同期完了（今回分）");
+          statusText("同期データをinspectionlogへ反映中…");
+          await syncInspectionAll();
+          showProgress(true, 100); statusText("同期完了（inspectionlogにも反映済み）");
         } catch (e) {
           statusText("同期失敗：" + e.message);
         } finally { setTimeout(() => showProgress(false), 400); }
