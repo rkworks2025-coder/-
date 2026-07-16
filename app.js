@@ -554,6 +554,8 @@ var Junkai = (() => {
             }
           }
           renderIndexButtons(); repaintCounters();
+          statusText("サーバー側の作業記録を復元中…");
+          await mergeLogNonDestructive();
           statusText("同期データをinspectionlogへ反映中…");
           await syncInspectionAll();
           showProgress(true, 100); statusText("同期完了（inspectionlogにも反映済み）");
@@ -566,6 +568,50 @@ var Junkai = (() => {
     if (pullBtn) {
       pullBtn.textContent = "Pull"; 
       pullBtn.addEventListener("click", execPullLog);
+    }
+  }
+
+  /**
+   * inspectionlogから既存の作業記録（チェック済み・ステータス・日付）だけを
+   * 復元する。execPullLogと違い、無い分の削除や新規追加は一切行わない
+   * （同期直後、サーバー側の実際の状態を壊さずにローカルへ反映するための処理）。
+   * inspectionlogがまだ空（新規ラウンド立ち上げ時）の場合は何も起きない。
+   */
+  async function mergeLogNonDestructive() {
+    try {
+      const url = `${GAS_URL}?action=pullLog&_=${Date.now()}`;
+      const json = await fetchJSONWithRetry(url, 2);
+      if (!json || !json.ok || !Array.isArray(json.rows)) return;
+      const logRows = json.rows;
+      for (const roundTag of ["current", "prev"]) {
+        const roundRows = logRows.filter(r => (r.round || "current") === roundTag);
+        for (const cfg of appConfig) {
+          const cityData = readCity(cfg.name, roundTag);
+          if (cityData.length === 0) continue;
+          let isCityModified = false;
+          const cityLogs = roundRows.filter(r => r.city === cfg.name);
+          cityLogs.forEach(logRow => {
+            const targetRow = cityData.find(r => r.plate === logRow.plate);
+            if (!targetRow) return; // 新規追加・削除はしない
+            let newChecked = false, newStatus = "";
+            const s = (logRow.status || "").toLowerCase();
+            if (s === "checked" || s === "完了" || s === "済") newChecked = true;
+            else if (s === "stop" || s === "stopped" || s === "停止") newStatus = "stop";
+            else if (s === "skip" || s === "unnecessary" || s === "不要") newStatus = "skip";
+            else if (s === "7days_rule") newStatus = "7days_rule";
+            const newDate = logRow.date ? logRow.date.slice(0, 10) : "";
+            if (targetRow.checked !== newChecked || targetRow.status !== newStatus || targetRow.last_inspected_at !== newDate) {
+              targetRow.checked = newChecked;
+              targetRow.status = newStatus;
+              targetRow.last_inspected_at = newDate;
+              isCityModified = true;
+            }
+          });
+          if (isCityModified) saveCity(cfg.name, cityData, roundTag);
+        }
+      }
+    } catch (e) {
+      console.warn("mergeLogNonDestructive failed", e);
     }
   }
 
@@ -807,6 +853,46 @@ var Junkai = (() => {
 
     if (document.getElementById("filterCancel")) {
       document.getElementById("filterCancel").addEventListener("click", () => filterModal.classList.remove("show"));
+    }
+
+    const addVehicleBtn = document.getElementById("addVehicleBtn");
+    const addVehicleModal = document.getElementById("addVehicleModal");
+    if (addVehicleBtn && addVehicleModal) {
+      addVehicleBtn.addEventListener("click", () => {
+        document.getElementById("addVehicleStation").value = "";
+        document.getElementById("addVehicleModel").value = "";
+        document.getElementById("addVehiclePlate").value = "";
+        addVehicleModal.classList.add("show");
+      });
+      const addVehicleCancel = document.getElementById("addVehicleCancel");
+      if (addVehicleCancel) {
+        addVehicleCancel.addEventListener("click", () => addVehicleModal.classList.remove("show"));
+      }
+      const addVehicleOk = document.getElementById("addVehicleOk");
+      if (addVehicleOk) {
+        addVehicleOk.addEventListener("click", () => {
+          const station = (document.getElementById("addVehicleStation").value || "").trim();
+          const model = (document.getElementById("addVehicleModel").value || "").trim();
+          const plate = (document.getElementById("addVehiclePlate").value || "").trim();
+          if (!plate) { alert("プレート番号は必須です"); return; }
+          const arr = readCity(cityName, round);
+          if (arr.some(r => r.plate === plate)) {
+            alert(`【${plate}】は既にリストに存在します`);
+            return;
+          }
+          const newRec = normalizeRow({
+            city: cityName, station: station, model: model, plate: plate,
+            note: "", operator: "", status: "", checked: false, last_inspected_at: "",
+            ui_index: "", ui_index_num: arr.length + 1
+          });
+          arr.push(newRec);
+          applyUIIndex(cityName, arr);
+          saveCity(cityName, arr, round);
+          syncInspectionAll();
+          addVehicleModal.classList.remove("show");
+          renderList();
+        });
+      }
     }
 
     updateFilterButton();
