@@ -75,6 +75,27 @@ var Junkai = (() => {
     throw lastErr || new Error("fetch-fail");
   }
 
+  // visibilitychangeでフォアグラウンドに戻った時に自動PULLを実行する。
+  // 前回PULLから60秒以内なら実行しない（余分なリクエストを抑制）。
+  const PULL_INTERVAL_MS = 60 * 1000;
+  let lastPullTime = 0;
+
+  async function autoPullIfNeeded() {
+    const now = Date.now();
+    if (now - lastPullTime < PULL_INTERVAL_MS) return;
+    lastPullTime = now;
+    try {
+      await executePullLog();
+      renderList();
+    } catch(e) {
+      console.warn('自動PULL失敗:', e);
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') autoPullIfNeeded();
+  });
+
   // ===== 戻り時の自動アクション (強化版) =====
   function handleReturnActions() {
     // 1. 作業管理アプリからの戻り -> 自動チェック
@@ -479,6 +500,7 @@ var Junkai = (() => {
       }
     }
     repaintCounters();
+    lastPullTime = Date.now();
     return { updatedCount, addedCount, deletedCount };
   }
 
