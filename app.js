@@ -78,13 +78,16 @@ var Junkai = (() => {
   // フォアグラウンド復帰検知はiOSのStandalone/WebViewでは不安定なため、
   // renderList()の呼び出し時に経過時間をチェックして自動PULLする方式にする。
   const PULL_INTERVAL_MS = 10 * 1000;
-  let lastPullTime = 0;
+  // lastPullTimeはlocalStorageで共有（同一オリジンのポータル版・WebView版間で同期）
+  const LAST_PULL_LS_KEY = "junkai:last_pull_time";
+  const getLastPullTime = () => Number(localStorage.getItem(LAST_PULL_LS_KEY) || 0);
+  const setLastPullTime = (t) => localStorage.setItem(LAST_PULL_LS_KEY, String(t));
   let _pullInProgress = false;
 
   async function autoPullIfNeeded() {
     if (_pullInProgress) return;
     const now = Date.now();
-    if (now - lastPullTime < PULL_INTERVAL_MS) return;
+    if (now - getLastPullTime() < PULL_INTERVAL_MS) return;
     _pullInProgress = true;
     try {
       await executePullLog();
@@ -435,7 +438,7 @@ var Junkai = (() => {
       statusText("ログを取得中...");
       const result = await executePullLog();
       // PULL完了後、lastPullTimeをリセットして次回エリアページ表示時に即反映
-      lastPullTime = 0;
+      setLastPullTime(0);
       showProgress(true, 100);
       statusText(`Pull完了 (更新:${result.updatedCount}, 追加:${result.addedCount}, 削除:${result.deletedCount})`);
       setTimeout(() => showProgress(false), 2000);
@@ -500,7 +503,7 @@ var Junkai = (() => {
       }
     }
     repaintCounters();
-    lastPullTime = Date.now();
+    setLastPullTime(Date.now());
     return { updatedCount, addedCount, deletedCount };
   }
 
@@ -657,15 +660,9 @@ var Junkai = (() => {
       const h=document.getElementById("hint");
       if(h) h.textContent="送信中...";
       await fetch(`${GAS_URL}?action=syncInspection`, { method: "POST", body: JSON.stringify({ data: all }) });
-      // PUSH完了後にサイレントPULLを実行し、GAS側の最新判定（7days_rule等）を反映する
-      try {
-        await executePullLog();
-        // PULL完了後、lastPullTimeをリセットする。
-        // これにより、別の版に切り替えた時に即座に自動PULLが走る。
-        lastPullTime = 0;
-      } catch(e) {
-        console.warn('自動PULL失敗:', e);
-      }
+      // PUSH完了後、lastPullTimeをリセットする。
+      // これにより、次回エリアページ表示時（10秒チェック）に自動PULLが走る。
+      setLastPullTime(0);
       if(h) {
         h.textContent="送信成功";
         setTimeout(()=>h.textContent=`件数：${all.length}`, 1500);
@@ -724,7 +721,7 @@ var Junkai = (() => {
     function renderList() {
       // 前回PULLから時間が経過していれば自動PULLを実行し、完了後に再描画する
       // ただしPULL中も既存キャッシュで先に描画してフリーズを防ぐ
-      if (Date.now() - lastPullTime >= PULL_INTERVAL_MS && !_pullInProgress) {
+      if (Date.now() - getLastPullTime() >= PULL_INTERVAL_MS && !_pullInProgress) {
         autoPullIfNeeded().then(() => renderList());
         // PULLを待たずに現在のキャッシュで先に描画する（fall through）
       }
