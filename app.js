@@ -75,28 +75,19 @@ var Junkai = (() => {
     throw lastErr || new Error("fetch-fail");
   }
 
-  // フォアグラウンド復帰検知はiOSのStandalone/WebViewでは不安定なため、
-  // renderList()の呼び出し時に経過時間をチェックして自動PULLする方式にする。
-  const PULL_INTERVAL_MS = 10 * 1000;
-  // lastPullTimeはlocalStorageで共有（同一オリジンのポータル版・WebView版間で同期）
-  const LAST_PULL_LS_KEY = "junkai:last_pull_time";
-  const getLastPullTime = () => Number(localStorage.getItem(LAST_PULL_LS_KEY) || 0);
-  const setLastPullTime = (t) => localStorage.setItem(LAST_PULL_LS_KEY, String(t));
-  let _pullInProgress = false;
-
-  async function autoPullIfNeeded() {
-    if (_pullInProgress) return;
-    const now = Date.now();
-    if (now - getLastPullTime() < PULL_INTERVAL_MS) return;
-    _pullInProgress = true;
+  // エリアページがフォアグラウンドに戻った時にPULLを実行する。
+  async function pullOnVisible() {
     try {
       await executePullLog();
     } catch(e) {
       console.warn('自動PULL失敗:', e);
-    } finally {
-      _pullInProgress = false;
     }
   }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pullOnVisible();
+  });
+  window.addEventListener('pageshow', () => pullOnVisible());
+  window.addEventListener('focus', () => pullOnVisible());
 
   // ===== 戻り時の自動アクション (強化版) =====
   function handleReturnActions() {
@@ -437,8 +428,6 @@ var Junkai = (() => {
       showProgress(true, 10);
       statusText("ログを取得中...");
       const result = await executePullLog();
-      // PULL完了後、lastPullTimeをリセットして次回エリアページ表示時に即反映
-      setLastPullTime(0);
       showProgress(true, 100);
       statusText(`Pull完了 (更新:${result.updatedCount}, 追加:${result.addedCount}, 削除:${result.deletedCount})`);
       setTimeout(() => showProgress(false), 2000);
@@ -503,7 +492,6 @@ var Junkai = (() => {
       }
     }
     repaintCounters();
-    setLastPullTime(Date.now());
     return { updatedCount, addedCount, deletedCount };
   }
 
@@ -660,9 +648,6 @@ var Junkai = (() => {
       const h=document.getElementById("hint");
       if(h) h.textContent="送信中...";
       await fetch(`${GAS_URL}?action=syncInspection`, { method: "POST", body: JSON.stringify({ data: all }) });
-      // PUSH完了後、lastPullTimeをリセットする。
-      // これにより、次回エリアページ表示時（10秒チェック）に自動PULLが走る。
-      setLastPullTime(0);
       if(h) {
         h.textContent="送信成功";
         setTimeout(()=>h.textContent=`件数：${all.length}`, 1500);
@@ -719,12 +704,6 @@ var Junkai = (() => {
     }
 
     function renderList() {
-      // 前回PULLから時間が経過していれば自動PULLを実行し、完了後に再描画する
-      // ただしPULL中も既存キャッシュで先に描画してフリーズを防ぐ
-      if (Date.now() - getLastPullTime() >= PULL_INTERVAL_MS && !_pullInProgress) {
-        autoPullIfNeeded().then(() => renderList());
-        // PULLを待たずに現在のキャッシュで先に描画する（fall through）
-      }
       const arr = readCity(cityName, round);
       list.innerHTML = "";
       if (arr.length === 0) { hint.textContent = "データなし"; return; }
