@@ -4,9 +4,9 @@
 var Junkai = (() => {
 
   // ===== 設定 =====
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyhvDaXPbZQWkhGDbt2XkUZhwe2-xprpC9U_6s3JuPeXoD2fxAGsVXePvZasId5I1zUyQ/exec";
-  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/TJM_TireCheck/";
-  const WORK_APP_URL = "https://rkworks2025-coder.github.io/TJM_work/";
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXbPaarnD7mQa_rqm6mk-Os3XBH6C731aGxk7ecJC5U3XjtwfMkeF429rezkAo79jN/exec";
+  const TIRE_APP_URL = "https://rkworks2025-coder.github.io/TireCheck/";
+  const WORK_APP_URL = "https://rkworks2025-coder.github.io/work/";
   const LS_CONFIG_KEY = "junkai:config";
   const LS_ROUND_KEY = "junkai:active_round"; // "current" または "prev"
   const TIMEOUT_MS = 15000;
@@ -847,6 +847,7 @@ var Junkai = (() => {
           }
         });
         const tireBtn = document.createElement("button"); tireBtn.className = "tire-btn"; tireBtn.textContent = "点検";
+        tireBtn.dataset.tirePlate = rec.plate || "";
         tireBtn.addEventListener("click", () => {
           // JKS-II経由の場合のlocalStorageをクリア（ループ防止）
           localStorage.removeItem('junkai:auto_tire_plate');
@@ -945,7 +946,6 @@ var Junkai = (() => {
 
     // セッション開始時に1回だけ自動PULLを実行する。
     // ポータル版との切り替え時に最新のinspectionlogを反映するため。
-    // sessionStorageでフラグ管理し、同セッション内での重複実行を防ぐ。
     if (!sessionStorage.getItem('junkai:session_pulled')) {
       sessionStorage.setItem('junkai:session_pulled', '1');
       try {
