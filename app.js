@@ -892,7 +892,7 @@ var Junkai = (() => {
       const addVehicleOk = document.getElementById("addVehicleOk");
       if (addVehicleOk) {
         addVehicleOk.addEventListener("click", () => {
-          const station = (document.getElementById("addVehicleStation").value || "").trim();
+          const station = (document.getElementById("addVehicleStation").value || "").trim().replace(/[0-9]/g, d => String.fromCharCode(d.charCodeAt(0) + 0xFEE0));
           const model = (document.getElementById("addVehicleModel").value || "").trim();
           const plate = (document.getElementById("addVehiclePlate").value || "").trim();
           if (!plate) { alert("プレート番号は必須です"); return; }
